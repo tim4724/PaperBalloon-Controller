@@ -17,10 +17,10 @@
 	<string>5ZH48MPAM3</string>
 	<key>provisioningProfiles</key>
 	<dict>
-		<key>games.couchpad.controller</key>
-		<string>CouchPad App Store</string>
-		<key>games.couchpad.controller.Clip</key>
-		<string>CouchPad Clip App Store</string>
+		<key>games.paperballoon.controller</key>
+		<string>Paper Balloon App Store</string>
+		<key>games.paperballoon.controller.Clip</key>
+		<string>Paper Balloon Clip App Store</string>
 	</dict>
 	<key>uploadSymbols</key>
 	<true/>

@@ -12,7 +12,7 @@ plugins {
 }
 
 android {
-  namespace = "games.couchpad.controller.baselineprofile"
+  namespace = "games.paperballoon.controller.baselineprofile"
   compileSdk = 37
   compileSdkMinor = 2
   defaultConfig {

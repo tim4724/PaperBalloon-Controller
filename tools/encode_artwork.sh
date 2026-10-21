@@ -6,7 +6,7 @@
 # Deliberately NOT a build step. Artwork changes once per game, not once per
 # build, so encoding on every build would put libwebp on every dev machine and
 # both CI runners to reproduce a file that is already in git — and it still
-# wouldn't cover the copies couchpad.games serves, which live in another repo.
+# wouldn't cover the copies paperballoon.games serves, which live in another repo.
 # Run this when the art changes; commit what it writes.
 #
 # 1280x720 is the ceiling both apps decode to (MAX_ART_* in Android's GameUi.kt,
@@ -25,7 +25,7 @@ MAX_WIDTH=1280
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 android="$root/android/app/src/main/assets/artwork"
-ios="$root/ios/CouchPad/Resources/artwork"
+ios="$root/ios/PaperBalloon/Resources/artwork"
 
 if [ $# -eq 0 ]; then
   cat >&2 <<'USAGE'

@@ -60,7 +60,7 @@
     <string name="game_end_generic">派对结束了</string>
 
     <string name="error_empty_code">代码为空。</string>
-    <string name="error_not_couchpad_room">这不是 CouchPad 房间的代码。</string>
+    <string name="error_not_paperballoon_room">这不是 Paper Balloon 房间的代码。</string>
     <string name="error_enter_room_code">请输入房间代码。</string>
     <string name="error_code_unmatched">目前无法将此代码匹配到游戏。</string>
     <string name="error_room_not_found_or_expired">房间未找到或已过期。</string>

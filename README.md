@@ -1,6 +1,6 @@
-# CouchPad Controller
+# Paper Balloon Controller
 
-Native **controller** apps for the CouchPad party-game suite. The
+Native **controller** apps for the Paper Balloon party-game suite. The
 TV/computer is the display; phones are the controllers: scan the room code the
 display shows and your phone becomes the gamepad.
 
@@ -11,7 +11,7 @@ an app update.
 
 [CONTRACT.md](CONTRACT.md) is the launcher⇄game contract: the player name
 and its rename sheet, leaving, the status-bar color scheme, the safe area, and the
-`_couchpad._tcp` room advertisement that puts a one-tap join card on home with no
+`_paperballoon._tcp` room advertisement that puts a one-tap join card on home with no
 scan at all: a **native** display app (tvOS / Android TV) announces its room code,
 and a controller already in a room relays it so browser-hosted rooms are findable
 too. Both apps implement it identically.
@@ -45,7 +45,7 @@ telemetry (CAMERA permission, with manual room-code entry as the fallback).
 ```sh
 cd ios
 xcodegen generate    # brew install xcodegen, once
-open CouchPad.xcodeproj
+open PaperBalloon.xcodeproj
 ```
 
 QR scanning uses AVFoundation (camera permission) and degrades to manual
@@ -55,7 +55,7 @@ room-code entry in the simulator.
 
 Both apps ship the 11 HexStacker locales (en + de, es, fr, it, ja, ko, pt, ru,
 tr, zh): Android in `res/values[-XX]/strings.xml`, iOS in
-`CouchPad/Resources/*.xcstrings`. Per-game display copy (e.g. player counts)
+`PaperBalloon/Resources/*.xcstrings`. Per-game display copy (e.g. player counts)
 lives in those same string resources under `game_<id>_*` keys, resolved by game
 id at load time — `games-manifest.json` itself is purely structural and holds no
 translated text.
@@ -76,9 +76,9 @@ fails the check. Run it after any string change.
   drives the home screen, scan/typed-code resolution, and relay probing. Cover
   art (`art`, 16:9) and the square brand mark (`icon`, used by the nearby-room
   card) both sit next to it in `assets/artwork/`. The iOS app bundles copies under
-  `ios/CouchPad/Resources/` — keep them in sync when the manifest changes.
+  `ios/PaperBalloon/Resources/` — keep them in sync when the manifest changes.
   The bundled copy is only the first-run seed: once per launch both apps fetch
-  `couchpad.games/games-manifest.json` (served no-cache from the site
+  `paperballoon.games/games-manifest.json` (served no-cache from the site
   repo), persist it, and render from it — so a new game or status flip is one
   site deploy, no app update. Art the current build didn't ship is downloaded
   into a URL-keyed cache that is never revalidated, and shipped art is matched
@@ -97,8 +97,8 @@ fails the check. Run it after any string change.
   which is the ceiling both apps decode to, so a larger source is download weight
   no screen ever shows. Not a build step, and it takes masters — every run is
   another generation of lossy re-encode.
-- `android/app/src/main/java/games/couchpad/controller/` — `data/` (manifest
+- `android/app/src/main/java/games/paperballoon/controller/` — `data/` (manifest
   model, join resolution, relay probe, LAN room discovery, prefs), `ui/main/`
   (home), `ui/game/` (WebView game host), `theme/`.
-- `ios/CouchPad/` — `Data/` (same responsibilities as Android `data/`),
+- `ios/PaperBalloon/` — `Data/` (same responsibilities as Android `data/`),
   `UI/Main/`, `GameHost/` (WKWebView game host), `Theme/`.

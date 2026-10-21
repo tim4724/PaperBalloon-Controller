@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Two native **launcher** apps (Android/Kotlin+Compose, iOS/Swift+SwiftUI) that are the shell
-for the CouchPad party-game suite. Each game's controller is a remote web page loaded in a
+for the Paper Balloon party-game suite. Each game's controller is a remote web page loaded in a
 hardened top-level web view, full-screen with no launcher chrome over it. Read `README.md` for layout and
 `CONTRACT.md` for the launcher⇄game interface — don't restate them here.
 
@@ -20,11 +20,11 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 # iOS (Xcode project is generated, not committed)
 cd ios
 xcodegen generate    # brew install xcodegen, once
-open CouchPad.xcodeproj
+open PaperBalloon.xcodeproj
 ```
 
 Android: minSdk 24 / target 36, applicationId and namespace both
-`games.couchpad.controller`. iOS: 17+, bundle id `games.couchpad.controller`, no
+`games.paperballoon.controller`. iOS: 17+, bundle id `games.paperballoon.controller`, no
 third-party dependencies. There is no automated test suite.
 
 ## The two apps are functional parity ports
@@ -32,13 +32,13 @@ third-party dependencies. There is no automated test suite.
 Android `data/` ↔ iOS `Data/`, `ui/main/` ↔ `UI/Main/`, `ui/game/` (WebView host) ↔
 `GameHost/` (WKWebView host), `theme/` ↔ `Theme/`. A behavior change on one platform almost
 always needs the mirrored change on the other. Both implement `CONTRACT.md` identically.
-iOS also builds the same sources a second time as an App Clip (`CP.isAppClip`; see
+iOS also builds the same sources a second time as an App Clip (`PB.isAppClip`; see
 `ios/README.md`) — iOS code must keep compiling and degrading cleanly there.
 
 ## Things that must stay in sync (and their checks)
 
 - **Manifest + artwork**: `android/app/src/main/assets/games-manifest.json` +
-  `assets/artwork/` are the source of truth; `ios/CouchPad/Resources/` holds byte-identical
+  `assets/artwork/` are the source of truth; `ios/PaperBalloon/Resources/` holds byte-identical
   copies. Update both when either changes. The manifest is purely structural — no translated
   text; per-game display copy lives in string resources under `game_<id>_*` keys. The bundled
   copy is only the first-run seed — both apps refresh from the served manifest
@@ -47,7 +47,7 @@ iOS also builds the same sources a second time as an App Clip (`CP.isAppClip`; s
   things live). Encode covers with `tools/encode_artwork.sh` (1280×720 q85, writes both
   bundles) — that is the ceiling both apps' `ArtCache` decodes to.
 - **Localization** (11 HexStacker locales): Android `res/values[-XX]/strings.xml`, iOS
-  `CouchPad/Resources/*.xcstrings`. After any string change run:
+  `PaperBalloon/Resources/*.xcstrings`. After any string change run:
   ```sh
   python3 tools/check_l10n_sync.py
   ```
@@ -59,7 +59,7 @@ iOS also builds the same sources a second time as an App Clip (`CP.isAppClip`; s
 
 `CONTRACT.md` carries no wire version — every touchpoint is feature-detected, and the
 same deployed controller must keep working in a plain browser, so all shell behavior is
-gated on the presence of `window.CouchPadHost`. The relay-declared join target (`url`) is UNTRUSTED and
+gated on the presence of `window.PaperBalloonHost`. The relay-declared join target (`url`) is UNTRUSTED and
 re-validated against the manifest host allow-list before loading, and it is the only thing
 that resolves an origin-less input — the launcher never guesses an owner for a code the
 directory can't place. A §8 mDNS advertisement carries only a room code, resolved through

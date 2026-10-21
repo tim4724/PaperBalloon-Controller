@@ -61,7 +61,7 @@
     <string name="game_end_generic">파티가 끝났어요</string>
 
     <string name="error_empty_code">코드가 비어 있어요.</string>
-    <string name="error_not_couchpad_room">CouchPad 방 코드가 아니에요.</string>
+    <string name="error_not_paperballoon_room">Paper Balloon 방 코드가 아니에요.</string>
     <string name="error_enter_room_code">방 코드를 입력하세요.</string>
     <string name="error_code_unmatched">지금은 이 코드를 게임과 연결할 수 없어요.</string>
     <string name="error_room_not_found_or_expired">방을 찾을 수 없거나 만료됐어요.</string>

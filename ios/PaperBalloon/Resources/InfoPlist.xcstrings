@@ -1,0 +1,174 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Paper Balloon"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Paper Balloon"
+          }
+        }
+      },
+      "shouldTranslate" : false
+    },
+    "NSCameraUsageDescription" : {
+      "comment" : "Privacy - Camera Usage Description",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon verwendet die Kamera, um den Raum-QR-Code auf deinem Fernseher zu scannen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon uses the camera to scan the room QR code shown on your TV."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon usa la cámara para escanear el código QR de la sala que aparece en tu TV."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon utilise la caméra pour scanner le QR code de la salle affiché sur ta TV."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon usa la fotocamera per scansionare il codice QR della stanza mostrato sulla TV."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloonは、テレビに表示されたルームのQRコードをスキャンするためにカメラを使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon은 TV에 표시된 방 QR 코드를 스캔할 때 카메라를 사용해요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Paper Balloon usa a câmera para escanear o código QR da sala exibido na sua TV."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon использует камеру, чтобы отсканировать QR-код комнаты на экране телевизора."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon, TV'nde gösterilen oda QR kodunu taramak için kamerayı kullanır."
+          }
+        },
+        "zh" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon 使用相机扫描电视上显示的房间二维码。"
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy - Local Network Usage Description",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon verwendet dein lokales Netzwerk, um Räume in der Nähe zu finden, damit du ohne Code-Scan beitreten kannst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon uses your local network to find nearby rooms, so you can join without scanning a code."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon usa tu red local para encontrar salas cercanas y que puedas unirte sin escanear un código."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon utilise ton réseau local pour trouver les salles à proximité, afin que tu puisses rejoindre une partie sans scanner de code."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon usa la tua rete locale per trovare le stanze nelle vicinanze, così puoi unirti senza scansionare un codice."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloonはローカルネットワークを使って近くのルームを見つけ、コードをスキャンせずに参加できるようにします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon은 로컬 네트워크로 주변 방을 찾아 코드 스캔 없이 참여할 수 있게 해요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Paper Balloon usa sua rede local para encontrar salas próximas, para você entrar sem escanear um código."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon использует локальную сеть, чтобы находить комнаты поблизости и присоединяться к ним без сканирования кода."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon, kod taramadan katılabilmen için yerel ağını kullanarak yakındaki odaları bulur."
+          }
+        },
+        "zh" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paper Balloon 使用你的本地网络查找附近的房间，让你无需扫码即可加入。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

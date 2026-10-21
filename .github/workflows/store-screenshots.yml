@@ -81,14 +81,14 @@ jobs:
             # here wouldn't stick). The test publishes PNGs to shared storage
             # (survives the post-test uninstall); clear leftovers so MediaStore
             # can't dedupe-rename.
-            adb shell rm -rf /sdcard/Pictures/couchpad-screenshots
+            adb shell rm -rf /sdcard/Pictures/paperballoon-screenshots
             ./gradlew :app:connectedDebugAndroidTest || { adb shell dumpsys window > ../diag/window.txt 2>&1; exit 1; }
-            adb pull /sdcard/Pictures/couchpad-screenshots ../out
+            adb pull /sdcard/Pictures/paperballoon-screenshots ../out
             ls -la ../out
 
       - uses: actions/upload-artifact@v7
         with:
-          name: games.couchpad.controller-screenshots-android
+          name: games.paperballoon.controller-screenshots-android
           path: out
           if-no-files-found: error
 
@@ -161,8 +161,8 @@ jobs:
           # (kAXErrorIPCTimeout etc.) that hit cold, freshly-created simulators on
           # slow runners — the retry runs against a warmed-up simulator.
           xcodebuild test \
-            -project CouchPad.xcodeproj \
-            -scheme CouchPad \
+            -project PaperBalloon.xcodeproj \
+            -scheme PaperBalloon \
             -destination "platform=iOS Simulator,name=$DEVICE" \
             -resultBundlePath TestResults.xcresult \
             -retry-tests-on-failure -test-iterations 3 \
@@ -184,7 +184,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: games.couchpad.controller-screenshots-ios-${{ matrix.size }}
+          name: games.paperballoon.controller-screenshots-ios-${{ matrix.size }}
           path: out
           if-no-files-found: error
 
