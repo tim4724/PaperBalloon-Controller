@@ -1,29 +1,28 @@
-name: CouchPad
+name: PaperBalloon
 options:
   createIntermediateGroups: true
   deploymentTarget:
     iOS: "17.0"
 targets:
-  CouchPad:
+  PaperBalloon:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: CouchPad
+      - path: PaperBalloon
         excludes:
           - "Resources"
-      - path: CouchPad/Resources
+      - path: PaperBalloon/Resources
         buildPhase: resources
     settings:
       base:
-        # App Store identity, reverse-DNS of couchpad.games. Changed in the 2026-07
-        # rebrand while the app was still unpublished — once a build reaches App Store
-        # Connect the bundle id is frozen. It must match the AASA `appID`
-        # (5ZH48MPAM3.games.couchpad.controller) on every Universal Link host.
-        PRODUCT_BUNDLE_IDENTIFIER: games.couchpad.controller
+        # App Store identity, reverse-DNS of paperballoon.games. Once a build reaches
+        # App Store Connect the bundle id is frozen. It must match the AASA `appID`
+        # (5ZH48MPAM3.games.paperballoon.controller) on every Universal Link host.
+        PRODUCT_BUNDLE_IDENTIFIER: games.paperballoon.controller
         # Names the .app and the Swift module (hence $(PRODUCT_MODULE_NAME) below);
         # what the user actually sees is CFBundleDisplayName.
-        PRODUCT_NAME: CouchPad
+        PRODUCT_NAME: PaperBalloon
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: 1
         SWIFT_VERSION: "5.10"
@@ -36,15 +35,14 @@ targets:
         # builds for the simulator (CI screenshots), which isn't code-signed, so
         # the distribution profile is inert there; Release uses it for the
         # archive. The profile is bound to the explicit App ID
-        # games.couchpad.controller carrying Associated Domains — set that up in
-        # the portal, not here. The rebrand changed the bundle id, so that App ID
-        # and its profile are NEW: create both, then keep the name below in sync
+        # games.paperballoon.controller carrying Associated Domains — set that up in
+        # the portal, not here. Keep the profile name below in sync
         # (Release builds fail on a profile name the portal doesn't know; Debug is
         # simulator-only and unsigned, so CI screenshots are unaffected).
         # Xcode-pane signing picks don't survive `xcodegen generate`; these do.
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "Apple Distribution"
-        PROVISIONING_PROFILE_SPECIFIER: "CouchPad App Store"
+        PROVISIONING_PROFILE_SPECIFIER: "Paper Balloon App Store"
         DEVELOPMENT_TEAM: 5ZH48MPAM3
       # Download size, Release only — Debug keeps the build-time-oriented defaults,
       # since it only ever builds for the simulator screenshot runs.
@@ -58,7 +56,7 @@ targets:
           # could visibly degrade output — eyeball the icon on device when changing it.
           ASSETCATALOG_COMPILER_OPTIMIZATION: space
     # Universal Links. Each host serves /.well-known/apple-app-site-association;
-    # hexstacker.com scopes to the 6-char room code, couchpad.games adds the
+    # hexstacker.com scopes to the 6-char room code, paperballoon.games adds the
     # legal pages (/privacy, /imprint, EN + default). The AASA room pattern is a
     # single exactly-6-char path segment — marketing pages fall through to the
     # browser, and JoinResolver rejects any 6-char non-room code at runtime.
@@ -78,34 +76,34 @@ targets:
     # gitignored; edit the list here, not the plist.
     # Associated Domains must also be enabled on the App ID in the Developer portal.
     entitlements:
-      path: CouchPad/CouchPad.entitlements
+      path: PaperBalloon/PaperBalloon.entitlements
       properties:
         com.apple.developer.associated-domains:
           - applinks:hexstacker.com
           - applinks:*.hexstacker.com
-          - applinks:couchpad.games
-          - applinks:*.couchpad.games
+          - applinks:paperballoon.games
+          - applinks:*.paperballoon.games
         # The App Clip below. Its App ID must be registered in the portal as an App
         # Clip of this one, which is what admits this key into the profile.
         com.apple.developer.associated-appclip-app-identifiers:
-          - $(AppIdentifierPrefix)games.couchpad.controller.Clip
+          - $(AppIdentifierPrefix)games.paperballoon.controller.Clip
         # Shared with the clip, which lists the same group: carries the player's name
         # over when the full app replaces the clip (ProfileStore).
         com.apple.security.application-groups:
-          - group.games.couchpad.controller
+          - group.games.paperballoon.controller
     # An on-demand-install-capable dependency is embedded under AppClips/, not built
     # as a plain framework dependency.
     dependencies:
-      - target: CouchPadClip
+      - target: PaperBalloonClip
     scheme:
       testTargets:
-        - CouchPadUITests
+        - PaperBalloonUITests
     info:
-      path: CouchPad/Info.plist
+      path: PaperBalloon/Info.plist
       properties:
         # Shared with the App Clip, which merges this and adds its own keys.
         <<: &appInfo
-          CFBundleDisplayName: CouchPad
+          CFBundleDisplayName: Paper Balloon
           CFBundleShortVersionString: "$(MARKETING_VERSION)"
           CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
           ITSAppUsesNonExemptEncryption: false
@@ -116,7 +114,7 @@ targets:
           # LAN navigation under #if DEBUG, so a release build never exercises it.
           NSAppTransportSecurity:
             NSAllowsLocalNetworking: true
-          NSCameraUsageDescription: "CouchPad uses the camera to scan the room QR code shown on your TV."
+          NSCameraUsageDescription: "Paper Balloon uses the camera to scan the room QR code shown on your TV."
           UILaunchScreen:
             UIColorName: LaunchBackground
           # The app-wide SUPERSET, not what any screen allows: landscape is listed only so
@@ -136,40 +134,40 @@ targets:
               UIWindowSceneSessionRoleApplication:
                 - UISceneConfigurationName: Default
                   UISceneDelegateClassName: "$(PRODUCT_MODULE_NAME).SceneDelegate"
-        # Contract §8 only: browsing `_couchpad._tcp` for rooms advertised on the LAN,
+        # Contract §8 only: browsing `_paperballoon._tcp` for rooms advertised on the LAN,
         # so home can offer one-tap join, and advertising the room the player is in.
         # Asked from home's "Allow"; the games' direct WebRTC path needs no grant, since
         # WKWebView traffic is exempt from Local Network privacy. NSBonjourServices is
         # not just documentation — an undeclared type is filtered out and the browser
         # silently returns nothing. Both strings are localized in InfoPlist.xcstrings.
-        NSLocalNetworkUsageDescription: "CouchPad uses your local network to find nearby rooms, so you can join without scanning a code."
+        NSLocalNetworkUsageDescription: "Paper Balloon uses your local network to find nearby rooms, so you can join without scanning a code."
         NSBonjourServices:
-          - _couchpad._tcp
+          - _paperballoon._tcp
   # App Clip: a camera scan of a room link plays without an install. It is the whole
   # launcher compiled a second time with APPCLIP set — the invocation URL arrives as a
   # browsing-web user activity, exactly like a Universal Link, so SceneDelegate and the
   # join funnel need no clip path of their own. `#if APPCLIP` only removes what a clip
   # can't run: Bonjour (contract §8 discovery and advertising, and the Local Network
   # prompt that rides a browse), plus the full-app offer on returning home.
-  CouchPadClip:
+  PaperBalloonClip:
     type: application.on-demand-install-capable
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: CouchPad
+      - path: PaperBalloon
         excludes:
           - "Resources"
-          # The app's own; the clip's are generated under CouchPadClip/ below.
+          # The app's own; the clip's are generated under PaperBalloonClip/ below.
           - "Info.plist"
-          - "CouchPad.entitlements"
-      - path: CouchPad/Resources
+          - "PaperBalloon.entitlements"
+      - path: PaperBalloon/Resources
         buildPhase: resources
     settings:
       base:
         # Must be the parent's id plus one component; the AASA `appclips` entry on
-        # every invocation host names 5ZH48MPAM3.games.couchpad.controller.Clip.
-        PRODUCT_BUNDLE_IDENTIFIER: games.couchpad.controller.Clip
-        PRODUCT_NAME: CouchPadClip
+        # every invocation host names 5ZH48MPAM3.games.paperballoon.controller.Clip.
+        PRODUCT_BUNDLE_IDENTIFIER: games.paperballoon.controller.Clip
+        PRODUCT_NAME: PaperBalloonClip
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) APPCLIP"
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: 1
@@ -181,7 +179,7 @@ targets:
         # — keep this name in sync with ExportOptions.plist.
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "Apple Distribution"
-        PROVISIONING_PROFILE_SPECIFIER: "CouchPad Clip App Store"
+        PROVISIONING_PROFILE_SPECIFIER: "Paper Balloon Clip App Store"
         DEVELOPMENT_TEAM: 5ZH48MPAM3
       configs:
         Release:
@@ -191,18 +189,18 @@ targets:
     # each serves an AASA whose `appclips.apps` names this clip. Which URLs actually
     # open the clip is decided by the App Clip experiences in App Store Connect.
     entitlements:
-      path: CouchPadClip/CouchPadClip.entitlements
+      path: PaperBalloonClip/PaperBalloonClip.entitlements
       properties:
         com.apple.developer.parent-application-identifiers:
-          - $(AppIdentifierPrefix)games.couchpad.controller
+          - $(AppIdentifierPrefix)games.paperballoon.controller
         com.apple.developer.associated-domains:
           - appclips:hexstacker.com
-          - appclips:couchpad.games
-          - appclips:tinytrack.couchpad.games
+          - appclips:paperballoon.games
+          - appclips:tinytrack.paperballoon.games
         com.apple.security.application-groups:
-          - group.games.couchpad.controller
+          - group.games.paperballoon.controller
     info:
-      path: CouchPadClip/Info.plist
+      path: PaperBalloonClip/Info.plist
       properties:
         # Without the app's Local Network keys: a clip can't hold that access (TN3179).
         # The fastlane doesn't need it — WKWebView traffic is exempt, and on-device
@@ -215,18 +213,18 @@ targets:
           NSAppClipRequestEphemeralUserNotification: false
           NSAppClipRequestLocationConfirmation: false
   # Smoke test + store-screenshot capture (see StoreScreenshotTests.swift).
-  CouchPadUITests:
+  PaperBalloonUITests:
     type: bundle.ui-testing
     platform: iOS
     deploymentTarget: "17.0"
     sources:
-      - path: CouchPadUITests
+      - path: PaperBalloonUITests
     dependencies:
-      - target: CouchPad
+      - target: PaperBalloon
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: games.couchpad.controller.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: games.paperballoon.controller.uitests
         SWIFT_VERSION: "5.10"
-        TEST_TARGET_NAME: CouchPad
+        TEST_TARGET_NAME: PaperBalloon
         GENERATE_INFOPLIST_FILE: true
         CODE_SIGN_STYLE: Automatic

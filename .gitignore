@@ -18,13 +18,13 @@ android/captures/
 .externalNativeBuild
 .cxx
 
-# iOS — CouchPad.xcodeproj is generated (cd ios && xcodegen generate)
-ios/CouchPad.xcodeproj
+# iOS — PaperBalloon.xcodeproj is generated (cd ios && xcodegen generate)
+ios/PaperBalloon.xcodeproj
 ios/build/
 ios/DerivedData/
 xcuserdata/
 *.xcresult
 
 # Generated from project.yml (entitlements.properties) alongside the .xcodeproj
-ios/CouchPad/CouchPad.entitlements
-ios/CouchPadClip/CouchPadClip.entitlements
+ios/PaperBalloon/PaperBalloon.entitlements
+ios/PaperBalloonClip/PaperBalloonClip.entitlements

@@ -1,6 +1,6 @@
-# CouchPad Controller Contract — v1
+# Paper Balloon Controller Contract — v1
 
-The interface between the **CouchPad launcher** — the Android app (WebView) and iOS app
+The interface between the **Paper Balloon launcher** — the Android app (WebView) and iOS app
 (WKWebView), identical unless a section says otherwise — and a **game's controller page**.
 A game that implements it plugs in with no launcher change beyond its entry in
 `games-manifest.json`.
@@ -12,17 +12,17 @@ or when it fails to load: a join cover and a retry cover, each with its own clos
 
 **Rules for every section:**
 
-- **Feature-detect.** Shell behavior is gated on `window.CouchPadHost`, which only the
+- **Feature-detect.** Shell behavior is gated on `window.PaperBalloonHost`, which only the
   launcher defines; the same deployed controller must keep working in a plain browser.
 - **Bundle your contract code.** Game origins typically ship `script-src 'self'`; inline
   scripts never run. The launcher's own injections are exempt.
-- **`cp*` is reserved** for query params. Don't mint your own; ignore ones you don't know.
+- **`pb*` is reserved** for query params. Don't mint your own; ignore ones you don't know.
 - Everything a page sends is untrusted; the launcher validates it.
 
-## 1. Launcher → game: `CouchPadHost.name`
+## 1. Launcher → game: `PaperBalloonHost.name`
 
 ```js
-const name = window.CouchPadHost?.name ?? myBrowserName;
+const name = window.PaperBalloonHost?.name ?? myBrowserName;
 ```
 
 The player's name, shared across games: a non-blank string of at most 16 characters.
@@ -31,21 +31,21 @@ launcher makes one up, so there is no need to ask for one. An Android WebView to
 for document-start scripts has neither `name` nor `editName` — the fallback above covers
 it.
 
-## 2. Rename: `CouchPadHost.editName()`
+## 2. Rename: `PaperBalloonHost.editName()`
 
 Optional. The launcher owns the name and its rules, so a game that offers a rename opens
 the launcher's name sheet instead of its own field:
 
 ```js
 renameButton.onclick = async () => {
-  if (!window.CouchPadHost?.editName) return openOwnNameField();   // browser
-  const name = await CouchPadHost.editName();   // null when the player dismisses it
+  if (!window.PaperBalloonHost?.editName) return openOwnNameField();   // browser
+  const name = await PaperBalloonHost.editName();   // null when the player dismisses it
   if (name) applyAndTellTheDisplay(name);
 };
 ```
 
 The resolved name already meets the launcher's rules and is from then on
-`CouchPadHost.name`, here and in every later game. Every call gets its own sheet and
+`PaperBalloonHost.name`, here and in every later game. Every call gets its own sheet and
 answer: one made while a sheet is still closing opens a new sheet once it has gone.
 Android back while the sheet is up dismisses it (resolving `null`) and never reaches the
 page's `back()` (§9).
@@ -60,7 +60,7 @@ The sheet takes its look from standard page styling, read when `editName` is cal
 
 Anything absent falls back to the launcher's own palette.
 
-## 3. Game → launcher: `CouchPadHost.leave()` and `gameEnded(reason)`
+## 3. Game → launcher: `PaperBalloonHost.leave()` and `gameEnded(reason)`
 
 Both close the web view and return home; the first call wins. Don't also navigate.
 Closing the web view destroys the page and with it its connections, relay socket
@@ -129,11 +129,11 @@ Client → relay:  create { clientId, maxClients, url? }
 - It must name the controller's own origin; a template on the launcher domain is ignored.
 - An invalid template rejects the whole create, so plain-http dev setups pass none — their
   rooms are then joinable only by scanning.
-- It may carry `cpp=tvos|androidtv|web` naming the display. Put it in the template: the
+- It may carry `pbp=tvos|androidtv|web` naming the display. Put it in the template: the
   launcher reads it wherever it first appears and renders the device name itself.
 
 The launcher resolves every origin-less input — typed code, §8 nearby tap, a
-`couchpad.games/<code>` link — through `GET {relayBase}/room/{code}`:
+`paperballoon.games/<code>` link — through `GET {relayBase}/room/{code}`:
 
 ```
 200 → { url?, origin?, clients, maxClients }   404 → not found
@@ -153,13 +153,13 @@ so the same code is right in a browser.
 ## 8. Native display → LAN: room advertisement
 
 A native display (tvOS, Android TV) may advertise its room over DNS-SD as
-`_couchpad._tcp.local`, for one-tap join. The instance name is the display's label
+`_paperballoon._tcp.local`, for one-tap join. The instance name is the display's label
 ("Living Room"), shown verbatim.
 
 | TXT key | Value |
 |---|---|
 | `c` | Required. The room code as shown on screen. |
-| `cpr` | Launcher-only: marks a controller relaying a room it is in. Displays never set it. |
+| `pbr` | Launcher-only: marks a controller relaying a room it is in. Displays never set it. |
 
 - The code is the whole payload: the launcher resolves it through §6, so the record
   carries no URL and can't point anywhere. The SRV port is never dialed.
@@ -180,16 +180,16 @@ By default the controller surface is opted out of the back gesture, so edge swip
 gameplay. Ask for back when it is welcome, and give it up the moment it isn't:
 
 ```js
-window.CouchPadHost?.enableSystemBack?.(true);    // dialog opened / in the lobby
-window.CouchPadHost?.enableSystemBack?.(false);   // dialog closed / match resumed
+window.PaperBalloonHost?.enableSystemBack?.(true);    // dialog opened / in the lobby
+window.PaperBalloonHost?.enableSystemBack?.(false);   // dialog closed / match resumed
 ```
 
 Only a literal `true` arms; it resets on every page load. Armed, the edges belong to the
 system (no drag-from-the-edge controls), and each back — gesture or 3-button — calls:
 
 ```js
-window.CouchPad = window.CouchPad || {};
-window.CouchPad.back = () => {
+window.PaperBalloon = window.PaperBalloon || {};
+window.PaperBalloon.back = () => {
   if (!dialogOpen) return false;   // not consumed → the launcher leaves the game
   closeDialog();
   return true;                     // consumed → the player stays
@@ -200,7 +200,7 @@ Only a synchronous literal `true` consumes; anything else (no handler, a Promise
 throw) leaves like `leave()`. While armed, the navigation bar comes back — in portrait,
 and in landscape too for 3-button navigation — and grows that edge's inset.
 
-## 10. Game → launcher: `CouchPadHost.setOrientation(mode)`
+## 10. Game → launcher: `PaperBalloonHost.setOrientation(mode)`
 
 The launcher is portrait. `setOrientation('landscape')` turns to landscape and follows the
 sensor between its two sides; anything else means portrait. It resets to portrait on any
@@ -229,13 +229,13 @@ stay within patterns that feel alike on both:
 
 Patterns are capped at 128 entries and 5 s.
 
-## 12. Game → launcher: `CouchPadHost.haptic(primitive, scale)`
+## 12. Game → launcher: `PaperBalloonHost.haptic(primitive, scale)`
 
 A weaker or shaped tap than §11 can make: one of Android's composition primitives at a
 strength — the vocabulary AirConsole's composition vibrate takes.
 
 ```js
-if (window.CouchPadHost?.haptic) CouchPadHost.haptic('click', 0.7);
+if (window.PaperBalloonHost?.haptic) PaperBalloonHost.haptic('click', 0.7);
 else navigator.vibrate?.(14);
 ```
 
@@ -256,7 +256,7 @@ else navigator.vibrate?.(14);
   was playing plays on.
 - On Android these follow the media-vibration setting, not touch feedback.
 
-### `CouchPadHost.hapticComposition(steps)`
+### `PaperBalloonHost.hapticComposition(steps)`
 
 Several primitives in one call, timed — a rumble under a held control, a rhythm, a knock
 after a tap. The step shape and its clock are Android's composition API and AirConsole's
@@ -265,10 +265,10 @@ composition vibrate, so a sequence written for AirConsole plays here unchanged:
 ```js
 // A held-control rumble: a low tick, 60 ms of rest, again — ~1.8 s, re-issued before it ends.
 const rumble = Array.from({ length: 25 }, (_, i) => ({ primitive: 'low_tick', scale: 1, delay: i ? 60 : 0 }));
-if (window.CouchPadHost?.hapticComposition) CouchPadHost.hapticComposition(rumble);
+if (window.PaperBalloonHost?.hapticComposition) PaperBalloonHost.hapticComposition(rumble);
 else navigator.vibrate?.(Array(25).fill([12, 60]).flat());
 // ...and on release:
-CouchPadHost.hapticComposition([]);
+PaperBalloonHost.hapticComposition([]);
 ```
 
 Each step is `{ primitive, scale, delay }`: a primitive and scale as above, and `delay` in
@@ -303,7 +303,7 @@ A missing `requestPermission` means no gate (Android), not a missing sensor.
 
 ## Checklist for a new game
 
-1. Use `CouchPadHost.name` as the player's name (§1); offer a rename through
+1. Use `PaperBalloonHost.name` as the player's name (§1); offer a rename through
    `editName()` (§2).
 2. A close button calling `leave()`; `gameEnded(reason)` on terminal end (§3).
 3. A `color-scheme` meta (§4).
@@ -313,8 +313,8 @@ A missing `requestPermission` means no gate (Android), not a missing sensor.
 7. *Optional:* Android back (§9), landscape (§10), haptics (§11–12), mDNS for native
    displays (§8).
 
-<https://test.couchpad.games/CPTEST> is a reference controller exercising every
-touchpoint; its source, `controller-test.html` in the couchpad.games site repo, changes
+<https://test.paperballoon.games/PBTEST> is a reference controller exercising every
+touchpoint; its source, `controller-test.html` in the paperballoon.games site repo, changes
 together with this document.
 
 ## Versioning

@@ -3,8 +3,8 @@
 #     see keystore.properties.example), uploaded as a workflow artifact. Tag builds
 #     also publish it to Play's closed testing track via the Play API service
 #     account, with the tag as versionName and the run number as versionCode.
-#   - iOS: signed with the Apple Distribution cert + "CouchPad App Store" profile, and
-#     the embedded App Clip with "CouchPad Clip App Store" (project.yml pins manual
+#   - iOS: signed with the Apple Distribution cert + "Paper Balloon App Store" profile, and
+#     the embedded App Clip with "Paper Balloon Clip App Store" (project.yml pins manual
 #     signing with exactly these). Tag builds upload straight to TestFlight via the
 #     ASC API key with the tag as marketing version (the TestFlight build IS the
 #     release candidate — no .ipa artifact); workflow_dispatch builds export the
@@ -72,9 +72,9 @@ jobs:
           # take their versionName from the tag (bare semver), others keep
           # build.gradle.kts's. Both are -P overrides — the static values stay
           # untouched. (Mirrors the iOS Archive step below.)
-          VERSION_ARGS=("-PcpVersionCode=$GITHUB_RUN_NUMBER")
+          VERSION_ARGS=("-PpbVersionCode=$GITHUB_RUN_NUMBER")
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            VERSION_ARGS+=("-PcpVersionName=$GITHUB_REF_NAME")
+            VERSION_ARGS+=("-PpbVersionName=$GITHUB_REF_NAME")
           fi
           ./gradlew bundleRelease "${VERSION_ARGS[@]}"
 
@@ -93,7 +93,7 @@ jobs:
       # downloadable from the run.
       - uses: actions/upload-artifact@v7
         with:
-          name: games.couchpad.controller-release-aab
+          name: games.paperballoon.controller-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
@@ -110,7 +110,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: games.couchpad.controller
+          packageName: games.paperballoon.controller
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           mappingFile: android/app/build/outputs/mapping/release/mapping.txt
           tracks: alpha
@@ -188,10 +188,10 @@ jobs:
             VERSION_ARGS+=("MARKETING_VERSION=$GITHUB_REF_NAME")
           fi
           xcodebuild archive \
-            -project CouchPad.xcodeproj \
-            -scheme CouchPad \
+            -project PaperBalloon.xcodeproj \
+            -scheme PaperBalloon \
             -destination "generic/platform=iOS" \
-            -archivePath build/CouchPad.xcarchive \
+            -archivePath build/PaperBalloon.xcarchive \
             "${VERSION_ARGS[@]}"
 
       - name: Export signed IPA (dispatch) or upload to TestFlight (tag)
@@ -201,7 +201,7 @@ jobs:
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
         run: |
-          EXPORT_ARGS=(-archivePath build/CouchPad.xcarchive -exportOptionsPlist ExportOptions.plist)
+          EXPORT_ARGS=(-archivePath build/PaperBalloon.xcarchive -exportOptionsPlist ExportOptions.plist)
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             for v in ASC_API_KEY_P8_BASE64 ASC_API_KEY_ID ASC_API_ISSUER_ID; do
               [ -n "${!v}" ] || { echo "::error::Secret $v is not set"; exit 1; }
@@ -219,7 +219,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: github.ref_type != 'tag'
         with:
-          name: games.couchpad.controller-release-ipa
+          name: games.paperballoon.controller-release-ipa
           path: ios/build/export/*.ipa
           if-no-files-found: error
 
@@ -227,6 +227,6 @@ jobs:
       # reports for exactly this binary.
       - uses: actions/upload-artifact@v7
         with:
-          name: games.couchpad.controller-release-dsyms
-          path: ios/build/CouchPad.xcarchive/dSYMs
+          name: games.paperballoon.controller-release-dsyms
+          path: ios/build/PaperBalloon.xcarchive/dSYMs
           if-no-files-found: error

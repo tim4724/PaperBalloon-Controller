@@ -60,7 +60,7 @@
     <string name="game_end_generic">Parti sona erdi</string>
 
     <string name="error_empty_code">Kod boş.</string>
-    <string name="error_not_couchpad_room">Bu kod bir CouchPad odasına ait değil.</string>
+    <string name="error_not_paperballoon_room">Bu kod bir Paper Balloon odasına ait değil.</string>
     <string name="error_enter_room_code">Bir oda kodu gir.</string>
     <string name="error_code_unmatched">Bu kod şu anda bir oyunla eşleştirilemiyor.</string>
     <string name="error_room_not_found_or_expired">Oda bulunamadı veya süresi doldu.</string>

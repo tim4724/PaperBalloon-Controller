@@ -37,19 +37,18 @@ val zxingCppWrapperSrc = rootProject.file("../third_party/zxing-cpp/wrappers/and
 android {
     // Kotlin package / R+BuildConfig namespace — compile-time only, kept identical
     // to the applicationId below.
-    namespace = "games.couchpad.controller"
+    namespace = "games.paperballoon.controller"
     compileSdk = 37
     compileSdkMinor = 2
     // Pinned because zxing-cpp is compiled here: the NDK decides the shipped .so's contents,
     // so leaving it to AGP's default would make the native build vary between machines and CI.
     ndkVersion = "30.0.16248370"
     defaultConfig {
-        // Play Store identity, reverse-DNS of couchpad.games. Changed in the 2026-07
-        // rebrand while the app was still unpublished — this is a one-way door once
+        // Play Store identity, reverse-DNS of paperballoon.games. A one-way door once
         // a build is uploaded (a new applicationId is a new listing), and it must
         // match the package_name in the assetlinks.json served on every App Link
         // host, or link verification silently fails.
-        applicationId = "games.couchpad.controller"
+        applicationId = "games.paperballoon.controller"
         minSdk = 24
         // 37 = Android 17. Local Network Protections are ENFORCED from this target:
         // mDNS room discovery (NearbyRooms.kt) needs ACCESS_LOCAL_NETWORK granted or
@@ -57,8 +56,8 @@ android {
         targetSdk = 37
         // CI overrides both via -P (release-build.yml): versionCode from the run
         // number — Play rejects a reused code — and versionName from the release tag.
-        versionCode = (findProperty("cpVersionCode") as String?)?.toInt() ?: 1
-        versionName = findProperty("cpVersionName") as String? ?: "1.0"
+        versionCode = (findProperty("pbVersionCode") as String?)?.toInt() ?: 1
+        versionName = findProperty("pbVersionName") as String? ?: "1.0"
         externalNativeBuild {
             cmake {
                 arguments(

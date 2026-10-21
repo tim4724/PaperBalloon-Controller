@@ -1,0 +1,218 @@
+import Foundation
+import UIKit
+
+// MARK: - ProfileStore
+
+enum ProfileStore {
+
+    private static let nameKey = "pb_profile.name"
+    /// The App Group shared by the app and its App Clip (project.yml), so the name a
+    /// player typed in the clip is waiting when the full app replaces it. Mirrored on
+    /// every save; read only when .standard has no name, i.e. on a fresh install.
+    private static let shared = UserDefaults(suiteName: "group.games.paperballoon.controller")
+
+    /// Last loaded/saved profile. load() is a @State default expression on the main
+    /// screens, so it re-runs on every struct init (each parent body re-eval). Only
+    /// the .standard domain is cached; an injected defaults (tests) always reads
+    /// through. Main-thread only.
+    private static var cached: Profile?
+
+    /// Get-or-create: returns the stored name, or on first launch mints a `FunnyName`
+    /// and persists it — so every screen's load() reads the same identity instead of
+    /// each minting its own.
+    static func load(defaults: UserDefaults = .standard) -> Profile {
+        if defaults === UserDefaults.standard, let cached {
+            return cached
+        }
+        let profile: Profile
+        var stored = defaults.string(forKey: nameKey) ?? ""
+        if stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, defaults === UserDefaults.standard {
+            stored = shared?.string(forKey: nameKey) ?? ""
+        }
+        if !stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            profile = Profile(name: stored)
+        } else {
+            profile = Profile(name: FunnyName.random())
+            save(profile, defaults: defaults)
+        }
+        if defaults === UserDefaults.standard {
+            cached = profile
+        }
+        return profile
+    }
+
+    /// Writes the name verbatim — no trimming on save.
+    static func save(_ profile: Profile, defaults: UserDefaults = .standard) {
+        if defaults === UserDefaults.standard {
+            cached = profile
+            shared?.set(profile.name, forKey: nameKey)
+        }
+        defaults.set(profile.name, forKey: nameKey)
+    }
+}
+
+// MARK: - ManifestStore
+
+/// The games list the launcher renders: the last manifest fetched from
+/// paperballoon.games (persisted verbatim), seeded from the bundled copy until a
+/// fetch has ever succeeded. `refresh()` pulls at most once per process launch —
+/// a launch-fresh list is fresh enough, and every failure silently keeps the
+/// current list. Persisted in Caches, not UserDefaults, so a backup restore can't
+/// resurrect a stale list naming art the installed build doesn't ship.
+/// Served art paths may name files this build didn't ship; ArtCache pulls those
+/// through ArtworkCache.
+@MainActor final class ManifestStore: ObservableObject {
+
+    static let shared = ManifestStore()
+
+    @Published private(set) var games: [Game]
+
+    private static let cacheFile = FileManager.default
+        .urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("games-manifest.json")
+    private static let manifestURL = URL(string: "https://\(PB.launcherHost)/games-manifest.json")!
+    /// Sanity cap for a served manifest (ours is ~1 KB) — a deploy mistake must not balloon memory.
+    private static let maxBytes = 1 << 20
+
+    private var refreshed = false
+
+    private init() {
+        if let data = try? Data(contentsOf: Self.cacheFile),
+           let cached = GamesManifest.parse(data) {
+            games = cached
+        } else {
+            games = GamesManifest.load()
+        }
+    }
+
+    /// Fetches the served manifest and, when it validates, persists + publishes it live.
+    func refresh() async {
+        guard !refreshed else { return }
+        refreshed = true
+        guard let (data, response) = try? await URLSession.shared.data(from: Self.manifestURL),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              data.count <= Self.maxBytes,
+              // Identical to the seeded copy (the common case every launch) — the
+              // current list already reflects it, so skip the re-parse, the
+              // rewrite, and the objectWillChange.
+              data != (try? Data(contentsOf: Self.cacheFile)),
+              let fresh = GamesManifest.parse(data) else {
+            return
+        }
+        try? data.write(to: Self.cacheFile, options: .atomic)
+        games = fresh
+    }
+}
+
+// MARK: - RecentRoom
+
+/// The room this phone is in or just left, with everything the home rejoin card needs.
+/// `title` is captured from the controller page mid-session, so it's nil until then; the
+/// card's glyph comes from the manifest `icon`, not the page. `platform` is which box the room
+/// is on, off the first URL that declared it — the join URL at `RecentRoomStore.remember`,
+/// else the relay's template at `RecentRoomStore.putPlatform`.
+struct RecentRoom {
+    let game: Game
+    let joinUrl: String
+    let roomCode: String
+    let title: String?
+    let platform: String?
+}
+
+/// Single-slot, in-memory memory of the current room. Deliberately not persisted:
+/// rejoin is a same-session convenience, so the slot dies with the process and ages
+/// out `ttl` after the player LEFT the room — a fresh launch simply shows no card.
+/// `remember` sets the base at join, platform included when the join URL declares one;
+/// the title arrives later, captured in-game, and so does the platform when that URL
+/// named no box.
+enum RecentRoomStore {
+
+    private static let ttl: TimeInterval = 20 * 60
+    private static let maxTitleLength = 64
+
+    private static let lock = NSLock()
+    private static var game: Game?
+    private static var joinUrl = ""
+    private static var roomCode = ""
+    private static var title: String?
+    private static var platform: String?
+    private static var savedAt = Date.distantPast
+    /// True while the game host is up. The slot must not age out under a player who is
+    /// still IN the room — a session outlasting `ttl` would otherwise clear itself from
+    /// under the home poll and take the rejoin card (and the room's §8 advertisement,
+    /// which reads the slot) with it. `leave` restarts the clock, so the TTL measures
+    /// time since the player left.
+    private static var inRoom = false
+
+    static func remember(game: Game, joinUrl: String, roomCode: String) {
+        lock.lock(); defer { lock.unlock() }
+        self.game = game
+        self.joinUrl = joinUrl
+        self.roomCode = roomCode
+        title = nil
+        platform = devicePlatform(fromUrl: joinUrl)
+        savedAt = Date()
+    }
+
+    /// Learns the room's `pbp` off `templateUrl` — the relay's §6 template, the one URL
+    /// guaranteed to declare it (the join URL the player arrived on is not: a display may
+    /// keep its QR clean). Sticky, because every other carrier is transient — a display's
+    /// advertisement dies with the display, and a browser room is advertised only by the
+    /// phones in it, so it stops naming its box moments after this one leaves.
+    static func putPlatform(fromTemplate templateUrl: String?) {
+        lock.lock(); defer { lock.unlock() }
+        guard game != nil, platform == nil else { return }
+        platform = templateUrl.flatMap { devicePlatform(fromUrl: $0) }
+    }
+
+    /// Sanitizes `raw` (trim, collapse whitespace, cap length) and stores it as the
+    /// active room's title — unless there's no active room or nothing survives cleaning.
+    static func putTitle(_ raw: String) {
+        let clean = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .prefix(maxTitleLength)
+        lock.lock(); defer { lock.unlock() }
+        guard game != nil, !clean.isEmpty else { return }
+        title = String(clean)
+    }
+
+    /// Called by the game host for as long as it is on screen (see `inRoom`).
+    static func enter() {
+        lock.lock(); defer { lock.unlock() }
+        inRoom = true
+    }
+
+    /// The player is out of the room: age it from here.
+    static func leave() {
+        lock.lock(); defer { lock.unlock() }
+        inRoom = false
+        savedAt = Date()
+    }
+
+    /// The current room while still fresh, else nil (clearing an aged-out slot).
+    static func current() -> RecentRoom? {
+        lock.lock(); defer { lock.unlock() }
+        guard let game else { return nil }
+        if !inRoom, Date().timeIntervalSince(savedAt) > ttl {
+            clearLocked()
+            return nil
+        }
+        return RecentRoom(game: game, joinUrl: joinUrl, roomCode: roomCode, title: title, platform: platform)
+    }
+
+    static func clear() {
+        lock.lock(); defer { lock.unlock() }
+        clearLocked()
+    }
+
+    // Caller holds the lock.
+    private static func clearLocked() {
+        game = nil
+        joinUrl = ""
+        roomCode = ""
+        title = nil
+        platform = nil
+        savedAt = .distantPast
+    }
+}

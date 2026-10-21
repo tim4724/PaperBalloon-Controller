@@ -25,7 +25,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
-    <!-- Backup carries only the player's name (cp_profile). Everything else is a cache
+    <!-- Backup carries only the player's name (pb_profile). Everything else is a cache
          or a device-local fact: a restored served manifest names art this build may not
          ship, and a restored "asked" flag without its permission reads as locked out. -->
     <application
@@ -36,7 +36,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.CouchPad">
+        android:theme="@style/Theme.PaperBalloon">
         <!-- screenOrientation is the DEFAULT, not a lock: the launcher's own screens are
              portrait, and a game host reverts to this on leave. A controller page that
              asks for landscape (CONTRACT.md §10) overrides it at runtime via
@@ -77,8 +77,8 @@
                 <data android:scheme="https" android:host="*.hexstacker.com" android:pathPattern="/......" />
             </intent-filter>
 
-            <!-- Canonical couchpad.games join links: a room code is the whole path
-                 (couchpad.games/<CODE>). pathPattern "/......" claims exactly six
+            <!-- Canonical paperballoon.games join links: a room code is the whole path
+                 (paperballoon.games/<CODE>). pathPattern "/......" claims exactly six
                  characters, so the marketing index and any non-6-char page fall through
                  to the browser. pathPattern can't express base58, so avoid naming a page
                  with a 6-char path — the app takes it, and a non-room code simply fails
@@ -87,8 +87,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="couchpad.games" android:pathPattern="/......" />
-                <data android:scheme="https" android:host="*.couchpad.games" android:pathPattern="/......" />
+                <data android:scheme="https" android:host="paperballoon.games" android:pathPattern="/......" />
+                <data android:scheme="https" android:host="*.paperballoon.games" android:pathPattern="/......" />
             </intent-filter>
 
             <!-- Launcher legal pages open in the in-app doc viewer (WebDocScreen),
@@ -99,10 +99,10 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="couchpad.games" android:path="/privacy" />
-                <data android:scheme="https" android:host="couchpad.games" android:path="/imprint" />
-                <data android:scheme="https" android:host="couchpad.games" android:path="/en/privacy" />
-                <data android:scheme="https" android:host="couchpad.games" android:path="/en/imprint" />
+                <data android:scheme="https" android:host="paperballoon.games" android:path="/privacy" />
+                <data android:scheme="https" android:host="paperballoon.games" android:path="/imprint" />
+                <data android:scheme="https" android:host="paperballoon.games" android:path="/en/privacy" />
+                <data android:scheme="https" android:host="paperballoon.games" android:path="/en/imprint" />
             </intent-filter>
         </activity>
     </application>

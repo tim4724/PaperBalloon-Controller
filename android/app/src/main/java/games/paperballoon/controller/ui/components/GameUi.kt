@@ -1,0 +1,349 @@
+package games.paperballoon.controller.ui.components
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import games.paperballoon.controller.R
+import games.paperballoon.controller.data.ArtworkCache
+import games.paperballoon.controller.data.Game
+import games.paperballoon.controller.data.PLATFORM_ANDROID_TV
+import games.paperballoon.controller.data.PLATFORM_TVOS
+import games.paperballoon.controller.data.PLATFORM_WEB
+import games.paperballoon.controller.data.remoteArtUrl
+import games.paperballoon.controller.theme.ActionCoral
+import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+// The tappable player identity in the home header.
+@Composable
+fun PlayerChip(name: String, onClick: () -> Unit) {
+  AssistChip(
+    onClick = onClick,
+    modifier = Modifier.height(40.dp),
+    label = {
+      Text(
+        name.ifBlank { stringResource(R.string.set_name) },
+        style = MaterialTheme.typography.bodyLarge,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+    },
+    leadingIcon = {
+      Icon(Icons.Filled.Person, contentDescription = null, Modifier.size(20.dp))
+    },
+    border = AssistChipDefaults.assistChipBorder(enabled = true),
+  )
+}
+
+/**
+ * Decoded-bitmap ceiling, matching iOS's ArtCache: a poster card renders at most
+ * ~410dp wide (~1230px at 3x), so 720p covers every device. The bundled covers are
+ * encoded to exactly this (tools/encode_artwork.sh); the ceiling is what stops a
+ * larger one — served art, or a future master — from decoding at full size.
+ */
+private const val MAX_ART_WIDTH = 1280
+private const val MAX_ART_HEIGHT = 720
+
+/**
+ * Decoded artwork plus what the status-bar icons need to know when a poster scrolls
+ * under them: the mean relative luminance of each of [ART_LUMINANCE_ROWS] horizontal
+ * bands, top to bottom.
+ */
+class Art(val image: ImageBitmap, val rowLuminance: FloatArray)
+
+const val ART_LUMINANCE_ROWS = 16
+
+/**
+ * Process-wide memoized decode of artwork, keyed by manifest art path. Decoding runs
+ * off the main thread, so opening a sheet never decodes mid-animation, and a path
+ * that FAILS is remembered too — otherwise a game whose art this build didn't ship
+ * (and whose download failed) re-probes assets and disk on every recomposition.
+ * Follows iOS's ArtCache (UI/Components/SharedComponents.swift), minus its
+ * in-flight coalescing: two composables wanting the same path at the same moment
+ * would each decode it. Only reachable in the window before the first decode
+ * memoizes, and the cost is one wasted decode, so it doesn't earn a task map.
+ */
+private object ArtCache {
+  private val images = ConcurrentHashMap<String, Art>()
+  private val failures = ConcurrentHashMap.newKeySet<String>()
+
+  /** Non-null only after a successful decode has been memoized. */
+  fun cached(art: String): Art? = images[art]
+
+  suspend fun load(context: Context, art: String): Art? {
+    images[art]?.let { return it }
+    if (art in failures) return null
+    val decoded = withContext(Dispatchers.IO) { decode(context, art) }
+    if (decoded == null) failures.add(art) else images[art] = decoded
+    return decoded
+  }
+
+  /**
+   * The bundled asset when one ships under artwork/<file> (matched by file name —
+   * the bundled and served manifests root the same art differently), else the
+   * ArtworkCache copy downloaded from the manifest URL. Both lookups key on the
+   * URL/name, never on content, so a changed image must ship under a new file name
+   * or ?v= — see ArtworkCache.
+   */
+  private fun decode(context: Context, art: String): Art? {
+    val assetPath = "artwork/" + art.substringAfterLast('/')
+    val bitmap = decodeScaled { runCatching { context.assets.open(assetPath) }.getOrNull() }
+      ?: remoteArtUrl(art)?.let { url -> ArtworkCache.fetch(context, url) }
+        ?.let { file -> decodeScaled { runCatching { file.inputStream() }.getOrNull() } }
+      ?: return null
+    return Art(bitmap.asImageBitmap(), rowLuminance(bitmap))
+  }
+}
+
+/**
+ * Mean relative luminance (sRGB-linearized, 0..1) of each band, off a coarse grid: 32
+ * columns by 4 scanlines per band is plenty for a yes/no on icon contrast.
+ */
+private fun rowLuminance(bitmap: Bitmap): FloatArray {
+  val columns = 32
+  val lines = 4
+  return FloatArray(ART_LUMINANCE_ROWS) { row ->
+    var sum = 0f
+    repeat(lines) { line ->
+      val y = (bitmap.height * (row * lines + line + 0.5f) / (ART_LUMINANCE_ROWS * lines)).toInt()
+      repeat(columns) { column ->
+        val x = (bitmap.width * (column + 0.5f) / columns).toInt()
+        sum += Color(bitmap.getPixel(x, y)).luminance()
+      }
+    }
+    sum / (columns * lines)
+  }
+}
+
+/** The decoded [Art] for a manifest path: null until decoded, or for good when it can't be. */
+@Composable
+fun rememberArt(path: String?): Art? {
+  val context = LocalContext.current
+  val art by produceState(initialValue = path?.let(ArtCache::cached), path) {
+    value = path?.let { ArtCache.load(context, it) }
+  }
+  return art
+}
+
+/**
+ * Decodes [open]'s bytes scaled down inside the decoder, so an oversized source
+ * never materializes at full size: a power-of-two prepass (all `inSampleSize`
+ * offers) gets within 2x of the ceiling, then inDensity/inTargetDensity lands the
+ * exact aspect-preserving fit. Needs TWO streams — the bounds pass consumes one.
+ */
+private fun decodeScaled(open: () -> InputStream?): Bitmap? {
+  val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+  // The bounds pass returns null BY DESIGN — the dimensions land on `bounds`, so
+  // the stream, not the decode result, is what says whether there was anything read.
+  (open() ?: return null).use { BitmapFactory.decodeStream(it, null, bounds) }
+  val width = bounds.outWidth
+  val height = bounds.outHeight
+  if (width <= 0 || height <= 0) return null
+  val opts = BitmapFactory.Options().apply { inSampleSize = 1 }
+  while (width / (opts.inSampleSize * 2) >= MAX_ART_WIDTH &&
+    height / (opts.inSampleSize * 2) >= MAX_ART_HEIGHT
+  ) {
+    opts.inSampleSize *= 2
+  }
+  val sampledWidth = width / opts.inSampleSize
+  val sampledHeight = height / opts.inSampleSize
+  if (sampledWidth > MAX_ART_WIDTH || sampledHeight > MAX_ART_HEIGHT) {
+    opts.inScaled = true
+    // Whichever axis binds first supplies the one ratio, so the aspect holds.
+    if (sampledWidth * MAX_ART_HEIGHT >= sampledHeight * MAX_ART_WIDTH) {
+      opts.inDensity = sampledWidth
+      opts.inTargetDensity = MAX_ART_WIDTH
+    } else {
+      opts.inDensity = sampledHeight
+      opts.inTargetDensity = MAX_ART_HEIGHT
+    }
+  }
+  return open()?.use { BitmapFactory.decodeStream(it, null, opts) }
+}
+
+/**
+ * Cover art or, when a game has none yet, its accent as a soft gradient. The
+ * accent is the one place a game's own branding shows outside the WebView.
+ */
+@Composable
+fun GameArt(game: Game, modifier: Modifier = Modifier) = GameArt(game, rememberArt(game.art), modifier)
+
+/** [GameArt] with the art already in hand, for a caller that needs the [Art] itself too. */
+@Composable
+fun GameArt(game: Game, art: Art?, modifier: Modifier = Modifier) {
+  Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
+    if (art != null) {
+      Image(art.image, contentDescription = game.name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+    } else {
+      Box(
+        Modifier.fillMaxSize().background(
+          Brush.linearGradient(listOf(game.accentColor.copy(alpha = 0.50f), game.accentColor.copy(alpha = 0.14f))),
+        ),
+      )
+    }
+  }
+}
+
+/**
+ * The display's name for a `pbp` platform code, rendered by the launcher and never by
+ * the wire, so the wording stays localized and consistent. Null when the URL declared
+ * nothing usable.
+ */
+@Composable
+fun deviceName(platform: String?): String? = when (platform) {
+  PLATFORM_TVOS -> stringResource(R.string.device_apple_tv)
+  PLATFORM_ANDROID_TV -> stringResource(R.string.device_android_tv)
+  PLATFORM_WEB -> stringResource(R.string.device_web)
+  else -> null
+}
+
+/**
+ * A game's square brand mark — the manifest `icon`, not the 16:9 cover (a poster crop is
+ * unreadable this small). Falls back to the TV glyph for a game with no icon, or an
+ * advert that resolved to an unknown launcher subdomain. The mark fills the tile and is
+ * clipped to it: icons ship in their own app-icon frame (rounded square, own backdrop),
+ * so a plate underneath would only show as a ring around a frame.
+ */
+@Composable
+fun GameIcon(game: Game, tint: Color, modifier: Modifier = Modifier) {
+  val bitmap = rememberArt(game.icon)?.image
+  if (bitmap != null) {
+    Image(
+      bitmap,
+      contentDescription = null,
+      modifier.size(48.dp).clip(RoundedCornerShape(12.dp)),
+      contentScale = ContentScale.Fit,
+    )
+  } else {
+    Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
+      Icon(painterResource(R.drawable.ic_tv), contentDescription = null, Modifier.size(34.dp), tint = tint)
+    }
+  }
+}
+
+/** Numbered instruction row. */
+@Composable
+private fun StepRow(n: Int, text: AnnotatedString) {
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    Box(
+      // Solid primary, not primaryContainer — the pale container tint is nearly
+      // invisible against the sheet's surface in light mode.
+      Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+      contentAlignment = Alignment.Center,
+    ) {
+      Text(
+        "$n",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onPrimary,
+      )
+    }
+    Text(text, style = MaterialTheme.typography.bodyLarge)
+  }
+}
+
+/**
+ * The two-step "start on your TV, then scan" how-to for a playable game's info sheet —
+ * the app is the controller, so a first-timer who taps the card learns they need
+ * the game running on a big screen first.
+ */
+@Composable
+fun PlaySteps(game: Game) {
+  Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    // Deliberately path-free ("start it", not "open the app / the site") — where
+    // the game runs is the device-tile row's job (PlatformTiles).
+    StepRow(1, AnnotatedString(stringResource(R.string.play_step_start, game.name)))
+    StepRow(2, AnnotatedString(stringResource(R.string.play_step_scan)))
+  }
+}
+
+/** The two join actions — shared by the home Join card and a playable game's info sheet. */
+@Composable
+fun JoinButtons(onScan: () -> Unit, onEnterCode: () -> Unit) {
+  // Coral fills a screen's one primary button (site --action-solid) and nothing else.
+  Button(
+    onClick = onScan,
+    modifier = Modifier.fillMaxWidth().height(56.dp),
+    colors = ButtonDefaults.buttonColors(containerColor = ActionCoral, contentColor = Color.White),
+  ) {
+    Icon(painterResource(R.drawable.ic_qr_scan), contentDescription = null, Modifier.size(22.dp))
+    Spacer(Modifier.width(10.dp))
+    Text(stringResource(R.string.scan_code), style = MaterialTheme.typography.titleMedium)
+  }
+  FilledTonalButton(onClick = onEnterCode, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+    Text(stringResource(R.string.enter_code_manually), style = MaterialTheme.typography.titleMedium)
+  }
+}
+
+// Solid accent = playable (live or beta), accent-tinted dark = coming soon. The chip can land on
+// bright art (the scrim thins toward its top), so the soon-variant needs its own
+// dark base rather than a bare translucent tint. Used by the home poster cards.
+@Composable
+fun PosterStatusChip(game: Game, modifier: Modifier = Modifier) {
+  val bg =
+    if (game.isPlayable) game.accentColor
+    else game.accentColor.copy(alpha = 0.32f).compositeOver(Color.Black.copy(alpha = 0.55f))
+  val fg = if (game.isPlayable) Color.Black.copy(alpha = 0.85f) else Color.White
+  val label = when {
+    game.isBeta -> R.string.status_beta
+    game.isPlayable -> R.string.status_live
+    else -> R.string.status_coming_soon
+  }
+  Text(
+    stringResource(label),
+    style = MaterialTheme.typography.labelMedium,
+    color = fg,
+    modifier = modifier
+      .clip(CircleShape)
+      .background(bg)
+      .padding(horizontal = 10.dp, vertical = 4.dp),
+  )
+}
