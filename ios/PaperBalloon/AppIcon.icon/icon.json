@@ -19,27 +19,21 @@
     {
       "layers" : [
         {
-          "glass" : false,
+          "glass" : true,
           "name" : "balloon",
-          "image-name-specializations" : [
-            {
-              "value" : "balloon.svg"
-            },
-            {
-              "appearance" : "dark",
-              "value" : "balloon-dark.svg"
-            }
-          ]
+          "image-name" : "balloon.svg"
         }
       ],
+      "blur-material" : 0.6,
+      "lighting" : "individual",
       "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.25
+        "kind" : "layer-color",
+        "opacity" : 0.6
       },
-      "specular" : false,
+      "specular" : true,
       "translucency" : {
-        "enabled" : false,
-        "value" : 0.5
+        "enabled" : true,
+        "value" : 0.2
       }
     }
   ],
