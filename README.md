@@ -102,3 +102,6 @@ fails the check. Run it after any string change.
   (home), `ui/game/` (WebView game host), `theme/`.
 - `ios/PaperBalloon/` — `Data/` (same responsibilities as Android `data/`),
   `UI/Main/`, `GameHost/` (WKWebView game host), `Theme/`.
+- The launcher icon (Android `ic_launcher_*` layers and legacy mipmaps, iOS
+  `AppIcon.icon` plus the `AppIcon.appiconset` fallback) is generated from one
+  drawing: edit and run `uv run tools/app_icon.py`, then commit what it writes.

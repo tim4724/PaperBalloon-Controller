@@ -1,37 +1,42 @@
 {
   "fill" : {
-    "solid" : "srgb:0.90196,0.88235,0.91373,1.00000"
-  },
-  "fill-specializations" : [
-    {
-      "appearance" : "dark",
-      "value" : {
-        "solid" : "srgb:0.12549,0.12549,0.14118,1.00000"
+    "linear-gradient" : [
+      "srgb:0.96863,0.14902,0.42745,1.00000",
+      "srgb:1.00000,0.54118,0.12157,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 0
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 1
       }
     }
-  ],
+  },
   "groups" : [
     {
       "layers" : [
         {
-          "glass" : true,
+          "glass" : false,
+          "name" : "balloon",
           "image-name-specializations" : [
             {
-              "value" : "controller.svg"
+              "value" : "balloon.svg"
             },
             {
               "appearance" : "dark",
-              "value" : "controller-dark.svg"
+              "value" : "balloon-dark.svg"
             }
-          ],
-          "name" : "controller"
+          ]
         }
       ],
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.25
       },
-      "specular" : true,
+      "specular" : false,
       "translucency" : {
         "enabled" : false,
         "value" : 0.5
