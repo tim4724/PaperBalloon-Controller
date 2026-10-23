@@ -13,7 +13,6 @@
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">Navigateur</string>
-    <string name="status_live">Disponible</string>
     <string name="status_coming_soon">Bientôt disponible</string>
     <string name="status_beta">Bêta</string>
     <string name="trailer_unmute">Activer le son</string>
@@ -21,8 +20,8 @@
     <string name="trailer_fullscreen">Lire en plein écran</string>
     <string name="trailer_close">Fermer la vidéo</string>
 
-    <string name="join_title">Jouer</string>
-    <string name="join_start_game">Lance un jeu sur ta TV ou ton ordinateur.</string>
+    <string name="games_title">Jeux</string>
+    <string name="join_start_game">Lance un jeu sur ta TV ou dans ton navigateur.</string>
     <string name="scan_code">Scanner le code</string>
     <string name="enter_code_manually">Saisir le code manuellement</string>
 

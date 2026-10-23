@@ -63,7 +63,7 @@ final class StoreScreenshotTests: XCTestCase {
         app.launchArguments = baseArguments
         app.launch()
 
-        // ---- Home: catalog, live status, join card, profile chip ----
+        // ---- Home: catalog, tags, join dock, profile chip ----
         XCTAssertTrue(app.staticTexts["HexStacker"].waitForExistence(timeout: 10))
         // Assert and capture before MainScreen's 8 s search grace period settles this
         // to "No rooms found"; the queries below are slow on CI simulators.
@@ -71,10 +71,9 @@ final class StoreScreenshotTests: XCTestCase {
         snap("01-home-\(suffix)")
         XCTAssertTrue(app.staticTexts["Tiny Track"].firstMatch.exists)
         XCTAssertTrue(app.staticTexts["Powder"].firstMatch.exists)
-        XCTAssertTrue(app.staticTexts["Live"].firstMatch.exists)
         XCTAssertTrue(app.staticTexts["Beta"].firstMatch.exists)
         XCTAssertEqual(app.staticTexts.matching(identifier: "Coming soon").count, 1)
-        XCTAssertTrue(app.staticTexts["Play"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Games"].firstMatch.exists)
         XCTAssertTrue(app.buttons["Scan code"].firstMatch.exists)
         XCTAssertTrue(app.buttons[playerName].firstMatch.exists)
 

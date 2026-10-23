@@ -378,28 +378,14 @@ struct StepRow: View {
 
 // MARK: - JoinButtons
 
-/// The two join actions — shared by the home Join card and a playable game's info sheet.
+/// The two join actions, stacked — a playable game's info sheet.
 struct JoinButtons: View {
     let onScan: () -> Void
     let onEnterCode: () -> Void
 
-    @Environment(\.pbPalette) private var palette
-
     var body: some View {
         VStack(spacing: 10) {
-            // Coral fills a screen's one primary button (site --action-solid) and
-            // nothing else. A pill, like every site button and Android's.
-            Button(action: onScan) {
-                Label("Scan code", systemImage: "qrcode.viewfinder")
-                    .font(.pbTitleMedium)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(PBPalette.actionCoral)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-
+            ScanButton(action: onScan)
             SecondaryButton(action: onEnterCode) {
                 Text("Enter code manually")
             }
@@ -407,9 +393,50 @@ struct JoinButtons: View {
     }
 }
 
+// MARK: - ScanButton
+
+/// The one primary action: scan. Shared by the home dock and the info sheet. The sunset
+/// fills a screen's one primary button and nothing else; a 56pt pill, like Android's.
+struct ScanButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label("Scan code", systemImage: "qrcode.viewfinder")
+                .font(.pbTitleMedium)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+        }
+        .modifier(SunsetButton())
+    }
+}
+
+/// The sunset laid over Liquid Glass where the OS has it (iOS 26): the gradient at 85%
+/// over regular glass, so the glass still catches the light at the rim and the posters
+/// move faintly through it; the filled pill painted with the gradient before. 56pt, like
+/// Android's. A modifier rather than an inline `if #available` so the SDK-17 build
+/// compiles.
+private struct SunsetButton: ViewModifier {
+    private let sunset = LinearGradient(colors: PBPalette.actionSunset, startPoint: .top, endPoint: .bottom)
+
+    func body(content: Content) -> some View {
+        let pill = content
+            .buttonStyle(.plain)
+            .padding(.vertical, 13)
+        if #available(iOS 26.0, *) {
+            pill
+                .background(sunset.opacity(0.85), in: Capsule())
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            pill.background(sunset, in: Capsule())
+        }
+    }
+}
+
 // MARK: - SecondaryButton
 
-/// The secondary action beside the one coral primary: the system bordered button,
+/// The secondary action beside the one sunset primary: the system bordered button,
 /// which inherits the global ink tint, sized to match the primary.
 struct SecondaryButton<Label: View>: View {
     let action: () -> Void
@@ -426,34 +453,24 @@ struct SecondaryButton<Label: View>: View {
     }
 }
 
-// MARK: - PosterStatusChip
+// MARK: - StatusTag
 
-/// Solid accent = playable (live or beta), accent-tinted dark = coming soon. The chip can land on
-/// bright art (the scrim thins toward its top), so the soon-variant needs its own
-/// dark base rather than a bare translucent tint. Used by the home poster cards.
-struct PosterStatusChip: View {
+/// A quiet tint beside a game's name: amber for Beta, the chip grey for Coming soon. A
+/// live game has no tag at all. Used by the home cards.
+struct StatusTag: View {
     let game: Game
 
+    @Environment(\.pbPalette) private var palette
+
     var body: some View {
-        if game.isPlayable {
-            Text(game.isBeta ? LocalizedStringKey("Beta") : "Live")
-                .font(.pbLabelMedium)
-                .foregroundStyle(Color.black.opacity(0.85))
+        if !game.isPlayable || game.isBeta {
+            let ink = game.isBeta ? palette.onBetaTag : palette.onSurfaceVariant
+            Text(game.isBeta ? LocalizedStringKey("Beta") : "Coming soon")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(ink)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
-                .background(Capsule().fill(game.accentColor))
-        } else {
-            Text("Coming soon")
-                .font(.pbLabelMedium)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    ZStack {
-                        Capsule().fill(Color.black.opacity(0.55))
-                        Capsule().fill(game.accentColor.opacity(0.32))
-                    }
-                )
+                .background(Capsule().fill(game.isBeta ? palette.betaTag : palette.surfaceVariant))
         }
     }
 }

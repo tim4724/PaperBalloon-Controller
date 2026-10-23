@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,15 +48,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -66,8 +65,6 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -83,6 +80,24 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.CompositingStrategy as LayerCompositingStrategy
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -142,7 +157,19 @@ import games.paperballoon.controller.data.probeRoom
 import games.paperballoon.controller.data.resolveJoin
 import androidx.compose.ui.tooling.preview.Preview
 import games.paperballoon.controller.theme.PaperBalloonTheme
+import games.paperballoon.controller.theme.FleetDusk
+import games.paperballoon.controller.theme.FleetDuskNight
+import games.paperballoon.controller.theme.FleetGold
+import games.paperballoon.controller.theme.FleetSea
+import games.paperballoon.controller.theme.FleetSunset
+import games.paperballoon.controller.theme.FleetSunsetNight
+import games.paperballoon.controller.theme.SkyDark
+import games.paperballoon.controller.theme.SkyLight
 import games.paperballoon.controller.theme.card
+import games.paperballoon.controller.theme.frosted
+import games.paperballoon.controller.theme.ghost
+import games.paperballoon.controller.theme.ghostLine
+import games.paperballoon.controller.theme.isDark
 import games.paperballoon.controller.ui.preview.CardSamples
 import games.paperballoon.controller.ui.legal.LegalLinks
 import games.paperballoon.controller.R
@@ -154,10 +181,10 @@ import games.paperballoon.controller.ui.components.GameIcon
 import games.paperballoon.controller.ui.components.rememberArt
 import games.paperballoon.controller.ui.components.deviceName
 import games.paperballoon.controller.ui.components.findActivity
-import games.paperballoon.controller.ui.components.JoinButtons
+import games.paperballoon.controller.ui.components.ScanButton
 import games.paperballoon.controller.ui.components.JoiningCover
 import games.paperballoon.controller.ui.components.PlayerChip
-import games.paperballoon.controller.ui.components.PosterStatusChip
+import games.paperballoon.controller.ui.components.StatusTag
 import games.paperballoon.controller.ui.components.stableScreenInsets
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -429,11 +456,11 @@ fun MainScreen(
   val bars = BarIcons(lightStatus = lightStatus && !showScanner, lightNav = themeLight && !showScanner)
   SideEffect { onBarIcons(bars) }
 
-  // Games scroll the full screen; the join card floats over the list at the bottom.
-  // The trailing Spacer, sized off the card's measured height, keeps the last
+  // Games scroll the full screen; the dock floats over the list at the bottom.
+  // The trailing Spacer, sized off the dock's measured height, keeps the last
   // poster reachable. The scanner overlay sits in the same root Box but OUTSIDE
   // the inset padding — the camera runs edge to edge and pads its own controls.
-  var joinCardHeightPx by remember { mutableStateOf(0) }
+  var dockHeightPx by remember { mutableStateOf(0) }
   Box(modifier.fillMaxSize()) {
     // Only the horizontal (cutout) inset pads the container. The status bar and nav
     // bar are applied INSIDE the scroll (top spacer + card bottom inset) so the
@@ -444,15 +471,22 @@ fun MainScreen(
         .fillMaxSize()
         .windowInsetsPadding(stableScreenInsets.only(WindowInsetsSides.Horizontal)),
     ) {
+      val scroll = rememberScrollState()
+      SkyBackdrop(scrolled = { scroll.value })
+      // The list is drawn through a layer so the dock's edge can draw it again, blurred.
+      val listLayer = rememberGraphicsLayer()
       Column(
         Modifier
           .fillMaxSize()
-          .verticalScroll(rememberScrollState()),
+          .drawWithContent {
+            listLayer.record { this@drawWithContent.drawContent() }
+            drawLayer(listLayer)
+          }
+          .verticalScroll(scroll),
       ) {
         // Clears the status bar so the header starts below it, but scrolls away with
         // the content — posters slide under the transparent bar, not into a hard cut.
         Spacer(Modifier.windowInsetsTopHeight(stableScreenInsets))
-        // Sits OUTSIDE the 16dp content margin: it owns its own padding.
         HomeTopBar(profile = profile, onEditProfile = { showProfile = true }, onOpenAbout = onOpenAbout)
         // One rhythm for the whole stack: the banner, every room card and every poster
         // are cards in a single list, so they all sit 12dp apart. The one real break is
@@ -534,34 +568,28 @@ fun MainScreen(
             }
           }
           GamesSection(games, underBar, Modifier.padding(top = 8.dp), onOpen = { infoGame = it })
-          Spacer(Modifier.height(with(LocalDensity.current) { joinCardHeightPx.toDp() } + 12.dp))
+          Spacer(Modifier.height(with(LocalDensity.current) { dockHeightPx.toDp() } + 28.dp))
         }
       }
-      // Nav-area protection: posters dissolve into the background before they reach the gesture zone,
-      // instead of ending in a hard cut under the pill. Drawn behind the (opaque)
-      // join card, so only the band below and beside the card actually shows.
+      // The list dissolves into a blur under the dock, like iOS's soft scroll edge; the
+      // list's trailing spacer keeps the last card reachable.
       val bottomInset = with(LocalDensity.current) { stableScreenInsets.getBottom(this).toDp() }
-      val fadeBase = MaterialTheme.colorScheme.background
-      Box(
-        Modifier
-          .align(Alignment.BottomCenter)
-          .fillMaxWidth()
-          .height(bottomInset + 56.dp)
-          // Fade from the background's own hue at zero alpha (not transparent
-          // black) so the mid-ramp doesn't darken light-theme posters.
-          .background(Brush.verticalGradient(0f to fadeBase.copy(alpha = 0f), 1f to fadeBase)),
+      DockEdge(
+        list = listLayer,
+        scrolled = { scroll.value },
+        modifier = Modifier.align(Alignment.BottomCenter).height(bottomInset + 12.dp + 56.dp + DOCK_EDGE_ABOVE),
       )
-      JoinCard(
+      JoinDock(
         onScan = { requireName(AfterName.Scan) },
         onEnterCode = { requireName(AfterName.EnterCode) },
         modifier = Modifier
           .align(Alignment.BottomCenter)
           // Measured OUTSIDE the margins + nav-bar inset so the spacer clears the
-          // whole floating card.
-          .onGloballyPositioned { joinCardHeightPx = it.size.height }
-          // The container no longer reserves the nav bar; lift the card above it here.
+          // whole dock.
+          .onGloballyPositioned { dockHeightPx = it.size.height }
+          // The container no longer reserves the nav bar; lift the dock above it here.
           .windowInsetsPadding(stableScreenInsets.only(WindowInsetsSides.Bottom))
-          .padding(horizontal = 12.dp)
+          .padding(horizontal = 16.dp)
           .padding(bottom = 12.dp),
       )
     }
@@ -661,41 +689,40 @@ private sealed interface AfterName {
   data class Join(val target: JoinOutcome.Success) : AfterName
 }
 
-// Home chrome: the title, the name chip and About.
-@OptIn(ExperimentalMaterial3Api::class)
+// Home chrome over the sky: the frosted name chip and About at the top right, the title
+// large beneath them (iOS's large navigation title) with the fleet flying beside it.
 @Composable
 private fun HomeTopBar(profile: Profile, onEditProfile: () -> Unit, onOpenAbout: () -> Unit) {
-  TopAppBar(
-    title = {
-      Column {
-        Text(
-          stringResource(R.string.app_name),
-          style = MaterialTheme.typography.titleLarge,
-          fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-          stringResource(R.string.home_subtitle),
-          style = MaterialTheme.typography.labelMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-    },
-    actions = {
+  Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    Row(
+      Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
       PlayerChip(name = profile.name, onClick = onEditProfile)
-      IconButton(onClick = onOpenAbout) {
-        Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.about))
+      IconButton(
+        onClick = onOpenAbout,
+        modifier = Modifier.size(44.dp),
+        colors = IconButtonDefaults.iconButtonColors(
+          containerColor = MaterialTheme.colorScheme.frosted,
+          contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+      ) {
+        Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.about), Modifier.size(22.dp))
       }
-      Spacer(Modifier.width(8.dp))
-    },
-    // The host Box already pads status bar + cutout; don't let the bar re-add them.
-    windowInsets = WindowInsets(0),
-    // Text color for About, not M3's onSurfaceVariant grey: it sits beside the name
-    // chip's onSurface label and matches iOS's .primary.
-    colors = TopAppBarDefaults.topAppBarColors(
-      containerColor = Color.Transparent,
-      actionIconContentColor = MaterialTheme.colorScheme.onSurface,
-    ),
-  )
+    }
+    Text(
+      stringResource(R.string.app_name),
+      style = MaterialTheme.typography.headlineLarge,
+      fontWeight = FontWeight.SemiBold,
+      modifier = Modifier.padding(top = 18.dp),
+    )
+    Text(
+      stringResource(R.string.home_subtitle),
+      style = MaterialTheme.typography.labelMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
 }
 
 // Tactile press feedback shared by the tappable cards: a subtle spring scale-down
@@ -769,7 +796,7 @@ private fun GameEndBanner(message: String?, onDismiss: () -> Unit) {
  * The site's card: flat, the card fill with a hairline border, so it adapts per theme
  * instead of sitting as a dark slab on a light screen. The game's colour lives on the
  * icon and nowhere else: routing brand through the border made every HexStacker card
- * near-CTA red (its accent is #FF6B6B against the coral), which both read as an alert
+ * near-CTA red (its accent is #FF6B6B beside the sunset), which both read as an alert
  * and spent the one colour that's supposed to mean "this is how you play".
  */
 @Composable
@@ -899,10 +926,9 @@ private enum class NearbyStatus {
 // the verb changes between the two. The info line wears the toggle's own system icon —
 // the mark the system dialog and the Settings row show — in the muted-status layout, so
 // every state of the slot is one icon-plus-line; the button stays bare-verb tonal like
-// JoinButtons' "Enter code manually". Tonal, not coral:
-// this is one-time setup that vanishes for good once granted, and it must not outshout
-// the scan CTA you use every session. Metrics match JoinButtons so the three buttons on
-// this screen are one family.
+// the info sheet's "Enter code manually", at the same height. Tonal, not the sunset: this
+// is one-time setup that vanishes for good once granted, and it must not outshout the
+// scan CTA you use every session.
 //
 // Once granted, searching, not-found and the off-Wi-Fi hint collapse to a muted line — an
 // idle home screen shouldn't carry a box announcing that a TV simply isn't switched on.
@@ -979,7 +1005,7 @@ private fun StatusLine(text: AnnotatedString, @DrawableRes icon: Int, showsProgr
   }
 }
 
-// Every game — live or coming soon — gets the same full-width poster card.
+// The catalog: a heading, then every game — live or coming soon — as the same card.
 @Composable
 private fun GamesSection(
   games: List<Game>,
@@ -988,6 +1014,19 @@ private fun GamesSection(
   onOpen: (Game) -> Unit,
 ) {
   Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.padding(bottom = 2.dp)) {
+      Text(
+        stringResource(R.string.games_title),
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+      )
+      // Path-free: on a TV the game is an app, on a laptop a website.
+      Text(
+        stringResource(R.string.join_start_game),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
     games.forEach { game -> GameCard(game, underBar, onOpen) }
   }
 }
@@ -997,22 +1036,19 @@ private fun GamesSection(
 // crossover (~0.18).
 private const val ICON_FLIP_LUMINANCE = 0.4f
 
-// The title scrim over a poster: clear down to SCRIM_START, then to SCRIM_ALPHA black.
-private const val SCRIM_START = 0.55f
-private const val SCRIM_ALPHA = 0.86f
-
-// Poster tile: name/tagline/status sit ON the art over a bottom scrim, so the
-// scrim colors are fixed (white text on black gradient) in both themes.
+// The language's card: flat, the card fill with one hairline, the poster whole and
+// untouched on top, and the name under it with its tag beside it, the player count at
+// the right and where it runs below. The whole card is the tap.
 @Composable
 private fun GameCard(game: Game, underBar: SnapshotStateMap<String, Boolean>, onOpen: (Game) -> Unit) {
   val interaction = remember { MutableInteractionSource() }
   val scale = rememberPressScale(interaction)
   val art = rememberArt(game.art)
-  // Whether the art is light where the status bar's icon row crosses this card; null
-  // while the bar is elsewhere (or the art hasn't decoded). Decided in the positioned
-  // callback so the card only recomposes on a flip, not on every scroll frame. Root
-  // coordinates are window coordinates (edge to edge), so root y = 0 is the top of
-  // the screen.
+  // Whether the art is light where the status bar's icon row crosses this poster; null
+  // while the bar is elsewhere (the card body is the theme's own tone) or the art hasn't
+  // decoded. Decided in the positioned callback so the card only recomposes on a flip,
+  // not on every scroll frame. Root coordinates are window coordinates (edge to edge),
+  // so root y = 0 is the top of the screen.
   val barCenterPx = with(LocalDensity.current) { stableScreenInsets.getTop(this) / 2f }
   val latestArt by rememberUpdatedState(art)
   var lightUnderBar by remember { mutableStateOf<Boolean?>(null) }
@@ -1020,83 +1056,301 @@ private fun GameCard(game: Game, underBar: SnapshotStateMap<String, Boolean>, on
     lightUnderBar?.let { underBar[game.id] = it }
     onDispose { underBar.remove(game.id) }
   }
-  ElevatedCard(
+  val muted = MaterialTheme.colorScheme.onSurfaceVariant
+  Card(
     onClick = { onOpen(game) },
     modifier = Modifier
       .fillMaxWidth()
-      .graphicsLayer { scaleX = scale; scaleY = scale }
-      .onGloballyPositioned { coords ->
-        // positionInRoot, not boundsInRoot: the latter clips to the ancestors, which
-        // would fold the part scrolled off the top into the fraction.
-        val top = coords.positionInRoot().y
-        val height = coords.size.height
-        val crossing = if (barCenterPx >= top && barCenterPx < top + height) (barCenterPx - top) / height else null
-        lightUnderBar = latestArt?.let { a -> crossing?.let { posterLuminance(a, it) > ICON_FLIP_LUMINANCE } }
-      },
+      .graphicsLayer { scaleX = scale; scaleY = scale },
     interactionSource = interaction,
+    shape = MaterialTheme.shapes.large,
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.card,
+      contentColor = MaterialTheme.colorScheme.onSurface,
+    ),
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
   ) {
-    Box {
-      // 16:9 matches the screenshots — a shorter crop would slice the per-player
-      // HUD chips in the corners of each quadrant.
-      GameArt(game, art, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-      Box(
-        Modifier.matchParentSize().background(
-          Brush.verticalGradient(
-            SCRIM_START to Color.Transparent,
-            1f to Color.Black.copy(alpha = SCRIM_ALPHA),
-          ),
-        ),
-      )
-      Row(
-        Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-      ) {
-        Text(
-          game.name,
-          style = MaterialTheme.typography.titleMedium,
-          color = Color.White,
-          modifier = Modifier.weight(1f),
-        )
-        PosterStatusChip(game)
+    // 16:9 matches the screenshots — a shorter crop would slice the per-player
+    // HUD chips in the corners of each quadrant.
+    GameArt(
+      game,
+      art,
+      Modifier
+        .fillMaxWidth()
+        .aspectRatio(16f / 9f)
+        .onGloballyPositioned { coords ->
+          // positionInRoot, not boundsInRoot: the latter clips to the ancestors, which
+          // would fold the part scrolled off the top into the fraction.
+          val top = coords.positionInRoot().y
+          val height = coords.size.height
+          val crossing = if (barCenterPx >= top && barCenterPx < top + height) (barCenterPx - top) / height else null
+          lightUnderBar = latestArt?.let { a -> crossing?.let { posterLuminance(a, it) > ICON_FLIP_LUMINANCE } }
+        },
+    )
+    Column(Modifier.padding(start = 14.dp, top = 12.dp, end = 14.dp, bottom = 14.dp)) {
+      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+          Modifier.weight(1f),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          Text(
+            game.name,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+          )
+          StatusTag(game)
+        }
+        // "1–8" with the person glyph standing in for the word "players" (Game.playersRange).
+        game.playersRange?.let { range ->
+          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(painterResource(R.drawable.ic_people), contentDescription = null, Modifier.size(18.dp), tint = muted)
+            Text(range, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = muted)
+          }
+        }
+      }
+      // Where it runs: each live TV app, then the browser host. A game with neither
+      // (not out yet) has no row.
+      val meta = buildList {
+        TV_PLATFORMS.forEach { (id, nameRes) ->
+          if (game.tvApps[id] == "live") add(R.drawable.ic_tv to stringResource(nameRes))
+        }
+        game.displayHost?.let { add(R.drawable.ic_globe to it) }
+      }
+      if (meta.isNotEmpty()) {
+        Row(
+          Modifier.padding(top = 6.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+          meta.forEach { (icon, label) ->
+            Row(
+              Modifier.weight(1f, fill = false),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+              Icon(painterResource(icon), contentDescription = null, Modifier.size(15.dp), tint = muted)
+              Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+            }
+          }
+        }
       }
     }
   }
 }
 
-// How light a poster is at [fraction] of its height, with the title scrim GameCard
-// draws over the art folded in: that composite is what the icons actually sit on.
-private fun posterLuminance(art: Art, fraction: Float): Float {
-  val row = art.rowLuminance[(fraction * ART_LUMINANCE_ROWS).toInt().coerceIn(0, ART_LUMINANCE_ROWS - 1)]
-  val scrim = SCRIM_ALPHA * ((fraction - SCRIM_START) / (1f - SCRIM_START)).coerceIn(0f, 1f)
-  return row * (1f - scrim)
+// How light a poster is at [fraction] of its height: what the status-bar icons sit on.
+private fun posterLuminance(art: Art, fraction: Float): Float =
+  art.rowLuminance[(fraction * ART_LUMINANCE_ROWS).toInt().coerceIn(0, ART_LUMINANCE_ROWS - 1)]
+
+// The home sky behind the catalog, scrolling with it. One dusk: lilac at the zenith, peach
+// at the horizon, fading into the paper by the first card — with flat white clouds by day;
+// by night the clouds go, the stars come out and the ground is the night violet. The fleet flies
+// beside the large title: the sunset balloon leads, sea, gold and dusk follow. Placed in
+// dp from the top of the screen (sky) or the bottom of the status bar (the fleet, which
+// keeps station with the title) and from the right edge; iOS's SkyBackdrop draws the
+// same sky around its own title.
+@Composable
+private fun SkyBackdrop(scrolled: () -> Int) {
+  val scheme = MaterialTheme.colorScheme
+  val dark = scheme.isDark
+  val statusTop = with(LocalDensity.current) { stableScreenInsets.getTop(this).toDp() }
+  // Moved in the draw phase (graphicsLayer reads the offset there), so scrolling never
+  // recomposes it.
+  Box(Modifier.fillMaxSize().graphicsLayer { translationY = -scrolled().toFloat() }) {
+    Canvas(Modifier.fillMaxSize()) {
+      val paperAt = SKY_PAPER_DP.dp.toPx()
+      drawRect(
+        if (dark) {
+          Brush.verticalGradient(SKY_NIGHT_FLAT_DP / SKY_PAPER_DP to SkyDark, 1f to scheme.background, endY = paperAt)
+        } else {
+          Brush.verticalGradient(
+            0f to SkyLight[0], SKY_HORIZON_DP / SKY_PAPER_DP to SkyLight[1], 1f to scheme.background, endY = paperAt,
+          )
+        },
+      )
+      if (dark) {
+        for ((x, y, r) in SKY_STARS) {
+          drawCircle(scheme.onSurface.copy(alpha = 0.75f), r.dp.toPx(), Offset(x * size.width, y.dp.toPx()))
+        }
+      } else {
+        for (cloud in SKY_CLOUDS) {
+          // A puff: a rounded bar with three circles rising from it, on a 200×90 grid.
+          val s = cloud.width.dp.toPx() / 200f
+          val left = if (cloud.fromRight) size.width + cloud.x.dp.toPx() - cloud.width.dp.toPx() else cloud.x.dp.toPx()
+          val top = cloud.y.dp.toPx()
+          drawRoundRect(Color.White, Offset(left + 16 * s, top + 52 * s), Size(168 * s, 34 * s), CornerRadius(17 * s))
+          drawCircle(Color.White, 30 * s, Offset(left + 62 * s, top + 54 * s))
+          drawCircle(Color.White, 38 * s, Offset(left + 106 * s, top + 44 * s))
+          drawCircle(Color.White, 24 * s, Offset(left + 150 * s, top + 58 * s))
+        }
+      }
+    }
+    val fleet = listOf(
+      if (dark) FleetSunsetNight else FleetSunset,
+      FleetSea,
+      FleetGold,
+      if (dark) FleetDuskNight else FleetDusk,
+    )
+    SKY_FLEET.forEachIndexed { i, (width, end, top) ->
+      val brush = Brush.verticalGradient(fleet[i])
+      Image(
+        painterResource(R.drawable.sky_balloon),
+        contentDescription = null,
+        modifier = Modifier
+          .align(Alignment.TopEnd)
+          .padding(top = statusTop + top.dp, end = end.dp)
+          .width(width.dp)
+          .aspectRatio(SKY_BALLOON_ASPECT)
+          // The silhouette becomes a mask for the balloon's gradient.
+          .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+          .drawWithContent {
+            drawContent()
+            drawRect(brush, blendMode = BlendMode.SrcIn)
+          },
+      )
+    }
+  }
 }
 
-// The floating join card pinned over the scrolling catalog: browse first, act at
-// the thumb. Order and copy per design.
+// The sky's three stops, in dp from the top of the screen: the horizon (peach), where the
+// night's flat sky starts to fade, and where either has become the paper.
+private const val SKY_HORIZON_DP = 220f
+private const val SKY_NIGHT_FLAT_DP = 300f
+private const val SKY_PAPER_DP = 520f
+// x as a fraction of the width, y in dp from the top of the screen, radius dp.
+private val SKY_STARS = listOf(
+  Triple(0.08f, 40f, 1.2f), Triple(0.31f, 90f, 1f), Triple(0.51f, 30f, 1.3f), Triple(0.77f, 70f, 1f),
+  Triple(0.92f, 150f, 1.2f), Triple(0.18f, 190f, 1f), Triple(0.64f, 210f, 1.1f), Triple(0.85f, 300f, 1f),
+  Triple(0.10f, 330f, 1.2f), Triple(0.46f, 390f, 1f), Triple(0.15f, 20f, 0.8f), Triple(0.41f, 60f, 1.2f),
+  Triple(0.62f, 120f, 0.9f), Triple(0.87f, 30f, 1f), Triple(0.05f, 110f, 1.3f), Triple(0.28f, 150f, 0.8f),
+  Triple(0.74f, 160f, 1.1f), Triple(0.95f, 210f, 0.9f), Triple(0.38f, 230f, 1f), Triple(0.21f, 260f, 1.2f),
+  Triple(0.56f, 280f, 0.8f), Triple(0.77f, 250f, 1.3f), Triple(0.08f, 370f, 0.9f), Triple(0.33f, 340f, 1.1f),
+  Triple(0.67f, 350f, 0.8f), Triple(0.90f, 380f, 1.2f), Triple(0.49f, 410f, 0.9f), Triple(0.95f, 100f, 0.8f),
+)
+// Clouds: left dp (from the screen's right edge when fromRight), top dp from the top of
+// the screen, width dp. One overflows the left edge, one drifts behind the fleet at the
+// right — never behind the chips or over the status line below the title.
+private class Cloud(val x: Float, val y: Float, val width: Float, val fromRight: Boolean)
+private val SKY_CLOUDS = listOf(
+  Cloud(-12f, 46f, 118f, fromRight = false), Cloud(-10f, 96f, 150f, fromRight = true), Cloud(118f, 24f, 54f, fromRight = false),
+)
+// The fleet in colour order (sunset, sea, gold, dusk): width dp, end margin dp, top dp
+// below the status bar. The sunset is the biggest; the rest fly smaller and further off.
+private val SKY_FLEET = listOf(
+  Triple(40f, 48f, 62f), Triple(24f, 104f, 94f), Triple(15f, 20f, 56f), Triple(17f, 5f, 92f),
+)
+private const val SKY_BALLOON_ASPECT = 58f / 82.43f // res/drawable/sky_balloon.xml's viewport
+
+// The soft edge under the dock, like iOS's soft scroll edge: the list, drawn again from its
+// layer at three blur strengths that fade in over overlapping halves of the ramp, so the
+// blur grows progressively instead of one blurred copy crossfading over the sharp list (a
+// faint double image that reads as a line), under a veil of the paper (blur alone keeps
+// the posters saturated and reads as out-of-focus content, not a frosted surface). Every
+// ramp is eased, so nothing kinks where it starts or ends. The edge reaches only a little
+// above the dock and finishes softening just inside it, so the posters stay sharp until
+// they reach the buttons. Below API 31 (no render effects) the list
+// fades into the paper instead.
 @Composable
-private fun JoinCard(
+private fun DockEdge(list: GraphicsLayer, scrolled: () -> Int, modifier: Modifier) {
+  val blurs = List(DOCK_EDGE_BLURS.size) { rememberGraphicsLayer() }
+  val masked = List(DOCK_EDGE_BLURS.size) { rememberGraphicsLayer() }
+  val background = MaterialTheme.colorScheme.background
+  Box(
+    modifier
+      .fillMaxWidth()
+      .drawWithCache {
+        val ramp = DOCK_EDGE_RAMP.toPx()
+        val veil = easedRamp(background.copy(alpha = 0f), background.copy(alpha = 0.5f), 0f, ramp)
+        val fade = easedRamp(background.copy(alpha = 0f), background, 0f, ramp)
+        val masks = DOCK_EDGE_BLURS.map { (_, from, to) -> easedRamp(Color.Transparent, Color.Black, from * ramp, to * ramp) }
+        onDrawBehind {
+          scrolled() // read here so every scroll frame redraws the edge
+          if (Build.VERSION.SDK_INT >= 31) {
+            // The list layer is the whole viewport; this edge is its bottom slice.
+            val above = list.size.height - size.height
+            val slice = IntSize(size.width.toInt(), size.height.toInt())
+            DOCK_EDGE_BLURS.forEachIndexed { i, (radius, _, _) ->
+              val blur = blurs[i]
+              blur.record(slice) { translate(top = -above) { drawLayer(list) } }
+              blur.renderEffect = BlurEffect(radius.toPx(), radius.toPx(), TileMode.Clamp)
+              // The mask's DstIn must cut only this blur, so the two share an offscreen layer.
+              val layer = masked[i]
+              layer.compositingStrategy = LayerCompositingStrategy.Offscreen
+              layer.record(slice) {
+                drawLayer(blur)
+                drawRect(masks[i], blendMode = BlendMode.DstIn)
+              }
+              drawLayer(layer)
+            }
+            drawRect(veil)
+          } else {
+            drawRect(fade)
+          }
+        }
+      },
+  )
+}
+
+// A vertical ramp from [from] to [to] between [startY] and [endY], eased (smoothstep) so
+// its slope is zero at both ends — a linear ramp shows a line where it stops.
+private fun easedRamp(from: Color, to: Color, startY: Float, endY: Float): Brush {
+  val steps = 12
+  val stops = Array(steps + 1) { i ->
+    val t = i / steps.toFloat()
+    t to lerp(from, to, t * t * (3 - 2 * t))
+  }
+  return Brush.verticalGradient(*stops, startY = startY, endY = endY)
+}
+
+// How far above the dock the list starts to soften, and over how far it does (so the ramp
+// ends half of it inside the dock).
+private val DOCK_EDGE_ABOVE = 12.dp
+private val DOCK_EDGE_RAMP = 24.dp
+// The progressive blur: radius, and where in the ramp (0 = its top, 1 = its end) that
+// strength fades in.
+private val DOCK_EDGE_BLURS = listOf(
+  Triple(2.dp, 0f, 0.5f), Triple(4.dp, 0.25f, 0.75f), Triple(6.dp, 0.5f, 1f),
+)
+
+// The dock at the thumb, over the scrolling catalog: scan, and the keyboard for a typed
+// code.
+@Composable
+private fun JoinDock(
   onScan: () -> Unit,
   onEnterCode: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  Surface(
-    modifier = modifier.fillMaxWidth(),
-    shape = MaterialTheme.shapes.extraLarge,
-    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    // A hairline border does the "lift" in light mode; a heavy drop-shadow just
-    // reads as a gray blob on the near-white base.
-    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    shadowElevation = 2.dp,
+  Row(
+    modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    Column(
-      Modifier.fillMaxWidth().padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp),
+    ScanButton(onScan, Modifier.weight(1f))
+    // The ghost button: the card fill with a 1.5dp line, as a circle.
+    OutlinedIconButton(
+      onClick = onEnterCode,
+      modifier = Modifier.size(56.dp),
+      colors = IconButtonDefaults.outlinedIconButtonColors(
+        containerColor = MaterialTheme.colorScheme.ghost,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+      ),
+      border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.ghostLine),
     ) {
-      Text(stringResource(R.string.join_title), style = MaterialTheme.typography.titleLarge)
-      // Path-free: on a TV the game is an app, on a laptop a website.
-      Text(stringResource(R.string.join_start_game), style = MaterialTheme.typography.bodyLarge)
-      JoinButtons(onScan = onScan, onEnterCode = onEnterCode)
+      Icon(
+        painterResource(R.drawable.ic_keyboard),
+        contentDescription = stringResource(R.string.enter_code_manually),
+        Modifier.size(24.dp),
+      )
     }
   }
 }

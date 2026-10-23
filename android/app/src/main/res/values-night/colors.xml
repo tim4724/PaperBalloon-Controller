@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- SurfaceDarkBase in Color.kt — keep in sync. -->
-    <color name="pb_surface">#110F17</color>
+    <color name="pb_surface">#141119</color>
 </resources>

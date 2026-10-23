@@ -14,7 +14,6 @@
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">ブラウザ</string>
-    <string name="status_live">プレイ可能</string>
     <string name="status_coming_soon">近日公開</string>
     <string name="status_beta">ベータ版</string>
     <string name="trailer_unmute">ミュート解除</string>
@@ -22,8 +21,8 @@
     <string name="trailer_fullscreen">全画面で再生</string>
     <string name="trailer_close">動画を閉じる</string>
 
-    <string name="join_title">プレイ</string>
-    <string name="join_start_game">テレビまたはパソコンでゲームを始めてください。</string>
+    <string name="games_title">ゲーム</string>
+    <string name="join_start_game">テレビまたはブラウザでゲームを始めてください。</string>
     <string name="scan_code">コードをスキャン</string>
     <string name="enter_code_manually">コードを手動で入力</string>
 

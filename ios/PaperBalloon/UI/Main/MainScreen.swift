@@ -69,7 +69,6 @@ struct MainScreen: View {
     @State private var infoGame: Game? = nil
     // A scan/enter action tapped inside the info sheet, run once it dismisses.
     @State private var pendingSheetAction: AfterName? = nil
-    @State private var joinCardHeight: CGFloat = 0
     // Haptic triggers (any change fires the paired sensoryFeedback).
     @State private var successTick = 0
     @State private var errorTick = 0
@@ -136,51 +135,42 @@ struct MainScreen: View {
                     }
 
                     VStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Games")
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(palette.onSurface)
+                            // Path-free: on a TV the game is an app, on a laptop a website.
+                            Text("Start a game on your TV or in your browser.")
+                                .font(.pbBodyLarge)
+                                .foregroundStyle(palette.onSurfaceVariant)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         ForEach(games) { game in
                             GameCard(game: game) { infoGame = game }
                         }
                     }
                     .padding(.top, 8)
-
-                    Color.clear
-                        .frame(height: joinCardHeight + 12)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+                .padding(.bottom, 16)
+                .background(alignment: .top) { SkyBackdrop() }
                 .animation(.spring(duration: 0.45), value: messages.gameEndBanner)
                 .animation(.spring(duration: 0.45), value: resolvedNearby.count)
             }
-
-            // Bottom protection, mirroring Android's nav-area fade: posters dissolve
-            // into the background before the home-indicator zone instead of ending in
-            // a hard cut beneath the join card. Fades from the background's own hue at
-            // zero alpha (not .clear) so the mid-ramp doesn't gray out light posters.
-            LinearGradient(
-                stops: [
-                    .init(color: palette.background.opacity(0), location: 0),
-                    .init(color: palette.background, location: 1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 96)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .ignoresSafeArea(edges: .bottom)
-            .allowsHitTesting(false)
-
-            JoinCard(
-                onScan: { requireName(.scan) },
-                onEnterCode: { requireName(.enterCode) }
-            )
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.height
-            } action: { height in
-                joinCardHeight = height
-            }
-            .padding(.horizontal, 12)
-            // The safe area already clears the home indicator — anything more
-            // reads as a floating gap.
-            .padding(.bottom, 4)
+            // The dock sits in a bar at the bottom edge: the list scrolls under it and
+            // blurs out into the soft scroll edge (the system's, on iOS 26), and the
+            // content is inset so the last card stays reachable.
+            .modifier(DockBar {
+                JoinDock(
+                    onScan: { requireName(.scan) },
+                    onEnterCode: { requireName(.enterCode) }
+                )
+                .padding(.horizontal, 16)
+                // The safe area already clears the home indicator — anything more
+                // reads as a floating gap.
+                .padding(.bottom, 4)
+            })
 
             // The same cover the game host shows while the controller paints, so a join
             // is ONE loading screen from tap to page: this one names no game because
@@ -660,7 +650,7 @@ private struct GameEndBanner: View {
 /// The site's card: flat, the card fill with a hairline border, so it adapts per
 /// theme instead of sitting as a dark slab on a light screen. The game's colour lives on
 /// the icon and nowhere else: routing brand through the border made every HexStacker card
-/// near-CTA red (its accent is #FF6B6B against the coral), which both read as an alert
+/// near-CTA red (its accent is #FF6B6B beside the sunset), which both read as an alert
 /// and spent the one colour that's supposed to mean "this is how you play".
 private struct RoomCard: View {
     let game: Game
@@ -787,10 +777,10 @@ enum NearbyStatus {
 /// name]" — goal first, then the concrete thing to flip, over a button that carries only
 /// the verb — ask the system, or open Settings once that's the one place that can still
 /// answer. The info line reuses the muted-status row, so every state of the slot is one
-/// icon-plus-line; the button stays bare-verb tonal like JoinButtons' "Enter code
-/// manually". Tonal, not coral: this is one-time setup
-/// that vanishes for good once granted, and it must not outshout the scan CTA you use every
-/// session. Metrics match JoinButtons so the three buttons on this screen are one family.
+/// icon-plus-line; the button stays bare-verb tonal like the info sheet's "Enter code
+/// manually", at the same size. Tonal, not the sunset: this is one-time setup that
+/// vanishes for good once granted, and it must not outshout the scan CTA you use every
+/// session.
 ///
 /// Once granted, searching, not-found and the off-Wi-Fi hint collapse to a muted line — an
 /// idle home screen shouldn't carry a box announcing that a TV simply isn't switched on.
@@ -856,77 +846,285 @@ private struct NearbyStatusCard: View {
 
 // MARK: - GameCard
 
+/// The language's card: flat, the card fill with one hairline, the poster whole and
+/// untouched on top, and the name under it with its tag beside it, the player count at
+/// the right and where it runs below. The whole card is the tap.
 private struct GameCard: View {
     let game: Game
     let onTap: () -> Void
 
+    @Environment(\.pbPalette) private var palette
+
+    /// Where it runs: each live TV app, then the browser host. A game with neither (not
+    /// out yet) has no row.
+    private var meta: [(icon: String, label: String)] {
+        var items: [(String, String)] = []
+        for (id, name) in tvPlatforms where game.tvApps[id] == "live" {
+            items.append(("tv", String(localized: name)))
+        }
+        if let host = game.displayHost { items.append(("globe", host)) }
+        return items
+    }
+
     var body: some View {
         Button(action: onTap) {
-            ZStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 0) {
                 GameArt(game: game)
                     .aspectRatio(16.0 / 9.0, contentMode: .fit)
                     .frame(maxWidth: .infinity)
 
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0.0),
-                        .init(color: .clear, location: 0.55),
-                        .init(color: Color.black.opacity(0.86), location: 1.0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(game.name)
-                            .font(.pbTitleMedium)
-                            .foregroundStyle(.white)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 10) {
+                        HStack(spacing: 8) {
+                            Text(game.name)
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(palette.onSurface)
+                                .lineLimit(1)
+                            StatusTag(game: game)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        // "1–8" with the person glyph standing in for the word "players"
+                        // (Game.playersRange).
+                        if let range = game.playersRange {
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.2")
+                                    .font(.system(size: 14, weight: .medium))
+                                Text(range)
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .foregroundStyle(palette.onSurfaceVariant)
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    PosterStatusChip(game: game)
+                    let places = meta
+                    if !places.isEmpty {
+                        HStack(spacing: 14) {
+                            ForEach(places.indices, id: \.self) { i in
+                                HStack(spacing: 5) {
+                                    Image(systemName: places[i].icon)
+                                        .font(.system(size: 12, weight: .medium))
+                                    Text(places[i].label)
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                        .foregroundStyle(palette.onSurfaceVariant)
+                    }
                 }
-                .padding(14)
+                .padding(EdgeInsets(top: 12, leading: 14, bottom: 14, trailing: 14))
             }
+            .background(palette.card)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: Color.black.opacity(0.15), radius: 4, y: 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(palette.outlineVariant, lineWidth: 1)
+            )
         }
         .buttonStyle(PressableCardButtonStyle())
     }
 }
 
-// MARK: - JoinCard (floating, material blur over the poster list)
+// MARK: - SkyBackdrop
 
-private struct JoinCard: View {
+/// The home sky behind the catalog, scrolling with it. One dusk: lilac at the zenith,
+/// peach at the horizon, fading into the paper by the first card — with flat white
+/// clouds by day; by night the clouds go, the stars come out and the ground is the night violet.
+/// The fleet flies beside the large title: the sunset balloon leads, sea, gold and dusk
+/// follow. The background of the scroll content, so it travels with the title; placed in
+/// points from the top of the content (just under the large title; negative is above
+/// it) and from the screen's edges. Android's SkyBackdrop (MainScreen.kt) draws the
+/// same sky around its own title.
+private struct SkyBackdrop: View {
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.pbPalette) private var palette
+
+    // How far the sky reaches above the content: past the top of the screen, with room to
+    // spare for a pull-down bounce.
+    private static let above: CGFloat = 1000
+    // The sky's stops, from the content top: where the screen's top sits on the phone
+    // the language was drawn for, the horizon (peach), where the night's flat sky starts
+    // to fade, and where either has become the paper.
+    private static let screenTop: CGFloat = -193
+    private static let horizon: CGFloat = 27
+    private static let nightFlat: CGFloat = 107
+    private static let paper: CGFloat = 327
+    // x as a fraction of the width, y, radius.
+    private static let stars: [(x: CGFloat, y: CGFloat, r: CGFloat)] = [
+        (0.08, -153, 1.2), (0.31, -103, 1), (0.51, -163, 1.3), (0.77, -123, 1), (0.92, -43, 1.2),
+        (0.18, -3, 1), (0.64, 17, 1.1), (0.85, 107, 1), (0.10, 137, 1.2), (0.46, 197, 1),
+        (0.15, -173, 0.8), (0.41, -133, 1.2), (0.62, -73, 0.9), (0.87, -163, 1), (0.05, -83, 1.3),
+        (0.28, -43, 0.8), (0.74, -33, 1.1), (0.95, 17, 0.9), (0.38, 37, 1), (0.21, 67, 1.2),
+        (0.56, 87, 0.8), (0.77, 57, 1.3), (0.08, 177, 0.9), (0.33, 147, 1.1), (0.67, 157, 0.8),
+        (0.90, 187, 1.2), (0.49, 217, 0.9), (0.95, -93, 0.8),
+    ]
+    // Clouds: left (from the screen's right edge when `fromRight`), top, width. One
+    // overflows the left edge, one drifts behind the fleet at the right — never behind
+    // the toolbar pills or over the status line below.
+    private static let clouds: [(x: CGFloat, y: CGFloat, width: CGFloat, fromRight: Bool)] = [
+        (-12, -140, 118, false), (-10, -100, 150, true), (118, -162, 54, false),
+    ]
+    // The fleet in colour order (sunset, sea, gold, dusk): width, end margin, top. The
+    // sunset is the biggest; the rest fly smaller and further off.
+    private static let fleet: [(width: CGFloat, end: CGFloat, top: CGFloat)] = [
+        (40, 48, -75), (24, 104, -43), (15, 20, -81), (17, 5, -45),
+    ]
+    private static let balloonAspect: CGFloat = 58 / 82.43  // SkyBalloon's viewBox
+
+    var body: some View {
+        let dark = scheme == .dark
+        let fleetColors = [
+            dark ? PBPalette.fleetSunsetNight : PBPalette.fleetSunset,
+            PBPalette.fleetSea,
+            PBPalette.fleetGold,
+            dark ? PBPalette.fleetDuskNight : PBPalette.fleetDusk,
+        ]
+        let height = Self.above + Self.paper
+        GeometryReader { geo in
+            let width = geo.size.width
+            ZStack(alignment: .topLeading) {
+                LinearGradient(
+                    stops: dark ? [
+                        .init(color: PBPalette.skyDark, location: (Self.above + Self.nightFlat) / height),
+                        .init(color: palette.background, location: 1),
+                    ] : [
+                        .init(color: PBPalette.skyLight[0], location: (Self.above + Self.screenTop) / height),
+                        .init(color: PBPalette.skyLight[1], location: (Self.above + Self.horizon) / height),
+                        .init(color: palette.background, location: 1),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(width: width, height: height)
+                if dark {
+                    ForEach(Self.stars.indices, id: \.self) { i in
+                        let star = Self.stars[i]
+                        Circle()
+                            .fill(palette.onSurface.opacity(0.75))
+                            .frame(width: star.r * 2, height: star.r * 2)
+                            .position(x: star.x * width, y: Self.above + star.y)
+                    }
+                } else {
+                    ForEach(Self.clouds.indices, id: \.self) { i in
+                        let cloud = Self.clouds[i]
+                        Puff()
+                            .fill(.white)
+                            .frame(width: cloud.width, height: cloud.width * 0.45)
+                            .offset(x: cloud.fromRight ? width + cloud.x - cloud.width : cloud.x,
+                                    y: Self.above + cloud.y)
+                    }
+                }
+                ForEach(Self.fleet.indices, id: \.self) { i in
+                    let balloon = Self.fleet[i]
+                    let balloonHeight = balloon.width / Self.balloonAspect
+                    // The silhouette masks the balloon's gradient.
+                    LinearGradient(colors: fleetColors[i], startPoint: .top, endPoint: .bottom)
+                        .mask(Image("SkyBalloon").resizable())
+                        .frame(width: balloon.width, height: balloonHeight)
+                        .offset(x: width - balloon.end - balloon.width, y: Self.above + balloon.top)
+                }
+            }
+            .offset(y: -Self.above)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A flat cloud: a rounded bar with three circles rising from it, on a 200×90 grid.
+private struct Puff: Shape {
+    func path(in rect: CGRect) -> Path {
+        let s = rect.width / 200
+        var path = Path()
+        path.addRoundedRect(in: CGRect(x: rect.minX + 16 * s, y: rect.minY + 52 * s, width: 168 * s, height: 34 * s),
+                            cornerSize: CGSize(width: 17 * s, height: 17 * s))
+        for (cx, cy, r) in [(62.0, 54.0, 30.0), (106.0, 44.0, 38.0), (150.0, 58.0, 24.0)] {
+            path.addEllipse(in: CGRect(x: rect.minX + (cx - r) * s, y: rect.minY + (cy - r) * s,
+                                       width: 2 * r * s, height: 2 * r * s))
+        }
+        return path
+    }
+}
+
+// MARK: - JoinDock (floating over the poster list)
+
+/// The dock at the thumb: scan, and the keyboard for a typed code. Glass where the OS
+/// has it.
+private struct JoinDock: View {
     let onScan: () -> Void
     let onEnterCode: () -> Void
 
     @Environment(\.pbPalette) private var palette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Play")
-                    .font(.title3.weight(.semibold))
+        HStack(spacing: 12) {
+            ScanButton(action: onScan)
+            Button(action: onEnterCode) {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(palette.onSurface)
-
-                // Path-free: on a TV the game is an app, on a laptop a website.
-                Text("Start a game on your TV or laptop.")
-                    .font(.pbBodyMedium)
-                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
             }
-
-            JoinButtons(onScan: onScan, onEnterCode: onEnterCode)
+            .modifier(GhostCircleButton())
+            .accessibilityLabel("Enter code manually")
         }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(.quaternary, lineWidth: 0.5)
-        )
-        .shadow(color: Color.black.opacity(0.15), radius: 18, y: 6)
+    }
+}
+
+/// The dock's bar at the bottom edge. iOS 26 has a bar with the soft scroll edge, a
+/// progressive blur the list dissolves into; before that the list dissolves into a fade
+/// of the paper instead. A modifier rather than an inline `if #available` so the SDK-17
+/// build compiles.
+private struct DockBar<Bar: View>: ViewModifier {
+    @ViewBuilder let bar: () -> Bar
+
+    @Environment(\.pbPalette) private var palette
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .scrollEdgeEffectStyle(.soft, for: .bottom)
+                .safeAreaBar(edge: .bottom) { bar() }
+        } else {
+            content
+                .safeAreaInset(edge: .bottom) {
+                    bar()
+                        .padding(.top, 40)
+                        .background(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: palette.background.opacity(0), location: 0),
+                                    .init(color: palette.background, location: 0.4),
+                                    .init(color: palette.background, location: 1),
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .ignoresSafeArea(edges: .bottom)
+                        )
+                }
+        }
+    }
+}
+
+/// A round glass button on iOS 26; the ghost button (the card fill with a 1.5pt line)
+/// before. 56pt around the 30pt glyph, like the scan pill beside it. A modifier rather
+/// than an inline `if #available` so the SDK-17 build compiles.
+private struct GhostCircleButton: ViewModifier {
+    @Environment(\.pbPalette) private var palette
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
+        } else {
+            content
+                .buttonStyle(.plain)
+                .padding(13)
+                .background(palette.ghost, in: Circle())
+                .overlay(Circle().strokeBorder(palette.ghostLine, lineWidth: 1.5))
+        }
     }
 }
 

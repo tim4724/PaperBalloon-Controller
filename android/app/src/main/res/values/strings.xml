@@ -14,7 +14,6 @@
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">Browser</string>
-    <string name="status_live">Live</string>
     <string name="status_coming_soon">Coming soon</string>
     <string name="status_beta">Beta</string>
     <string name="trailer_unmute">Unmute</string>
@@ -22,9 +21,9 @@
     <string name="trailer_fullscreen">Play fullscreen</string>
     <string name="trailer_close">Close video</string>
 
-    <!-- Join card -->
-    <string name="join_title">Play</string>
-    <string name="join_start_game">Start a game on your TV or laptop.</string>
+    <!-- Games + the join dock -->
+    <string name="games_title">Games</string>
+    <string name="join_start_game">Start a game on your TV or in your browser.</string>
     <string name="scan_code">Scan code</string>
     <string name="enter_code_manually">Enter code manually</string>
 

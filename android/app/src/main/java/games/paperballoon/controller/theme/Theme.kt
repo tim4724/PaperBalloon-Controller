@@ -25,15 +25,17 @@ private val DarkColors = darkColorScheme(
   outline = OutlineDark,
   outlineVariant = OutlineVariantDark,
   background = SurfaceDarkBase,
+  onBackground = OnSurfaceDark,
   surface = SurfaceDarkBase,
+  onSurface = OnSurfaceDark,
   surfaceDim = SurfaceDarkBase,
   surfaceBright = lerp(SurfaceDarkBase, Color.White, 0.20f),
-  // Site --surface-* ladder verbatim, not lerps: the tokens are the contract.
-  surfaceContainerLowest = Color(0xFF0B0A10),
-  surfaceContainerLow = Color(0xFF1C1A24),
-  surfaceContainer = Color(0xFF211E2B),
-  surfaceContainerHigh = Color(0xFF2A2735),
-  surfaceContainerHighest = Color(0xFF332F3F),
+  // Night steps: the TV black, the card, then the violet up to the chip.
+  surfaceContainerLowest = Color(0xFF0D0B11),
+  surfaceContainerLow = CardDark,
+  surfaceContainer = Color(0xFF251F30),
+  surfaceContainerHigh = Color(0xFF2A2435),
+  surfaceContainerHighest = SurfaceVariantDark,
 )
 
 private val LightColors = lightColorScheme(
@@ -48,32 +50,51 @@ private val LightColors = lightColorScheme(
   outline = OutlineLight,
   outlineVariant = OutlineVariantLight,
   background = SurfaceLightBase,
+  onBackground = OnSurfaceLight,
   surface = SurfaceLightBase,
+  onSurface = OnSurfaceLight,
   // Explicit: the M3 default is lavender-white #FEF7FF, which clashes with paper
   // (and iOS mirrors this value).
   surfaceBright = SurfaceLightBase,
-  // Much paler than the site's raw ladder: on the site only --surface-low
-  // (--surface-low, the facts panel) appears as a large fill; the deeper steps are
-  // hover/detail tones and read muddy when spread across a card or button.
+  // Day steps: white, then paper through the panel up to the chip.
   surfaceContainerLowest = Color.White,
-  surfaceContainerLow = Color(0xFFF7F5F2),
-  surfaceContainer = Color(0xFFF2F0EC),
-  surfaceContainerHigh = Color(0xFFEFEDEA),
-  surfaceContainerHighest = Color(0xFFE7E4DF),
+  surfaceContainerLow = Color(0xFFFCF3EE),
+  surfaceContainer = Color(0xFFF8ECE6),
+  surfaceContainerHigh = Color(0xFFF4E6DE),
+  surfaceContainerHighest = Color(0xFFF0DED4),
 )
 
 /**
- * The site's --card fill (white on paper, one step up from the dark background), which
- * no M3 role matches in both schemes. Keyed on the scheme in force rather than the
- * system setting, so a forced palette gets the right one.
+ * Whether this is the night palette. Keyed on the scheme in force rather than the
+ * system setting, so a forced palette gets the right tokens.
  */
-val ColorScheme.card: Color
-  get() = if (background.luminance() < 0.5f) CardDark else CardLight
+val ColorScheme.isDark: Boolean
+  get() = background.luminance() < 0.5f
 
-// The site's radii: 18 for cards, tiles and media, 28 for panels and sheets; buttons
+/** The card fill: white on paper, one step up from the night ground. */
+val ColorScheme.card: Color
+  get() = if (isDark) CardDark else CardLight
+
+/** Frosted white behind the chips that sit over the home sky. */
+val ColorScheme.frosted: Color
+  get() = if (isDark) FrostedDark else FrostedLight
+
+/** The ghost button's fill and 1.5dp line. */
+val ColorScheme.ghost: Color
+  get() = if (isDark) GhostDark else GhostLight
+val ColorScheme.ghostLine: Color
+  get() = if (isDark) GhostLineDark else GhostLineLight
+
+/** The Beta tag's amber tint and the ink on it. */
+val ColorScheme.betaTag: Color
+  get() = if (isDark) BetaTagDark else BetaTagLight
+val ColorScheme.onBetaTag: Color
+  get() = if (isDark) OnBetaTagDark else OnBetaTagLight
+
+// The language's radii: 20 for cards, tiles and media, 28 for panels and sheets; buttons
 // and fields are pills (M3's default button shape already).
 private val AppShapes = Shapes(
-  large = RoundedCornerShape(18.dp),
+  large = RoundedCornerShape(20.dp),
   extraLarge = RoundedCornerShape(28.dp),
 )
 

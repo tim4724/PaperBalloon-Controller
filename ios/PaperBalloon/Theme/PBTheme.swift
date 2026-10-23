@@ -18,16 +18,17 @@ extension Color {
 
 // MARK: - Palette
 
-/// The paperballoon.games design tokens (Couch-Games assets/theme.css) mapped onto
-/// Material 3 roles, plus the site card token that has no M3 role; must stay
-/// value-identical to the Android theme (android theme/Color.kt + Theme.kt), minus the
-/// tonal-button roles only Android's FilledTonalButton reads. Faintly warm paper light,
-/// violet-tinted near-black dark; large fills use only the palest surface steps (the
-/// deep ones read muddy at card size). From the site's rules: coral fills a screen's one
-/// primary button and nothing else, and cards are flat with a hairline border.
-/// Interactive controls stay the platform's own (the secondary button is the system
-/// bordered button). Members are `var` only so the copy helpers can mutate a copy;
-/// `.light`/`.dark` are the sole instances handed out.
+/// The Paper Balloon design language (Couch-Games assets/theme.css ⇄ Android
+/// theme/Color.kt + Theme.kt ⇄ this file) mapped onto Material 3 roles, plus the tokens
+/// that have no M3 role; must stay value-identical to the Android theme, minus the
+/// tonal-button roles only Android's FilledTonalButton reads and the frosted chip fill
+/// (iOS's toolbar brings its own glass). The app icon sets the
+/// palette: a sunset on a sky. Warm paper by day, near-black with a hint of the night
+/// sky's violet by night; ink and paper carry the structure and the game posters carry
+/// the colour. From the language's rules: the sunset fills a screen's one primary button and nothing
+/// else, cards are flat with a hairline, tags are quiet tints. Interactive controls
+/// stay the platform's own. Members are `var` only so the copy helpers can mutate a
+/// copy; `.light`/`.dark` are the sole instances handed out.
 struct PBPalette: Equatable {
     var primary, onPrimary, primaryContainer, onPrimaryContainer: Color
     var secondary, onSecondary: Color
@@ -35,70 +36,97 @@ struct PBPalette: Equatable {
     var surfaceVariant, onSurfaceVariant, outline, outlineVariant: Color
     var surfaceContainerLowest, surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest, surfaceBright: Color
     var error, onError, inverseSurface, inverseOnSurface, scrim: Color
-    /// Site --card.
+    /// The card fill: white on paper, one step up from the night ground.
     var card: Color
+    /// The ghost button's fill and 1.5pt line.
+    var ghost, ghostLine: Color
+    /// The Beta tag's amber tint and the ink on it.
+    var betaTag, onBetaTag: Color
 
     static let light = PBPalette(
-        primary: Color(pbHex: 0x26242C),
+        primary: Color(pbHex: 0x2A2030),
         onPrimary: Color(pbHex: 0xFFFFFF),
-        primaryContainer: Color(pbHex: 0xE7E4DF),
-        onPrimaryContainer: Color(pbHex: 0x26242C),
+        primaryContainer: Color(pbHex: 0xF8ECE6),
+        onPrimaryContainer: Color(pbHex: 0x2A2030),
         secondary: Color(pbHex: 0x625B71),
         onSecondary: Color(pbHex: 0xFFFFFF),
-        background: Color(pbHex: 0xFAF9F7),
-        onBackground: Color(pbHex: 0x1C1B1F),
-        surface: Color(pbHex: 0xFAF9F7),
-        onSurface: Color(pbHex: 0x1C1B1F),
-        surfaceVariant: Color(pbHex: 0xE7E4DF),
-        onSurfaceVariant: Color(pbHex: 0x5E5A66),
-        outline: Color(pbHex: 0x77717F),
-        outlineVariant: Color(pbHex: 0xDCD9D3),
+        background: Color(pbHex: 0xFFF8F3),
+        onBackground: Color(pbHex: 0x2A2030),
+        surface: Color(pbHex: 0xFFF8F3),
+        onSurface: Color(pbHex: 0x2A2030),
+        surfaceVariant: Color(pbHex: 0xF0DED4),
+        onSurfaceVariant: Color(pbHex: 0x5E4F66),
+        outline: Color(pbHex: 0x8E8296),
+        outlineVariant: Color(pbHex: 0xEEDDD3),
         surfaceContainerLowest: Color(pbHex: 0xFFFFFF),
-        surfaceContainerLow: Color(pbHex: 0xF7F5F2),
-        surfaceContainer: Color(pbHex: 0xF2F0EC),
-        surfaceContainerHigh: Color(pbHex: 0xEFEDEA),
-        surfaceContainerHighest: Color(pbHex: 0xE7E4DF),
-        surfaceBright: Color(pbHex: 0xFAF9F7),
+        surfaceContainerLow: Color(pbHex: 0xFCF3EE),
+        surfaceContainer: Color(pbHex: 0xF8ECE6),
+        surfaceContainerHigh: Color(pbHex: 0xF4E6DE),
+        surfaceContainerHighest: Color(pbHex: 0xF0DED4),
+        surfaceBright: Color(pbHex: 0xFFF8F3),
         error: Color(pbHex: 0xB3261E),
         onError: Color(pbHex: 0xFFFFFF),
         inverseSurface: Color(pbHex: 0x313033),
         inverseOnSurface: Color(pbHex: 0xF4EFF4),
         scrim: Color(pbHex: 0x000000),
-        card: Color(pbHex: 0xFFFFFF)
+        card: Color(pbHex: 0xFFFFFF),
+        ghost: Color(pbHex: 0xFFFFFF),
+        ghostLine: Color(pbHex: 0xDCC7BE),
+        betaTag: Color(pbHex: 0xFCE3CC),
+        onBetaTag: Color(pbHex: 0x7A3E00)
     )
 
     static let dark = PBPalette(
         primary: Color(pbHex: 0xF1EFEC),
-        onPrimary: Color(pbHex: 0x26242C),
-        primaryContainer: Color(pbHex: 0x3D3849),
+        onPrimary: Color(pbHex: 0x2A2030),
+        primaryContainer: Color(pbHex: 0x3A3246),
         onPrimaryContainer: Color(pbHex: 0xF1EFEC),
         secondary: Color(pbHex: 0xCCC2DC),
         onSecondary: Color(pbHex: 0x332D41),
-        background: Color(pbHex: 0x110F17),
-        onBackground: Color(pbHex: 0xE6E1E5),
-        surface: Color(pbHex: 0x110F17),
-        onSurface: Color(pbHex: 0xE6E1E5),
-        surfaceVariant: Color(pbHex: 0x332F3F),
-        onSurfaceVariant: Color(pbHex: 0xA8A3B1),
+        background: Color(pbHex: 0x141119),
+        onBackground: Color(pbHex: 0xF1EFEC),
+        surface: Color(pbHex: 0x141119),
+        onSurface: Color(pbHex: 0xF1EFEC),
+        surfaceVariant: Color(pbHex: 0x2C2635),
+        onSurfaceVariant: Color(pbHex: 0xABA9B0),
         outline: Color(pbHex: 0x8D8798),
-        outlineVariant: Color(pbHex: 0x2F2B3A),
-        surfaceContainerLowest: Color(pbHex: 0x0B0A10),
-        surfaceContainerLow: Color(pbHex: 0x1C1A24),
-        surfaceContainer: Color(pbHex: 0x211E2B),
-        surfaceContainerHigh: Color(pbHex: 0x2A2735),
-        surfaceContainerHighest: Color(pbHex: 0x332F3F),
-        surfaceBright: Color(pbHex: 0x413F45),
+        outlineVariant: Color(pbHex: 0x342C40),
+        surfaceContainerLowest: Color(pbHex: 0x0D0B11),
+        surfaceContainerLow: Color(pbHex: 0x201A2A),
+        surfaceContainer: Color(pbHex: 0x251F30),
+        surfaceContainerHigh: Color(pbHex: 0x2A2435),
+        surfaceContainerHighest: Color(pbHex: 0x2C2635),
+        surfaceBright: Color(pbHex: 0x434147),
         error: Color(pbHex: 0xF2B8B5),
         onError: Color(pbHex: 0x601410),
         inverseSurface: Color(pbHex: 0xE6E1E5),
         inverseOnSurface: Color(pbHex: 0x313033),
         scrim: Color(pbHex: 0x000000),
-        card: Color(pbHex: 0x1C1A24)
+        card: Color(pbHex: 0x201A2A),
+        ghost: Color.white.opacity(0.08),
+        ghostLine: Color.white.opacity(0.18),
+        betaTag: Color(pbHex: 0xFFC14D).opacity(0.14),
+        onBetaTag: Color(pbHex: 0xFFC14D)
     )
 
-    /// Site --action-solid: the fill of a screen's one primary button, behind a white
-    /// label (4.6:1, AA). Nothing else is coral.
-    static let actionCoral = Color(pbHex: 0xD63C43)
+    /// The fill of a screen's one primary button, top to bottom: white text holds
+    /// 4.6:1 at both ends. Nothing else wears it.
+    static let actionSunset = [Color(pbHex: 0xE0185F), Color(pbHex: 0xD83A1A)]
+
+    /// The home sky (MainScreen's SkyBackdrop), fading into the background below: zenith
+    /// then horizon, lilac over peach, by day; one flat night by dark.
+    static let skyLight = [Color(pbHex: 0xE6DAF2), Color(pbHex: 0xFFE0CC)]
+    static let skyDark = Color(pbHex: 0x1C1725)
+
+    /// The fleet flying in the sky: the icon's balloon in four colours, top to bottom of
+    /// the envelope. Sunset leads and is always the biggest; sea, gold and dusk follow.
+    /// By night the sunset and the dusk brighten so they lift off the dark.
+    static let fleetSunset = [Color(pbHex: 0xF2216A), Color(pbHex: 0xFA6A2C)]
+    static let fleetSunsetNight = [Color(pbHex: 0xFF4F86), Color(pbHex: 0xFF9640)]
+    static let fleetSea = [Color(pbHex: 0x0F8F9E), Color(pbHex: 0x3CC29A)]
+    static let fleetGold = [Color(pbHex: 0xF07A00), Color(pbHex: 0xFFC23D)]
+    static let fleetDusk = [Color(pbHex: 0x6A4CF0), Color(pbHex: 0xC062E8)]
+    static let fleetDuskNight = [Color(pbHex: 0xA07CFF), Color(pbHex: 0xE48BF7)]
 
     /// Copy with primary = accent, onPrimary = contentColorOn(accent). (Game-host accent remap.)
     func withAccent(_ accent: Color) -> PBPalette {
@@ -165,7 +193,7 @@ private struct PBThemedModifier: ViewModifier {
         content
             .environment(\.pbPalette, palette)
             // Ink chrome accent for every system control (buttons, alerts, cursors);
-            // coral is applied per-CTA, never as the global tint.
+            // the sunset is applied per-CTA, never as the global tint.
             .tint(palette.primary)
     }
 }

@@ -13,7 +13,6 @@
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">浏览器</string>
-    <string name="status_live">已上线</string>
     <string name="status_coming_soon">即将推出</string>
     <string name="status_beta">测试版</string>
     <string name="trailer_unmute">取消静音</string>
@@ -21,8 +20,8 @@
     <string name="trailer_fullscreen">全屏播放</string>
     <string name="trailer_close">关闭视频</string>
 
-    <string name="join_title">开始游戏</string>
-    <string name="join_start_game">在电视或电脑上启动游戏。</string>
+    <string name="games_title">游戏</string>
+    <string name="join_start_game">在电视或浏览器上启动游戏。</string>
     <string name="scan_code">扫描二维码</string>
     <string name="enter_code_manually">手动输入代码</string>
 

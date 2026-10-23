@@ -39,7 +39,7 @@ struct GameInfoSheet: View {
             }
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
             if !game.tvApps.isEmpty || game.displayHost != nil {
                 PlatformTiles(game: game)
@@ -85,6 +85,13 @@ struct GameInfoSheet: View {
 
 // MARK: - PlatformTiles
 
+/// Platforms with native TV apps (manifest tvApps): id -> the nearby-card device label,
+/// reused. Unknown manifest ids simply have no tile (and no home-card mention).
+let tvPlatforms: [(String, LocalizedStringResource)] = [
+    ("appletv", "Apple TV"),
+    ("androidtv", "Android TV"),
+]
+
 /// Where the game runs, as a row of equal device tiles: one per declared TV app
 /// (dimmed, with the shared "Coming soon" copy, when not yet live) plus a tile
 /// for the browser path. This row is the sheet's only mention of platforms and
@@ -99,16 +106,9 @@ private struct PlatformTiles: View {
 
     @Environment(\.pbPalette) private var palette
 
-    // Platforms with native TV apps (manifest tvApps): id -> the nearby-card
-    // device label, reused. Unknown manifest ids simply have no tile.
-    private static let platforms: [(String, LocalizedStringResource)] = [
-        ("appletv", "Apple TV"),
-        ("androidtv", "Android TV"),
-    ]
-
     var body: some View {
         HStack(spacing: 9) {
-            ForEach(Self.platforms, id: \.0) { id, name in
+            ForEach(tvPlatforms, id: \.0) { id, name in
                 if let status = game.tvApps[id] {
                     tile(icon: "tv", label: String(localized: name), soon: status != "live")
                 }
@@ -151,7 +151,7 @@ private struct PlatformTiles: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.vertical, 12)
         .padding(.horizontal, 6)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(palette.surfaceContainerHighest))
+        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(palette.surfaceContainerHighest))
     }
 }
 

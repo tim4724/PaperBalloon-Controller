@@ -123,7 +123,7 @@ class StoreScreenshotTest {
   }
 
   private fun walkHomeFlow(suffix: String) {
-    // ---- Home: catalog, live status, join card, profile chip ----
+    // ---- Home: catalog, tags, join dock, profile chip ----
     waitForText("HexStacker")
     // Assert and capture before MainScreen's 8 s search grace period settles this to
     // "No rooms found"; the checks below take time on a CI emulator.
@@ -133,10 +133,9 @@ class StoreScreenshotTest {
     compose.onNodeWithText("HexStacker").assertIsDisplayed()
     compose.onNodeWithText("Tiny Track").assertExists()
     compose.onNodeWithText("Powder").assertExists()
-    compose.onNodeWithText(str(R.string.status_live)).assertIsDisplayed()
     compose.onNodeWithText(str(R.string.status_beta)).assertExists()
     compose.onAllNodesWithText(str(R.string.status_coming_soon)).assertCountEquals(1)
-    compose.onNodeWithText(str(R.string.join_title)).assertIsDisplayed()
+    compose.onNodeWithText(str(R.string.games_title)).assertIsDisplayed()
     compose.onNodeWithText(str(R.string.scan_code)).assertIsDisplayed()
     compose.onNodeWithText(PLAYER_NAME).assertIsDisplayed()
 

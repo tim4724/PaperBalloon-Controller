@@ -13,7 +13,6 @@
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">Tarayıcı</string>
-    <string name="status_live">Yayında</string>
     <string name="status_coming_soon">Çok yakında</string>
     <string name="status_beta">Beta</string>
     <string name="trailer_unmute">Sesi aç</string>
@@ -21,8 +20,8 @@
     <string name="trailer_fullscreen">Tam ekranda oynat</string>
     <string name="trailer_close">Videoyu kapat</string>
 
-    <string name="join_title">Oyna</string>
-    <string name="join_start_game">TV\'nde veya bilgisayarında bir oyun başlat.</string>
+    <string name="games_title">Oyunlar</string>
+    <string name="join_start_game">TV\'nde veya tarayıcında bir oyun başlat.</string>
     <string name="scan_code">Kodu tara</string>
     <string name="enter_code_manually">Kodu elle gir</string>
 

@@ -93,7 +93,7 @@ import kotlinx.coroutines.launch
 /**
  * Pure game info — name, media, players. A game with a trailer shows its gameplay
  * loop, muted until the user unmutes it; one without shows its cover art instead.
- * Joining lives on the home's Join card.
+ * Joining lives on the home dock.
  */
 @Composable
 fun GameInfoSheet(
@@ -131,11 +131,11 @@ fun GameInfoSheet(
 }
 
 // Platforms with native TV apps (manifest tvApps): id -> the nearby-card device
-// label, reused. Unknown manifest ids simply have no tile. Deliberately no brand
-// logos: Apple licenses only its word marks to third parties, and Google's
+// label, reused. Unknown manifest ids simply have no tile (and no home-card mention).
+// Deliberately no brand logos: Apple licenses only its word marks to third parties, and Google's
 // Android TV guidance excludes the robot — the neutral TV glyph + name is the
 // compliant version of the same message on both platforms.
-private val TV_PLATFORMS = listOf(
+internal val TV_PLATFORMS = listOf(
   "appletv" to R.string.device_apple_tv,
   "androidtv" to R.string.device_android_tv,
 )

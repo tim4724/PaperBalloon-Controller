@@ -19,14 +19,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,7 +36,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
@@ -45,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import games.paperballoon.controller.R
@@ -54,31 +53,44 @@ import games.paperballoon.controller.data.PLATFORM_ANDROID_TV
 import games.paperballoon.controller.data.PLATFORM_TVOS
 import games.paperballoon.controller.data.PLATFORM_WEB
 import games.paperballoon.controller.data.remoteArtUrl
-import games.paperballoon.controller.theme.ActionCoral
+import games.paperballoon.controller.theme.ActionSunset
+import games.paperballoon.controller.theme.betaTag
+import games.paperballoon.controller.theme.frosted
+import games.paperballoon.controller.theme.onBetaTag
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// The tappable player identity in the home header.
+// The tappable player identity in the home header: a frosted pill over the sky, like
+// iOS's glass toolbar chip.
 @Composable
 fun PlayerChip(name: String, onClick: () -> Unit) {
-  AssistChip(
+  Surface(
     onClick = onClick,
-    modifier = Modifier.height(40.dp),
-    label = {
+    shape = CircleShape,
+    color = MaterialTheme.colorScheme.frosted,
+    contentColor = MaterialTheme.colorScheme.onSurface,
+  ) {
+    Row(
+      Modifier.height(44.dp).padding(start = 8.dp, end = 16.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      Icon(
+        Icons.Filled.AccountCircle,
+        contentDescription = null,
+        Modifier.size(28.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
       Text(
         name.ifBlank { stringResource(R.string.set_name) },
         style = MaterialTheme.typography.bodyLarge,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-    },
-    leadingIcon = {
-      Icon(Icons.Filled.Person, contentDescription = null, Modifier.size(20.dp))
-    },
-    border = AssistChipDefaults.assistChipBorder(enabled = true),
-  )
+    }
+  }
 }
 
 /**
@@ -305,45 +317,48 @@ fun PlaySteps(game: Game) {
   }
 }
 
-/** The two join actions — shared by the home Join card and a playable game's info sheet. */
+/** The two join actions, stacked — a playable game's info sheet. */
 @Composable
 fun JoinButtons(onScan: () -> Unit, onEnterCode: () -> Unit) {
-  // Coral fills a screen's one primary button (site --action-solid) and nothing else.
-  Button(
-    onClick = onScan,
-    modifier = Modifier.fillMaxWidth().height(56.dp),
-    colors = ButtonDefaults.buttonColors(containerColor = ActionCoral, contentColor = Color.White),
-  ) {
-    Icon(painterResource(R.drawable.ic_qr_scan), contentDescription = null, Modifier.size(22.dp))
-    Spacer(Modifier.width(10.dp))
-    Text(stringResource(R.string.scan_code), style = MaterialTheme.typography.titleMedium)
-  }
+  ScanButton(onScan, Modifier.fillMaxWidth())
   FilledTonalButton(onClick = onEnterCode, modifier = Modifier.fillMaxWidth().height(56.dp)) {
     Text(stringResource(R.string.enter_code_manually), style = MaterialTheme.typography.titleMedium)
   }
 }
 
-// Solid accent = playable (live or beta), accent-tinted dark = coming soon. The chip can land on
-// bright art (the scrim thins toward its top), so the soon-variant needs its own
-// dark base rather than a bare translucent tint. Used by the home poster cards.
+/** The one primary action: scan. Shared by the home dock and the info sheet. */
 @Composable
-fun PosterStatusChip(game: Game, modifier: Modifier = Modifier) {
-  val bg =
-    if (game.isPlayable) game.accentColor
-    else game.accentColor.copy(alpha = 0.32f).compositeOver(Color.Black.copy(alpha = 0.55f))
-  val fg = if (game.isPlayable) Color.Black.copy(alpha = 0.85f) else Color.White
-  val label = when {
-    game.isBeta -> R.string.status_beta
-    game.isPlayable -> R.string.status_live
-    else -> R.string.status_coming_soon
-  }
-  Text(
-    stringResource(label),
-    style = MaterialTheme.typography.labelMedium,
-    color = fg,
+fun ScanButton(onScan: () -> Unit, modifier: Modifier = Modifier) {
+  // The sunset fills a screen's one primary button and nothing else. M3 buttons take only
+  // a solid container, so the gradient is painted under a transparent one.
+  Button(
+    onClick = onScan,
     modifier = modifier
-      .clip(CircleShape)
-      .background(bg)
-      .padding(horizontal = 10.dp, vertical = 4.dp),
+      .height(56.dp)
+      .background(Brush.verticalGradient(ActionSunset), CircleShape),
+    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
+  ) {
+    Icon(painterResource(R.drawable.ic_qr_scan), contentDescription = null, Modifier.size(22.dp))
+    Spacer(Modifier.width(10.dp))
+    Text(stringResource(R.string.scan_code), style = MaterialTheme.typography.titleMedium)
+  }
+}
+
+/**
+ * A quiet tint beside a game's name: amber for Beta, the chip grey for Coming soon. A live
+ * game has no tag at all. Used by the home cards.
+ */
+@Composable
+fun StatusTag(game: Game, modifier: Modifier = Modifier) {
+  if (game.isPlayable && !game.isBeta) return
+  val scheme = MaterialTheme.colorScheme
+  val bg = if (game.isBeta) scheme.betaTag else scheme.surfaceVariant
+  val ink = if (game.isBeta) scheme.onBetaTag else scheme.onSurfaceVariant
+  Text(
+    stringResource(if (game.isBeta) R.string.status_beta else R.string.status_coming_soon),
+    style = MaterialTheme.typography.labelLarge,
+    fontWeight = FontWeight.SemiBold,
+    color = ink,
+    modifier = modifier.clip(CircleShape).background(bg).padding(horizontal = 10.dp, vertical = 4.dp),
   )
 }
