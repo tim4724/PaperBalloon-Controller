@@ -50,9 +50,10 @@ val OnSurfaceDark = Color(0xFFF1EFEC)
 val ActionSunset = listOf(Color(0xFFE0185F), Color(0xFFD83A1A))
 
 // The home sky (MainScreen's SkyBackdrop), fading into the background below: zenith then
-// horizon, lilac over peach, by day; one flat night by dark.
+// horizon, lilac over peach, by day; by night navy, then dusk violet, then the sunset's
+// last light low at the horizon.
 val SkyLight = listOf(Color(0xFFE6DAF2), Color(0xFFFFE0CC))
-val SkyDark = Color(0xFF1C1725)
+val SkyNight = listOf(Color(0xFF13142B), Color(0xFF2B1E40), Color(0xFF4D2338))
 
 // The fleet flying in the sky: the icon's balloon in four colours, top to bottom of the
 // envelope. Sunset leads and is always the biggest; sea, gold and dusk follow. By night
@@ -66,15 +67,15 @@ val FleetDuskNight = listOf(Color(0xFFA07CFF), Color(0xFFE48BF7))
 
 // Per-scheme tokens with no M3 role: see the ColorScheme extensions in Theme.kt.
 internal val CardLight = Color(0xFFFFFFFF)
-internal val CardDark = Color(0xFF201A2A)
+internal val CardDark = Color(0xFF2A2339)
 // Chips over the sky: frosted white.
 internal val FrostedLight = Color(0xB8FFFFFF)
-internal val FrostedDark = Color(0x1AFFFFFF)
+internal val FrostedDark = Color(0x24FFFFFF)
 // The ghost button: paper with a 1.5dp line.
 internal val GhostLight = Color(0xFFFFFFFF)
 internal val GhostLineLight = Color(0xFFDCC7BE)
-internal val GhostDark = Color(0x14FFFFFF)
-internal val GhostLineDark = Color(0x2EFFFFFF)
+internal val GhostDark = Color(0x1FFFFFFF)
+internal val GhostLineDark = Color(0x38FFFFFF)
 // The Beta tag's amber tint and the ink on it.
 internal val BetaTagLight = Color(0xFFFCE3CC)
 internal val OnBetaTagLight = Color(0xFF7A3E00)

@@ -163,8 +163,8 @@ import games.paperballoon.controller.theme.FleetGold
 import games.paperballoon.controller.theme.FleetSea
 import games.paperballoon.controller.theme.FleetSunset
 import games.paperballoon.controller.theme.FleetSunsetNight
-import games.paperballoon.controller.theme.SkyDark
 import games.paperballoon.controller.theme.SkyLight
+import games.paperballoon.controller.theme.SkyNight
 import games.paperballoon.controller.theme.card
 import games.paperballoon.controller.theme.frosted
 import games.paperballoon.controller.theme.ghost
@@ -1067,7 +1067,8 @@ private fun GameCard(game: Game, underBar: SnapshotStateMap<String, Boolean>, on
       containerColor = MaterialTheme.colorScheme.card,
       contentColor = MaterialTheme.colorScheme.onSurface,
     ),
-    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    // By day the hairline is the card's only edge on the paper; by night the lifted fill is.
+    border = if (MaterialTheme.colorScheme.isDark) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
   ) {
     // 16:9 matches the screenshots — a shorter crop would slice the per-player
     // HUD chips in the corners of each quadrant.
@@ -1153,11 +1154,11 @@ private fun posterLuminance(art: Art, fraction: Float): Float =
 
 // The home sky behind the catalog, scrolling with it. One dusk: lilac at the zenith, peach
 // at the horizon, fading into the paper by the first card — with flat white clouds by day;
-// by night the clouds go, the stars come out and the ground is the night violet. The fleet flies
-// beside the large title: the sunset balloon leads, sea, gold and dusk follow. Placed in
-// dp from the top of the screen (sky) or the bottom of the status bar (the fleet, which
-// keeps station with the title) and from the right edge; iOS's SkyBackdrop draws the
-// same sky around its own title.
+// by night its afterglow (navy, dusk violet, the sunset's last light at the horizon), with
+// the clouds gone and the stars out. The fleet flies beside the large title: the sunset
+// balloon leads, sea, gold and dusk follow. Placed in dp from the top of the screen (sky)
+// or the bottom of the status bar (the fleet, which keeps station with the title) and
+// from the right edge; iOS's SkyBackdrop draws the same sky around its own title.
 @Composable
 private fun SkyBackdrop(scrolled: () -> Int) {
   val scheme = MaterialTheme.colorScheme
@@ -1170,7 +1171,10 @@ private fun SkyBackdrop(scrolled: () -> Int) {
       val paperAt = SKY_PAPER_DP.dp.toPx()
       drawRect(
         if (dark) {
-          Brush.verticalGradient(SKY_NIGHT_FLAT_DP / SKY_PAPER_DP to SkyDark, 1f to scheme.background, endY = paperAt)
+          Brush.verticalGradient(
+            0f to SkyNight[0], SKY_NIGHT_DUSK_DP / SKY_PAPER_DP to SkyNight[1],
+            SKY_NIGHT_GLOW_DP / SKY_PAPER_DP to SkyNight[2], 1f to scheme.background, endY = paperAt,
+          )
         } else {
           Brush.verticalGradient(
             0f to SkyLight[0], SKY_HORIZON_DP / SKY_PAPER_DP to SkyLight[1], 1f to scheme.background, endY = paperAt,
@@ -1221,10 +1225,11 @@ private fun SkyBackdrop(scrolled: () -> Int) {
   }
 }
 
-// The sky's three stops, in dp from the top of the screen: the horizon (peach), where the
-// night's flat sky starts to fade, and where either has become the paper.
+// The sky's stops, in dp from the top of the screen: the horizon (peach), the night's dusk
+// violet and its afterglow, and where either sky has become the paper.
 private const val SKY_HORIZON_DP = 220f
-private const val SKY_NIGHT_FLAT_DP = 300f
+private const val SKY_NIGHT_DUSK_DP = 140f
+private const val SKY_NIGHT_GLOW_DP = 250f
 private const val SKY_PAPER_DP = 520f
 // x as a fraction of the width, y in dp from the top of the screen, radius dp.
 private val SKY_STARS = listOf(

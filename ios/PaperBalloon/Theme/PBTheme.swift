@@ -38,6 +38,9 @@ struct PBPalette: Equatable {
     var error, onError, inverseSurface, inverseOnSurface, scrim: Color
     /// The room and game cards' fill where Liquid Glass is unavailable (before iOS 26).
     var frosted: Color
+    /// The room and game cards' glass tint on iOS 26: none by day; by night a lilac wash
+    /// that lifts them off the sky (untinted glass sinks below it) to Android's card.
+    var cardGlassTint: Color?
     /// The ghost button's fill and 1.5pt line.
     var ghost, ghostLine: Color
     /// The Beta tag's amber tint and the ink on it.
@@ -70,6 +73,7 @@ struct PBPalette: Equatable {
         inverseOnSurface: Color(pbHex: 0xF4EFF4),
         scrim: Color(pbHex: 0x000000),
         frosted: Color.white.opacity(0.72),
+        cardGlassTint: nil,
         ghost: Color(pbHex: 0xFFFFFF),
         ghostLine: Color(pbHex: 0xDCC7BE),
         betaTag: Color(pbHex: 0xFCE3CC),
@@ -102,9 +106,10 @@ struct PBPalette: Equatable {
         inverseSurface: Color(pbHex: 0xE6E1E5),
         inverseOnSurface: Color(pbHex: 0x313033),
         scrim: Color(pbHex: 0x000000),
-        frosted: Color.white.opacity(0.10),
-        ghost: Color.white.opacity(0.08),
-        ghostLine: Color.white.opacity(0.18),
+        frosted: Color.white.opacity(0.14),
+        cardGlassTint: Color(pbHex: 0xB4A3E6).opacity(0.16),
+        ghost: Color.white.opacity(0.12),
+        ghostLine: Color.white.opacity(0.22),
         betaTag: Color(pbHex: 0xFFC14D).opacity(0.14),
         onBetaTag: Color(pbHex: 0xFFC14D)
     )
@@ -114,9 +119,10 @@ struct PBPalette: Equatable {
     static let actionSunset = [Color(pbHex: 0xE0185F), Color(pbHex: 0xD83A1A)]
 
     /// The home sky (MainScreen's SkyBackdrop), fading into the background below: zenith
-    /// then horizon, lilac over peach, by day; one flat night by dark.
+    /// then horizon, lilac over peach, by day; by night navy, then dusk violet, then the
+    /// sunset's last light low at the horizon.
     static let skyLight = [Color(pbHex: 0xE6DAF2), Color(pbHex: 0xFFE0CC)]
-    static let skyDark = Color(pbHex: 0x1C1725)
+    static let skyNight = [Color(pbHex: 0x13142B), Color(pbHex: 0x2B1E40), Color(pbHex: 0x4D2338)]
 
     /// The fleet flying in the sky: the icon's balloon in four colours, top to bottom of
     /// the envelope. Sunset leads and is always the biggest; sea, gold and dusk follow.

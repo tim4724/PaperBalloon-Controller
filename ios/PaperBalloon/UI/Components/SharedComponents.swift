@@ -60,15 +60,17 @@ struct ProminentGlassButton: ViewModifier {
 
 // MARK: - ChromeGlass
 
-/// Liquid Glass on iOS 26 behind the home toolbar's pills and the room and game cards.
-/// Earlier releases have no glass in their toolbars, so they get `fallback`.
+/// Liquid Glass on iOS 26 behind the home toolbar's pills and the room and game cards,
+/// tinted by `tint` when given. Earlier releases have no glass in their toolbars, so they
+/// get `fallback`.
 struct ChromeGlass<S: Shape>: ViewModifier {
     let shape: S
     var fallback: Color = .clear
+    var tint: Color? = nil
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: shape)
+            content.glassEffect(.regular.tint(tint).interactive(), in: shape)
         } else {
             content.background(fallback, in: shape)
         }

@@ -696,7 +696,7 @@ private struct RoomCard: View {
             .padding(14)
             .frame(maxWidth: .infinity)
             .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
-                                  fallback: palette.frosted))
+                                  fallback: palette.frosted, tint: palette.cardGlassTint))
         }
         .modifier(GlassCardPress())
     }
@@ -924,7 +924,7 @@ private struct GameCard: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
-                                  fallback: palette.frosted))
+                                  fallback: palette.frosted, tint: palette.cardGlassTint))
         }
         .modifier(GlassCardPress())
     }
@@ -934,7 +934,8 @@ private struct GameCard: View {
 
 /// The home sky behind the catalog, scrolling with it. One dusk: lilac at the zenith,
 /// peach at the horizon, fading into the paper by the first card — with flat white
-/// clouds by day; by night the clouds go, the stars come out and the ground is the night violet.
+/// clouds by day; by night its afterglow (navy, dusk violet, the sunset's last light at
+/// the horizon), with the clouds gone and the stars out.
 /// The fleet flies beside the large title: the sunset balloon leads, sea, gold and dusk
 /// follow. The background of the scroll content, so it travels with the title; placed in
 /// points from the top of the content (just under the large title; negative is above
@@ -948,11 +949,12 @@ private struct SkyBackdrop: View {
     // spare for a pull-down bounce.
     private static let above: CGFloat = 1000
     // The sky's stops, from the content top: where the screen's top sits on the phone
-    // the language was drawn for, the horizon (peach), where the night's flat sky starts
-    // to fade, and where either has become the paper.
+    // the language was drawn for, the horizon (peach), the night's dusk violet and its
+    // afterglow, and where either sky has become the paper.
     private static let screenTop: CGFloat = -193
     private static let horizon: CGFloat = 27
-    private static let nightFlat: CGFloat = 107
+    private static let nightDusk: CGFloat = -53
+    private static let nightGlow: CGFloat = 57
     private static let paper: CGFloat = 327
     // x as a fraction of the width, y, radius.
     private static let stars: [(x: CGFloat, y: CGFloat, r: CGFloat)] = [
@@ -990,7 +992,9 @@ private struct SkyBackdrop: View {
             ZStack(alignment: .topLeading) {
                 LinearGradient(
                     stops: dark ? [
-                        .init(color: PBPalette.skyDark, location: (Self.above + Self.nightFlat) / height),
+                        .init(color: PBPalette.skyNight[0], location: (Self.above + Self.screenTop) / height),
+                        .init(color: PBPalette.skyNight[1], location: (Self.above + Self.nightDusk) / height),
+                        .init(color: PBPalette.skyNight[2], location: (Self.above + Self.nightGlow) / height),
                         .init(color: palette.background, location: 1),
                     ] : [
                         .init(color: PBPalette.skyLight[0], location: (Self.above + Self.screenTop) / height),
