@@ -141,6 +141,7 @@ struct GameWebView: UIViewRepresentable {
     let playerName: String             // PaperBalloonHost.name, baked into the bridge shim (§1)
     let nameResult: NameResult?        // settles the page's editName() Promise (§2)
     let onLandscape: (Bool) -> Void    // the orientation the page is asking for (§10)
+    let onBackMode: (String) -> Void   // where a back goes: "off", "page" or "leave" (§9)
     let onRendererGone: () -> Void     // web-content process died — re-issue the load
     @Binding var failed: Bool          // main-doc load failed — drives the retry overlay
     let reloadToken: Int               // bumped by Retry → re-issue the join request
@@ -522,6 +523,10 @@ struct GameWebView: UIViewRepresentable {
                 guard !didEnd else { return }
                 didEnd = true
                 parent.onLeave()
+            case "setBackMode":
+                // Not fire-once: games switch repeatedly (a dialog opening and closing).
+                // The shim already narrowed it to the three modes; a non-string is off.
+                parent.onBackMode((body["value"] as? String) ?? "off")
             case "editName":
                 // Not fire-once: the player may rename any number of times.
                 hostedWebView?.evaluateJavaScript(GameHostJS.readSheetColors) { [weak self] result, _ in

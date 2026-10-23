@@ -17,8 +17,8 @@ internal const val DISPATCH_PAGE_HIDE_JS =
   "window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));"
 
 /**
- * Delivers a system back press to the page (CONTRACT.md §9), evaluated only while
- * the page has armed system back.
+ * Delivers a system back press to the page (CONTRACT.md §9), evaluated only in the
+ * `page` back mode.
  *
  * Evaluates to `true` — the ONLY result that keeps the player in the game — when the
  * game both implements `back()` and returns a literal `true` from it. A missing
@@ -147,7 +147,7 @@ internal val HOST_SHIM_JS = """
       },
       gameEnded: (reason) => host.gameEnded(reason),
       leave: () => host.leave(),
-      enableSystemBack: (on) => host.enableSystemBack(on),
+      setBackMode: (mode) => host.setBackMode(mode),
       setOrientation: (mode) => host.setOrientation(mode),
       haptic: (primitive, scale) => host.haptic(primitive, scale),
       hapticComposition,

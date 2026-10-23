@@ -117,17 +117,16 @@ func parseHapticComposition(_ value: String?) -> [HapticStep] {
 
 enum GameHostJS {
     /// Document-start user script (all frames): defines
-    /// `window.PaperBalloonHost.{name,editName,gameEnded,leave,enableSystemBack,setOrientation,haptic,hapticComposition}`
+    /// `window.PaperBalloonHost.{name,editName,gameEnded,leave,setBackMode,setOrientation,haptic,hapticComposition}`
     /// posting `{type, value}` to `window.webkit.messageHandlers.pbHost`, and polyfills
     /// `navigator.vibrate` over the same channel (CONTRACT.md §11) — WebKit ships no
     /// Vibration API, which is why a game's haptics are silent on iOS but not on
     /// Android. Idempotent — the shim must exist on every page load/navigation, but
     /// never redefine an already-installed bridge.
     ///
-    /// `enableSystemBack` is an empty function: iOS has no system back (CONTRACT.md §9),
-    /// but games call the same API on both platforms. `setOrientation` narrows to the two legal
-    /// keywords here, so the native side sees the contract's strict comparison (Android
-    /// gets the same for free from its typed JS bridge) rather than JS truthiness.
+    /// `setBackMode` and `setOrientation` narrow to their legal keywords here, so the
+    /// native side sees the contract's strict comparison (Android narrows in its bridge
+    /// methods) rather than JS truthiness.
     /// `vibrate` likewise normalizes to the spec's millisecond array and returns the
     /// spec's boolean, so a page sees the same shape and return type as the real API.
     ///
@@ -164,9 +163,9 @@ enum GameHostJS {
         },
         gameEnded: function (reason) { post('gameEnded', reason); },
         leave: function () { post('leave', null); },
-        // A hint that back is welcome (CONTRACT.md §9). iOS has no system back to
-        // hand it to, so it does nothing here — but it exists, so games call one API.
-        enableSystemBack: function () {},
+        setBackMode: function (mode) {
+          post('setBackMode', mode === 'page' || mode === 'leave' ? mode : 'off');
+        },
         setOrientation: function (mode) {
           post('setOrientation', mode === 'landscape' ? 'landscape' : 'portrait');
         },

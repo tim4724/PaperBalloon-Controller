@@ -7,8 +7,8 @@ import UIKit
 /// area through env(safe-area-inset-*). The launcher's own surfaces here (join cover,
 /// retry, the blank page behind them) follow the system's light/dark mode, like home: the
 /// launcher can't know a game's colors before its page has loaded, and not every game is
-/// in the manifest. Leaving is explicit: the page's close is the only exit — iOS has no
-/// system back (CONTRACT.md §9).
+/// in the manifest. Leaving is the page's close, or the system's swipe back while the page
+/// lets back leave (CONTRACT.md §9).
 struct GameHostScreen: View {
     let joinUrl: String
     let title: String
@@ -33,6 +33,9 @@ struct GameHostScreen: View {
     // landscape-only game's "turn your phone" overlay, say).
     @State private var painted = false
     @State private var wantsLandscape = false
+    // Does a swipe back leave (the page's §9 back mode is "leave")? It's the mode every
+    // page load starts in, so a page that never loads right can still be swiped away.
+    @State private var swipeLeaves = true
     @State private var isLandscape = false
     // The main document failed to load (no connection / host unreachable) — drives the
     // in-place retry overlay. Retry bumps the token GameWebView observes to reload.
@@ -96,11 +99,16 @@ struct GameHostScreen: View {
                     wantsLandscape = $0
                     ChromeState.shared.orientation = $0 ? .landscape : .portrait
                 },
+                // iOS has no back inside a page, so only "leave" does anything here.
+                onBackMode: { swipeLeaves = $0 == "leave" },
                 onRendererGone: reload,
                 failed: $failed,
                 reloadToken: reloadToken,
                 onSchemeChanged: { pageDark = $0 },
-                onNavigationStart: { pageDark = nil }
+                onNavigationStart: {
+                    pageDark = nil
+                    swipeLeaves = true  // each page load starts in "leave" (§9)
+                }
             )
             .ignoresSafeArea()
 
@@ -148,9 +156,9 @@ struct GameHostScreen: View {
         // The game surface never resizes for the keyboard (the page sees its own
         // field's only through visualViewport).
         .ignoresSafeArea(.keyboard)
-        // No back button and no interactive pop: the only way out of a live match is
-        // the page's close, routed explicitly, never through NavigationStack's history.
+        // No back button; the swipe back is SwipeBackGate's.
         .navigationBarBackButtonHidden(true)
+        .background(SwipeBackGate(enabled: swipeLeaves))
         .toolbar(.hidden, for: .navigationBar)
         // Immersive chrome, scoped to THIS view so it cannot leak onto home:
         // home indicator dims when idle, edge swipes need a second confirm.
@@ -261,4 +269,53 @@ private struct RenameRequest: Identifiable {
     let id = UUID()
     let profile: Profile
     let colors: SheetColors
+}
+
+/// The system's swipe back to home, allowed only while the page's back mode is "leave"
+/// (CONTRACT.md §9). UIKit won't start the navigation controller's swipe back under a
+/// hidden navigation bar, and SwiftUI turns it off with the back button, so while this
+/// screen is up the gate takes over the recognizer's delegate and gives it back as the
+/// screen goes. Popping changes the router's path, the same exit as the page's close.
+private struct SwipeBackGate: UIViewControllerRepresentable {
+    let enabled: Bool
+
+    func makeUIViewController(context: Context) -> Gate { Gate() }
+
+    func updateUIViewController(_ gate: Gate, context: Context) {
+        gate.enabled = enabled
+    }
+
+    final class Gate: UIViewController, UIGestureRecognizerDelegate {
+        var enabled = true
+        private weak var recognizer: UIGestureRecognizer?
+        private weak var systemDelegate: UIGestureRecognizerDelegate?
+        private var systemEnabled = true
+
+        // Re-taken on every appearance: a swipe that is let go of halfway brings the
+        // screen back.
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            guard recognizer == nil,
+                  let pop = navigationController?.interactivePopGestureRecognizer else { return }
+            recognizer = pop
+            systemDelegate = pop.delegate
+            systemEnabled = pop.isEnabled
+            pop.delegate = self
+            pop.isEnabled = true
+        }
+
+        // Not on viewWillDisappear: that fires as a swipe starts, and turning the
+        // recognizer off mid-swipe would cancel it.
+        override func viewDidDisappear(_ animated: Bool) {
+            super.viewDidDisappear(animated)
+            guard let pop = recognizer else { return }
+            pop.delegate = systemDelegate
+            pop.isEnabled = systemEnabled
+            recognizer = nil
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            enabled && (navigationController?.viewControllers.count ?? 0) > 1
+        }
+    }
 }

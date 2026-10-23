@@ -172,10 +172,10 @@ private fun GameHostContent(
       slowLoad = true
     }
   }
-  // Has the page armed the system back gesture (CONTRACT.md §9)? Default false —
-  // the safe state: edges excluded, the page's own close the only exit. Reset on
-  // every navigation.
-  var systemBackEnabled by remember { mutableStateOf(false) }
+  // Where a system back goes (CONTRACT.md §9). Default LEAVE, so a page that never
+  // loads right can still be backed out of. Reset on every navigation.
+  var backMode by remember { mutableStateOf(BackMode.LEAVE) }
+  val backOn = backMode != BackMode.OFF
   // Has the page asked for landscape (CONTRACT.md §10)? Default false — the launcher's
   // portrait.
   var landscape by remember { mutableStateOf(false) }
@@ -264,7 +264,7 @@ private fun GameHostContent(
     PaperBalloonHostBridge(
       onGameEnded = { exitOnce { currentOnGameEnd(it) } },
       onLeave = leave,
-      onSystemBackEnabled = { systemBackEnabled = it },
+      onBackMode = { backMode = it },
       onLandscape = {
         orientationAsked = true
         landscape = it
@@ -319,10 +319,10 @@ private fun GameHostContent(
   // cap on gesture exclusion, so the WebView's exclusion rects (set below) can
   // cover the whole play area.
   //
-  // Arming (CONTRACT.md §9) brings the bar back for as long as the page stays armed —
+  // Back (CONTRACT.md §9) brings the bar back for as long as the page keeps it on —
   // see [hostShowsNavBar] for when.
   val hostShowsNavBar = hostShowsNavBar(
-    armed = systemBackEnabled,
+    backOn = backOn,
     landscape = isLandscapeUi,
     gestureNav = gestureNavEnabled(context),
   )
@@ -341,10 +341,10 @@ private fun GameHostContent(
   // controller the same size on both apps rather than handing Android players a
   // shorter screen.
   //
-  // Deliberately NOT tied to systemBackEnabled, unlike the nav bar above: the
+  // Deliberately NOT tied to backMode, unlike the nav bar above: the
   // exclusion-cap lift is a nav-bar-only condition (see hideNavigationBar), and back
-  // never starts from the top edge, so neither reason to un-hide on arming applies.
-  // That keeps the top inset out of §9's arming story — it moves on rotation alone.
+  // never starts from the top edge, so neither reason to un-hide while back is on
+  // applies. That keeps the top inset out of §9 — it moves on rotation alone.
   // Games need no change either way: env(safe-area-inset-top) is already live and §10
   // already tells them the zone reshapes when it turns.
   //
@@ -377,31 +377,36 @@ private fun GameHostContent(
     webView?.evaluateJavascript("window.__pbNameResult && window.__pbNameResult($arg);", null)
   }
 
-  // Opt the controller surface out of the system back-gesture so edge swipes reach
-  // the game — unless the page has armed system back (CONTRACT.md §9), in which case
-  // the edges go back to the system so the gesture can start at all (and draws the
-  // system's own back affordance). Full-height exclusion only works because the nav
-  // bar is hidden. Applied on layout and whenever the flag flips.
+  // In OFF (CONTRACT.md §9), opt the controller surface out of the system back
+  // gesture so edge swipes reach the game. In any other mode — the default LEAVE
+  // included — the edges go to the system so the gesture can start at all (and
+  // draws the system's own back affordance). Full-height exclusion only works
+  // because the nav bar is hidden. Applied on layout and whenever back turns on or off.
   fun applyGestureExclusion(target: View) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
     target.systemGestureExclusionRects =
-      if (systemBackEnabled) emptyList() else listOf(Rect(0, 0, target.width, target.height))
+      if (backOn) emptyList() else listOf(Rect(0, 0, target.width, target.height))
   }
 
-  LaunchedEffect(systemBackEnabled, webView) {
+  LaunchedEffect(backOn, webView) {
     webView?.let(::applyGestureExclusion)
   }
 
   // Always handled, never passed to the activity: back must never finish the task
-  // from inside a live match. Disarmed (the default) it's swallowed outright — a
-  // stray press or edge swipe must not drop a player out. Armed, the page gets first
-  // refusal via back(); anything but a literal `true` means it didn't consume the
-  // press, and the launcher leaves. The evaluate is async, so the shell simply stays
-  // put until the answer arrives.
+  // from inside a live match. OFF swallows it — a stray press or edge swipe must not
+  // drop a player out. LEAVE leaves. PAGE gives the page first refusal via back();
+  // anything but a literal `true` means it didn't consume the press, and the
+  // launcher leaves. The evaluate is async, so the shell simply stays put until the
+  // answer arrives.
   BackHandler {
-    if (!systemBackEnabled) return@BackHandler
-    val wv = webView
-    if (wv == null) leave() else wv.evaluateJavascript(DELIVER_BACK_JS) { if (it != "true") leave() }
+    when (backMode) {
+      BackMode.OFF -> {}
+      BackMode.LEAVE -> leave()
+      BackMode.PAGE -> {
+        val wv = webView
+        if (wv == null) leave() else wv.evaluateJavascript(DELIVER_BACK_JS) { if (it != "true") leave() }
+      }
+    }
   }
 
   // Leaving the app (home/app switch/lock) synthesizes `pagehide` so the game
@@ -434,7 +439,7 @@ private fun GameHostContent(
   val legacyInsets = remember { webViewMajorVersion(context) < 136 }
 
   // Keep the bar icons contrasting against the page — status icons, and the nav bar's
-  // 3-button keys while the host shows it (armed, §9). While the join or retry cover is
+  // 3-button keys while the host shows it (back on, §9). While the join or retry cover is
   // up the icons sit on it, so they follow the cover's (system) mode — a server's error
   // page under the retry cover declares no color-scheme of its own. The page decides
   // once it shows — unless legacyInsets: the bars then sit on the host's surface, not
@@ -478,7 +483,7 @@ private fun GameHostContent(
           setBackgroundColor(surfaceArgb)
           // The REAL insets reach the page as env(safe-area-inset-*), with two edits,
           // zeroed rather than consumed (consumed insets never reach WebView at all):
-          // - The nav bar only counts while the host itself shows it (armed, above). The
+          // - The nav bar only counts while the host itself shows it (back on, above). The
           //   system also brings a hidden bar back for as long as a keyboard is up, and
           //   the game must not squash and spring back with it.
           // - The keyboard only counts while it is the page's own: the name sheet is a
@@ -489,7 +494,8 @@ private fun GameHostContent(
             val ime = WindowInsetsCompat.Type.ime()
             val pageInsets = WindowInsetsCompat.Builder(insets).apply {
               val landscape = v.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-              if (!hostShowsNavBar(systemBackEnabled, landscape, gestureNavEnabled(ctx))) {
+              // backMode read live: backOn is a snapshot from composition.
+              if (!hostShowsNavBar(backMode != BackMode.OFF, landscape, gestureNavEnabled(ctx))) {
                 setInsets(nav, Insets.NONE)
               }
               if (!(v.hasWindowFocus() && v.onCheckIsTextEditor())) {
@@ -501,16 +507,16 @@ private fun GameHostContent(
           }
           webViewClient = AllowListWebViewClient(
             allowed,
-            // Neither the §9 arming nor the §10 orientation may outlive the page that
+            // Neither the §9 back mode nor the §10 orientation may outlive the page that
             // asked for it — but they expire differently, because one is input safety
-            // and the other is cosmetic. Back DISARMS here: an unloaded page must never
-            // inherit a live exit gesture. Orientation is only re-armed for the verdict
+            // and the other is cosmetic. Back resets to LEAVE here: the new page must not
+            // inherit the old one's mode. Orientation is only re-armed for the verdict
             // in onLoaded — the device HOLDS what it has until the incoming document has
             // had its say. Reverting here instead rotates the phone to portrait for the
             // length of a page load and straight back again the moment the new page's
             // §10 call lands — which is every self-reload a landscape game does.
             onNavigationStart = {
-              systemBackEnabled = false
+              backMode = BackMode.LEAVE
               orientationAsked = false
               pageDark = null
             },
@@ -674,7 +680,7 @@ private const val SLOW_LOAD_MS = 3_000L
 private class NameRequest(val colors: SheetColors)
 
 /**
- * Whether the host shows the nav bar: only while the page has armed back (CONTRACT.md §9).
+ * Whether the host shows the nav bar: only while the page has back on (CONTRACT.md §9).
  * Then always for a 3-BUTTON player, whose back is a button a hidden bar doesn't have.
  * Under gesture navigation, in portrait only: the visible handle tells the player back is
  * available and lets the first edge swipe go back (a hidden bar spends it on the transient
@@ -682,8 +688,8 @@ private class NameRequest(val colors: SheetColors)
  * off the axis a landscape controller has least of, and the hidden bar's edge swipe still
  * works.
  */
-private fun hostShowsNavBar(armed: Boolean, landscape: Boolean, gestureNav: Boolean): Boolean =
-  armed && (!gestureNav || !landscape)
+private fun hostShowsNavBar(backOn: Boolean, landscape: Boolean, gestureNav: Boolean): Boolean =
+  backOn && (!gestureNav || !landscape)
 
 /** What covers the screen's edges: the status bar, the cutout, and the nav bar while the
  * host shows it. */
@@ -713,7 +719,7 @@ private class AllowListWebViewClient(
   private val onRenderGone: () -> Unit,
 ) : WebViewClient() {
   // Main-frame only, and deliberately not fired for same-document navigations —
-  // a page that pushes history mid-session keeps whatever it armed.
+  // a page that pushes history mid-session keeps its back mode.
   override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) = onNavigationStart()
 
   override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -813,6 +819,9 @@ private class NameBridge(
   }
 }
 
+/** Where a system back goes (CONTRACT.md §9). */
+private enum class BackMode { OFF, PAGE, LEAVE }
+
 /**
  * The game→launcher half of the contract (v1), exposed as `__pbHost` and wrapped into
  * `window.PaperBalloonHost` by HOST_SHIM_JS.
@@ -823,7 +832,7 @@ private class NameBridge(
 private class PaperBalloonHostBridge(
   private val onGameEnded: (String?) -> Unit,
   private val onLeave: () -> Unit,
-  private val onSystemBackEnabled: (Boolean) -> Unit,
+  private val onBackMode: (BackMode) -> Unit,
   private val onLandscape: (Boolean) -> Unit,
   private val haptics: GameHaptics,
 ) {
@@ -843,13 +852,17 @@ private class PaperBalloonHostBridge(
     mainHandler.post { onLeave() }
   }
 
-  // Whether the system back gesture may occur right now (CONTRACT.md §9). Not
-  // fire-once: games arm and disarm repeatedly (a dialog opening and closing).
-  // Declaring the parameter as Boolean gives the contract's strict `=== true` for
-  // free — the JS bridge converts every non-boolean argument to false.
+  // Where a system back goes right now (CONTRACT.md §9). Not fire-once: games switch
+  // repeatedly (a dialog opening and closing). Anything but the two literal modes —
+  // including a non-string, which the JS bridge hands over as null — is off.
   @JavascriptInterface
-  fun enableSystemBack(enabled: Boolean) {
-    mainHandler.post { onSystemBackEnabled(enabled) }
+  fun setBackMode(mode: String?) {
+    val backMode = when (mode) {
+      "page" -> BackMode.PAGE
+      "leave" -> BackMode.LEAVE
+      else -> BackMode.OFF
+    }
+    mainHandler.post { onBackMode(backMode) }
   }
 
   // The orientation the controller wants right now (CONTRACT.md §10). Not fire-once:

@@ -67,9 +67,9 @@ Closing the web view destroys the page and with it its connections, relay socket
 included, so there is nothing to clean up first. (§7's lingering socket is a page that
 stays alive in the background, not one that is closed.)
 
-- **`leave()`** — the player's own exit. Draw a visible close button that calls it: it is
-  the only way out (iOS has no system back; Android's is off by default, §9). Whether to
-  confirm first is the game's call. Never call `leave` when it doesn't exist; in a
+- **`leave()`** — the player's own exit. Draw a visible close button that calls it: while
+  back is `off` or `page` it is the only way out (§9). Whether to confirm first is the
+  game's call. Never call `leave` when it doesn't exist; in a
   browser the button is yours to repurpose or hide.
 - **`gameEnded(reason)`** — a terminal end the player didn't choose: room closed, display
   gone, join rejected. Not for match-over or "play again". Home shows a message:
@@ -171,34 +171,41 @@ A native display (tvOS, Android TV) may advertise its room over DNS-SD as
   a deny still loads it. iOS exempts web view traffic and never asks there. Either way,
   treat the LAN as unreliable.
 
-## 9. System back: `enableSystemBack` + `back()`
+## 9. System back: `PaperBalloonHost.setBackMode(mode)` + `back()`
 
-Call it on both platforms; only Android acts on it. iOS has no system back, so there
-`enableSystemBack` does nothing and `back()` is never called.
-
-By default the controller surface is opted out of the back gesture, so edge swipes are
-gameplay. Ask for back when it is welcome, and give it up the moment it isn't:
+Tell the launcher where a back goes, and update it whenever that changes:
 
 ```js
-window.PaperBalloonHost?.enableSystemBack?.(true);    // dialog opened / in the lobby
-window.PaperBalloonHost?.enableSystemBack?.(false);   // dialog closed / match resumed
+window.PaperBalloonHost?.setBackMode?.('off');     // match running: edges are gameplay
+window.PaperBalloonHost?.setBackMode?.('page');    // dialog open: back goes to back()
+window.PaperBalloonHost?.setBackMode?.('leave');   // lobby / results: back leaves the game
 ```
 
-Only a literal `true` arms; it resets on every page load. Armed, the edges belong to the
-system (no drag-from-the-edge controls), and each back — gesture or 3-button — calls:
+| Mode | Android: back gesture and button | iOS: swipe in from the leading edge |
+|---|---|---|
+| `off` | nothing | nothing |
+| `page` | calls `back()` | nothing |
+| `leave` | leaves like `leave()` | the system's swipe back, sliding the game away to home |
+
+Any other value is `off`. Every page load starts at `leave`, so a page that never loads
+right can still be backed out of: send `off` before the edges become gameplay. iOS has no
+system back, only the swipe that pops a whole screen, so it never steps back inside the
+page: there a dialog closes by its own controls. While back is on, its edges belong to the
+launcher (no drag-from-the-edge controls), and on Android the navigation bar comes back —
+in portrait, and in landscape too for 3-button navigation — and grows that edge's inset.
+
+In `page` mode each back calls:
 
 ```js
 window.PaperBalloon = window.PaperBalloon || {};
 window.PaperBalloon.back = () => {
-  if (!dialogOpen) return false;   // not consumed → the launcher leaves the game
   closeDialog();
-  return true;                     // consumed → the player stays
+  return true;   // consumed → the player stays
 };
 ```
 
 Only a synchronous literal `true` consumes; anything else (no handler, a Promise, a
-throw) leaves like `leave()`. While armed, the navigation bar comes back — in portrait,
-and in landscape too for 3-button navigation — and grows that edge's inset.
+throw) leaves like `leave()`.
 
 ## 10. Game → launcher: `PaperBalloonHost.setOrientation(mode)`
 
