@@ -206,8 +206,7 @@ struct GameplayLoopView: View {
                 .padding(.bottom, 6)
             }
         }
-        // The puck matches the scanner's flashlight toggle — the symbol shows the
-        // state, the label names the action.
+        // The symbol shows the state, the label names the action.
         .overlay(alignment: .topTrailing) {
             if hasAudio {
                 Button {

@@ -39,8 +39,6 @@
     <string name="set_name">이름 설정</string>
 
     <string name="close_scanner">스캐너 닫기</string>
-    <string name="flashlight_on">손전등 켜기</string>
-    <string name="flashlight_off">손전등 끄기</string>
     <string name="scan_hint">TV나 노트북의 QR 코드를 스캔하세요</string>
     <string name="camera_access_needed">카메라 권한 필요</string>
     <string name="camera_access_rationale">TV의 코드를 스캔하려면 카메라 접근을 허용하세요. 또는 방 코드를 직접 입력할 수도 있어요.</string>

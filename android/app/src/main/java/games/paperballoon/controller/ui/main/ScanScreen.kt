@@ -199,16 +199,9 @@ fun ScanScreen(
     haptics.performHapticFeedback(HapticFeedbackType.Reject)
   }
 
-  var torchOn by remember { mutableStateOf(false) }
-  var hasTorch by remember { mutableStateOf(false) }
-
   Box(Modifier.fillMaxSize().background(Color.Black)) {
     if (granted) {
-      CameraPreview(
-        onQr = ::onQr,
-        onTorchProbed = { hasTorch = it },
-        torchOn = torchOn,
-      )
+      CameraPreview(onQr = ::onQr)
       ViewfinderOverlay(Modifier.fillMaxSize())
     } else if (requested) {
       PermissionDeniedContent(
@@ -258,16 +251,6 @@ fun ScanScreen(
         ScannerIconButton(onClick = onClose) {
           Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close_scanner), tint = Color.White)
         }
-        Spacer(Modifier.weight(1f))
-        if (hasTorch) {
-          ScannerIconButton(onClick = { torchOn = !torchOn }) {
-            Icon(
-              painterResource(if (torchOn) R.drawable.ic_flash_on else R.drawable.ic_flash_off),
-              contentDescription = stringResource(if (torchOn) R.string.flashlight_off else R.string.flashlight_on),
-              tint = Color.White,
-            )
-          }
-        }
       }
       Spacer(Modifier.weight(1f))
       Column(
@@ -312,15 +295,10 @@ fun ScanScreen(
 
 // The camera side, isolated so use-case/analyzer lifecycle stays in one place.
 @Composable
-private fun CameraPreview(
-  onQr: (List<String>) -> Unit,
-  onTorchProbed: (Boolean) -> Unit,
-  torchOn: Boolean,
-) {
+private fun CameraPreview(onQr: (List<String>) -> Unit) {
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
   val previewView = remember { CameraPreviewView(context) }
-  var camera by remember { mutableStateOf<Camera?>(null) }
   // The viewport that keeps the analyzer's crop rect matching what the preview shows
   // is built from the preview's aspect ratio, so binding waits for the first layout —
   // and rebinds when a rotation changes it.
@@ -399,9 +377,7 @@ private fun CameraPreview(
 
     try {
       val bound = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, group)
-      camera = bound
       previewView.setCameraInfo(bound.cameraInfo)
-      onTorchProbed(bound.cameraInfo.hasFlashUnit())
       applyCenterMeteringRegions(bound)
       awaitCancellation()
     } catch (e: IllegalArgumentException) {
@@ -409,14 +385,11 @@ private fun CameraPreview(
       // black and manual entry — already on it — is the way out.
       Log.e("ScanScreen", "Camera bind failed", e)
     } finally {
-      camera = null
       provider.unbind(preview, analysis)
       analysis.clearAnalyzer()
       decodeExecutor.shutdown()
     }
   }
-
-  LaunchedEffect(camera, torchOn) { camera?.cameraControl?.enableTorch(torchOn) }
 }
 
 // Continuous AF meters the whole frame by default, so bright or high-contrast
@@ -515,8 +488,8 @@ private fun PermissionDeniedContent(onRetry: () -> Unit, onEnterCode: () -> Unit
   }
 }
 
-// The floating controls sit on live video — give them a constant dark puck so
-// they read on any background.
+// The close button sits on live video — give it a constant dark puck so it
+// reads on any background.
 @Composable
 private fun ScannerIconButton(onClick: () -> Unit, content: @Composable () -> Unit) {
   IconButton(

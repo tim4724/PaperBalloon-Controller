@@ -38,8 +38,6 @@
     <string name="set_name">Definir nome</string>
 
     <string name="close_scanner">Fechar o leitor</string>
-    <string name="flashlight_on">Ligar a lanterna</string>
-    <string name="flashlight_off">Desligar a lanterna</string>
     <string name="scan_hint">Escaneie o código QR na sua TV ou computador</string>
     <string name="camera_access_needed">Acesso à câmera necessário</string>
     <string name="camera_access_rationale">Permita o acesso à câmera para escanear o código na sua TV, ou digite o código da sala.</string>

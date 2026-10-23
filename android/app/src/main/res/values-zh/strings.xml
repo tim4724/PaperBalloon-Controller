@@ -38,8 +38,6 @@
     <string name="set_name">设置名字</string>
 
     <string name="close_scanner">关闭扫描器</string>
-    <string name="flashlight_on">打开手电筒</string>
-    <string name="flashlight_off">关闭手电筒</string>
     <string name="scan_hint">扫描电视或电脑上的二维码</string>
     <string name="camera_access_needed">需要相机权限</string>
     <string name="camera_access_rationale">允许使用相机来扫描电视上的二维码，或者直接输入房间代码。</string>

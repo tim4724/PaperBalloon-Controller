@@ -38,8 +38,6 @@
     <string name="set_name">Choisir un nom</string>
 
     <string name="close_scanner">Fermer le scanner</string>
-    <string name="flashlight_on">Activer la lampe torche</string>
-    <string name="flashlight_off">Désactiver la lampe torche</string>
     <string name="scan_hint">Scanne le QR code sur ta TV ou ton ordinateur</string>
     <string name="camera_access_needed">Accès à la caméra requis</string>
     <string name="camera_access_rationale">Autorise l’accès à la caméra pour scanner le code sur ta TV, ou saisis le code de la salle.</string>

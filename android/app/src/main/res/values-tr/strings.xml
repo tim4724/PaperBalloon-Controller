@@ -38,8 +38,6 @@
     <string name="set_name">İsim belirle</string>
 
     <string name="close_scanner">Tarayıcıyı kapat</string>
-    <string name="flashlight_on">El fenerini aç</string>
-    <string name="flashlight_off">El fenerini kapat</string>
     <string name="scan_hint">TV\'ndeki veya bilgisayarındaki QR kodu tara</string>
     <string name="camera_access_needed">Kamera erişimi gerekli</string>
     <string name="camera_access_rationale">TV\'ndeki kodu taramak için kamera erişimine izin ver ya da oda kodunu elle gir.</string>

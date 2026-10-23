@@ -33,8 +33,6 @@ struct QRScannerScreen: View {
     // every frame.
     @State private var scanError: String? = nil
     @State private var rejected: Set<String> = []
-    @State private var torchOn = false
-    @State private var hasTorch = false
 
     var body: some View {
         ZStack {
@@ -48,12 +46,10 @@ struct QRScannerScreen: View {
                     .foregroundStyle(.white)
             } else if authorized {
                 CameraPreview(
-                    torchOn: torchOn,
                     onCode: handleCode,
                     onFailure: { message in
                         finish(.failure(message: message))
-                    },
-                    onTorchProbed: { hasTorch = $0 }
+                    }
                 )
                 .ignoresSafeArea()
 
@@ -102,15 +98,6 @@ struct QRScannerScreen: View {
                         finish(.cancelled)
                     }
                     Spacer()
-                    if hasTorch {
-                        puckButton(
-                            torchOn ? "bolt.fill" : "bolt.slash.fill",
-                            label: torchOn ? String(localized: "Turn flashlight off")
-                                           : String(localized: "Turn flashlight on")
-                        ) {
-                            torchOn.toggle()
-                        }
-                    }
                 }
                 Spacer(minLength: 0)
                 if authorized {
@@ -176,8 +163,8 @@ struct QRScannerScreen: View {
         }
     }
 
-    /// The floating controls sit on live video — give them a constant dark puck so
-    /// they read on any background.
+    /// The close button sits on live video — give it a constant dark puck so it
+    /// reads on any background.
     private func puckButton(_ systemName: String, label: String,
                             action: @escaping () -> Void) -> some View {
         Button(action: action) {
@@ -238,10 +225,8 @@ struct QRScannerScreen: View {
 // MARK: - CameraPreview (private)
 
 private struct CameraPreview: UIViewRepresentable {
-    let torchOn: Bool
     let onCode: (String) -> Void
     let onFailure: (String) -> Void
-    let onTorchProbed: (Bool) -> Void
 
     final class PreviewView: UIView {
         override static var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
@@ -261,25 +246,18 @@ private struct CameraPreview: UIViewRepresentable {
     final class Coordinator: NSObject, AVCaptureMetadataOutputObjectsDelegate {
         var onCode: (String) -> Void
         var onFailure: (String) -> Void
-        var onTorchProbed: (Bool) -> Void
 
         let session = AVCaptureSession()
         private let sessionQueue = DispatchQueue(label: "games.paperballoon.controller.qr-session")
         private var configured = false
-        // Session-queue state: the capture device, and the torch state last applied
-        // to it (so a SwiftUI update that changed something else doesn't re-lock it).
-        private var device: AVCaptureDevice?
-        private var torchOn = false
         // Main-thread state: the running output, published from the session queue only
         // once it is live, and the view whose bounds define the scan region.
         private var qrOutput: AVCaptureMetadataOutput?
         private weak var previewView: PreviewView?
 
-        init(onCode: @escaping (String) -> Void, onFailure: @escaping (String) -> Void,
-             onTorchProbed: @escaping (Bool) -> Void) {
+        init(onCode: @escaping (String) -> Void, onFailure: @escaping (String) -> Void) {
             self.onCode = onCode
             self.onFailure = onFailure
-            self.onTorchProbed = onTorchProbed
         }
 
         private struct SetupError: LocalizedError {
@@ -297,10 +275,7 @@ private struct CameraPreview: UIViewRepresentable {
                         throw SetupError(message: String(localized: "No camera available"))
                     }
                     let input = try AVCaptureDeviceInput(device: device)
-                    self.device = device
                     Self.applyCenterMetering(device)
-                    let torchAvailable = device.hasTorch
-                    DispatchQueue.main.async { self.onTorchProbed(torchAvailable) }
                     self.session.beginConfiguration()
                     guard self.session.canAddInput(input) else {
                         self.session.commitConfiguration()
@@ -399,20 +374,6 @@ private struct CameraPreview: UIViewRepresentable {
             view.onLayout = { [weak self] in self?.applyScanRegion() }
         }
 
-        /// The scanner's own flashlight — the room code is often on a card or a
-        /// sleeve, not just a lit TV. Stopping the session releases the torch, so
-        /// there's nothing to undo on teardown.
-        func setTorch(_ on: Bool) {
-            sessionQueue.async { [weak self] in
-                guard let self, self.torchOn != on,
-                      let device = self.device, device.hasTorch,
-                      (try? device.lockForConfiguration()) != nil else { return }
-                defer { device.unlockForConfiguration() }
-                self.torchOn = on
-                device.torchMode = on ? .on : .off
-            }
-        }
-
         func stop() {
             sessionQueue.async { [weak self] in
                 guard let self else { return }
@@ -437,7 +398,7 @@ private struct CameraPreview: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onCode: onCode, onFailure: onFailure, onTorchProbed: onTorchProbed)
+        Coordinator(onCode: onCode, onFailure: onFailure)
     }
 
     func makeUIView(context: Context) -> PreviewView {
@@ -453,8 +414,6 @@ private struct CameraPreview: UIViewRepresentable {
     func updateUIView(_ uiView: PreviewView, context: Context) {
         context.coordinator.onCode = onCode
         context.coordinator.onFailure = onFailure
-        context.coordinator.onTorchProbed = onTorchProbed
-        context.coordinator.setTorch(torchOn)
     }
 
     static func dismantleUIView(_ uiView: PreviewView, coordinator: Coordinator) {

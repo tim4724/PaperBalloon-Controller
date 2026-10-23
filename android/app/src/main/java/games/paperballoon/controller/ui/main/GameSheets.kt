@@ -314,8 +314,7 @@ private fun GameplayLoop(game: Game, url: String) {
         }
       }
     }
-    // The puck matches the scanner's flashlight toggle — the icon shows the state,
-    // the label names the action.
+    // The icon shows the state, the label names the action.
     if (videoRendering && hasAudio) {
       IconButton(
         onClick = {

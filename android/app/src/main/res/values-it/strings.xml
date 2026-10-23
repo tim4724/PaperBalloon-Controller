@@ -38,8 +38,6 @@
     <string name="set_name">Imposta nome</string>
 
     <string name="close_scanner">Chiudi lo scanner</string>
-    <string name="flashlight_on">Accendi la torcia</string>
-    <string name="flashlight_off">Spegni la torcia</string>
     <string name="scan_hint">Scansiona il codice QR sulla tua TV o sul laptop</string>
     <string name="camera_access_needed">Serve l’accesso alla fotocamera</string>
     <string name="camera_access_rationale">Consenti l’accesso alla fotocamera per scansionare il codice sulla TV, oppure inserisci il codice della stanza.</string>

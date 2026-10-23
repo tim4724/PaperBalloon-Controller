@@ -39,8 +39,6 @@
     <string name="set_name">名前を設定</string>
 
     <string name="close_scanner">スキャナーを閉じる</string>
-    <string name="flashlight_on">ライトをオンにする</string>
-    <string name="flashlight_off">ライトをオフにする</string>
     <string name="scan_hint">テレビまたはパソコンのQRコードをスキャンしてください</string>
     <string name="camera_access_needed">カメラへのアクセスが必要です</string>
     <string name="camera_access_rationale">テレビのコードをスキャンするにはカメラへのアクセスを許可してください。または、ルームコードを直接入力することもできます。</string>

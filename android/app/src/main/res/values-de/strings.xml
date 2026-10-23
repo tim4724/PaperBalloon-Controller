@@ -38,8 +38,6 @@
     <string name="set_name">Name festlegen</string>
 
     <string name="close_scanner">Scanner schließen</string>
-    <string name="flashlight_on">Taschenlampe einschalten</string>
-    <string name="flashlight_off">Taschenlampe ausschalten</string>
     <string name="scan_hint">Scanne den QR-Code auf deinem Fernseher oder Laptop</string>
     <string name="camera_access_needed">Kamerazugriff benötigt</string>
     <string name="camera_access_rationale">Erlaube den Zugriff auf die Kamera, um den Code zu scannen, oder gib den Raumcode ein.</string>
