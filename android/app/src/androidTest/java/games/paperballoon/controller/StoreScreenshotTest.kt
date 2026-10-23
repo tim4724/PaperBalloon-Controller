@@ -21,6 +21,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -141,18 +142,20 @@ class StoreScreenshotTest {
 
     // ---- Game info sheet: manifest copy + join actions for the live game ----
     compose.onNodeWithText("HexStacker").performClick()
+    // Waits key on the sheet's own copy: the home card shows the players count too.
+    waitForText(str(R.string.play_step_scan))
     // The numeric players chip, rendered from the manifest counts (HexStacker is 1–8).
-    waitForText(PLAYERS_RANGE)
-    compose.onNodeWithText(str(R.string.play_step_scan)).assertIsDisplayed()
-    // Both the sheet and the home join card behind it carry the two join buttons.
+    compose.onAllNodesWithText(PLAYERS_RANGE).onFirst().assertExists()
+    // The sheet carries both join buttons as text; behind it, the home dock's Scan code
+    // does too, but its manual entry is an icon.
     compose.onAllNodesWithText(str(R.string.scan_code)).assertCountEquals(2)
-    compose.onAllNodesWithText(str(R.string.enter_code_manually)).assertCountEquals(2)
+    compose.onAllNodesWithText(str(R.string.enter_code_manually)).assertCountEquals(1)
     // Give the muted gameplay trailer time to download (first locale only — it's
     // cached after) and render real frames; cover art shows if it isn't ready.
     Thread.sleep(4_000)
     screenshot("02-game-info-$suffix")
     Espresso.pressBack()
-    waitForTextGone(PLAYERS_RANGE)
+    waitForTextGone(str(R.string.play_step_scan))
 
     // ---- Profile sheet: blank-name gating + persistence round-trip ----
     compose.onNodeWithText(PLAYER_NAME).performClick()
@@ -168,7 +171,7 @@ class StoreScreenshotTest {
     compose.onNodeWithText(PLAYER_NAME).assertIsDisplayed()
 
     // ---- Manual code entry: empty-code gating; never submitted (no relay dependency) ----
-    compose.onNodeWithText(str(R.string.enter_code_manually)).performClick()
+    compose.onNodeWithContentDescription(str(R.string.enter_code_manually)).performClick()
     waitForText(str(R.string.enter_room_code))
     val playButton = compose.onNode(hasText(str(R.string.join)) and hasAnyAncestor(isDialog()))
     playButton.assertIsNotEnabled()

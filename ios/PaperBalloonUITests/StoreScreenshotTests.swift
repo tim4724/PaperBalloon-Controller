@@ -79,17 +79,18 @@ final class StoreScreenshotTests: XCTestCase {
 
         // ---- Game info sheet: manifest copy + join actions for the live game ----
         app.staticTexts["HexStacker"].firstMatch.tap()
+        // Waits key on the sheet's own copy: the home card shows the players count too.
+        let steps = app.staticTexts["Scan the room code it shows."]
+        XCTAssertTrue(steps.waitForExistence(timeout: 5))
         // The numeric players chip (Game.playersRange over the manifest counts).
-        let players = app.staticTexts["1–8"]
-        XCTAssertTrue(players.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Scan the room code it shows."].exists)
+        XCTAssertTrue(app.staticTexts["1–8"].exists)
         // Give the muted gameplay trailer time to download (first locale only — it's
         // cached after) and render real frames; cover art shows if it isn't ready.
         Thread.sleep(forTimeInterval: 4)
         snap("02-game-info-\(suffix)")
         // Tap the dimmed area above the content-height sheet to dismiss it.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
-        XCTAssertTrue(players.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(steps.waitForNonExistence(timeout: 5))
 
         // ---- Profile sheet: seeded name round-trips through the field ----
         app.buttons[playerName].firstMatch.tap()
