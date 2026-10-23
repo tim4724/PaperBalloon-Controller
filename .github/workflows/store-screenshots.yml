@@ -66,6 +66,11 @@ jobs:
           # (Espresso's RootViewWithoutFocusException in pressBack).
           cores: 4
           ram-size: 4096M
+          # SwANGLE, not the action's default swiftshader_indirect: since the design
+          # language's home screen, that GL path deadlocks the emulator on the app's
+          # first frame here (qemu idles, adb goes offline). It doesn't reproduce on
+          # an Apple Silicon host, and no single home-screen effect is to blame.
+          emulator-options: -no-window -gpu swangle_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           working-directory: android
           # The action runs each line as its own `sh -c`: no multi-line constructs.
