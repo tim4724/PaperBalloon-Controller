@@ -104,7 +104,7 @@ jobs:
 
   ios:
     name: iOS ${{ matrix.size }} (simulator)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -119,9 +119,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select latest Xcode 26
+      - name: Select latest stable Xcode 27
         run: |
-          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          # Real bundles only (the image's Xcode_27.2.app is a symlink to a beta), no
+          # betas, newest by the bundle's own version (the RC folder name sorts badly).
+          XCODE="$(find /Applications -maxdepth 1 -type d -name 'Xcode_27*.app' ! -name '*beta*' \
+            | while read -r x; do echo "$(defaults read "$x/Contents/Info" CFBundleShortVersionString) $x"; done \
+            | sort -V | tail -1 | cut -d' ' -f2-)"
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE"
 
