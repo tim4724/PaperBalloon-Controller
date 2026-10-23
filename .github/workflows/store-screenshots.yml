@@ -181,12 +181,19 @@ jobs:
         run: |
           xcrun xcresulttool export attachments --path ios/TestResults.xcresult --output-path out
           # Exported files are UUID-named; manifest.json carries the attachment names.
+          # Keep only each test's last repetition — the one that passed; a retried
+          # one's captures (and Xcode's automatic failure attachments) are dropped.
           python3 - <<'EOF'
           import json, os
           for test in json.load(open("out/manifest.json")):
+              last = max(a.get("repetitionNumber", 1) for a in test["attachments"])
               for a in test["attachments"]:
-                  pretty = a["suggestedHumanReadableName"].split("_")[0] + ".png"
-                  os.rename(os.path.join("out", a["exportedFileName"]), os.path.join("out", pretty))
+                  path = os.path.join("out", a["exportedFileName"])
+                  name = a["suggestedHumanReadableName"].split("_")[0]
+                  if a.get("repetitionNumber", 1) == last and name[:2].isdigit():
+                      os.rename(path, os.path.join("out", name + ".png"))
+                  else:
+                      os.remove(path)
           EOF
           rm out/manifest.json
           ls -la out
