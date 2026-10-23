@@ -793,11 +793,11 @@ private fun GameEndBanner(message: String?, onDismiss: () -> Unit) {
  * advertising. The two are the same object to a player, so they are one card; only where
  * the pieces come from differs, which is what [RejoinCard] and [NearbyCard] supply.
  *
- * The site's card: flat, the card fill with a hairline border, so it adapts per theme
- * instead of sitting as a dark slab on a light screen. The game's colour lives on the
- * icon and nowhere else: routing brand through the border made every HexStacker card
- * near-CTA red (its accent is #FF6B6B beside the sunset), which both read as an alert
- * and spent the one colour that's supposed to mean "this is how you play".
+ * On the frosted surface of the name chip and About: rooms share the header's material,
+ * apart from the solid game cards below. The game's colour lives on the icon and nowhere
+ * else: routing it through the card's edge or fill made every HexStacker card near-CTA
+ * red (its accent is #FF6B6B beside the sunset), which both read as an alert and spent
+ * the one colour that's supposed to mean "this is how you play".
  */
 @Composable
 private fun RoomCard(
@@ -823,13 +823,12 @@ private fun RoomCard(
     interactionSource = interaction,
     shape = MaterialTheme.shapes.large,
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.card,
+      containerColor = MaterialTheme.colorScheme.frosted,
       contentColor = onCard,
     ),
-    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
   ) {
     Row(
-      Modifier.padding(16.dp),
+      Modifier.padding(14.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {

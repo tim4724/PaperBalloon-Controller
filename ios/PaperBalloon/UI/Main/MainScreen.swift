@@ -647,11 +647,11 @@ private struct GameEndBanner: View {
 /// advertising. The two are the same object to a player, so they are one card; only where
 /// the pieces come from differs, which is what `RejoinCard` and `NearbyCard` supply.
 ///
-/// The site's card: flat, the card fill with a hairline border, so it adapts per
-/// theme instead of sitting as a dark slab on a light screen. The game's colour lives on
-/// the icon and nowhere else: routing brand through the border made every HexStacker card
-/// near-CTA red (its accent is #FF6B6B beside the sunset), which both read as an alert
-/// and spent the one colour that's supposed to mean "this is how you play".
+/// Glass on iOS 26 like the toolbar pills, a frosted fill before: rooms share the header's
+/// material, apart from the solid game cards below. The game's colour lives on the icon
+/// and nowhere else: routing it through the card's edge or fill made every HexStacker
+/// card near-CTA red (its accent is #FF6B6B beside the sunset), which both read as an
+/// alert and spent the one colour that's supposed to mean "this is how you play".
 private struct RoomCard: View {
     let game: Game
     let title: String
@@ -693,18 +693,25 @@ private struct RoomCard: View {
                     .opacity(0.65)
             }
             .foregroundStyle(palette.onSurface)
-            .padding(16)
+            .padding(14)
             .frame(maxWidth: .infinity)
-            .background(
-                palette.card,
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(palette.outlineVariant, lineWidth: 1)
-            )
+            .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
+                                  fallback: palette.frosted))
         }
-        .buttonStyle(PressableCardButtonStyle())
+        .modifier(RoomCardPress())
+    }
+}
+
+/// Interactive glass gives its own press feedback on iOS 26; the card's spring scale is
+/// the cue before that. A modifier rather than an inline `if #available` so the SDK-17
+/// build compiles.
+private struct RoomCardPress: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.buttonStyle(.plain)
+        } else {
+            content.buttonStyle(PressableCardButtonStyle())
+        }
     }
 }
 
