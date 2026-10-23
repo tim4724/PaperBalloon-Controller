@@ -405,9 +405,9 @@ private class PlayerLayerUIView: UIView {
     /// backdrop while the fullscreen clip grows.
     func fadeInWhenReady() {
         alpha = 0
-        readyObservation = playerLayer.observe(\.isReadyForDisplay) { layer, _ in
+        readyObservation = playerLayer.observe(\.isReadyForDisplay) { [weak self] layer, _ in
             guard layer.isReadyForDisplay else { return }
-            Task { @MainActor [weak self] in
+            Task { @MainActor in
                 UIView.animate(withDuration: 0.3) { self?.alpha = 1 }
             }
         }
