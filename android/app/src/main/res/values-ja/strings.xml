@@ -9,8 +9,8 @@
     <string name="nearby_perm">付近のデバイス</string>
     <string name="nearby_allow">許可</string>
     <string name="nearby_no_wifi">Wi-Fiに接続すると近くのルームを検索できます</string>
-    <string name="nearby_none">ルームが見つかりません</string>
-    <string name="nearby_searching">ルームを検索中…</string>
+    <string name="nearby_none">近くにルームが見つかりません</string>
+    <string name="nearby_searching">近くのルームを検索中…</string>
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">ブラウザ</string>
@@ -21,7 +21,7 @@
     <string name="trailer_fullscreen">全画面で再生</string>
     <string name="trailer_close">動画を閉じる</string>
 
-    <string name="rooms_title">ルーム</string>
+    <string name="nearby_title">近くのルーム</string>
     <string name="games_title">ゲーム</string>
     <string name="join_start_game">テレビまたはブラウザでゲームを始めてください。</string>
     <string name="scan_code">コードをスキャン</string>

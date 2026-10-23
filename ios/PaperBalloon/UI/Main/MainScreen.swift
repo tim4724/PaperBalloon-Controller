@@ -100,9 +100,12 @@ struct MainScreen: View {
                     // and all, rather than standing up a second card for the room the
                     // player is already being offered.
                     let home = homeRooms(Array(resolvedNearby.values), rejoin: rejoin)
-                    // A clip shows no status line, so with no room there it has nothing to head.
-                    if !PB.isAppClip || rejoin != nil || !home.nearby.isEmpty {
-                        sectionTitle("Rooms")
+                    // Heads rooms only: the ask and the status lines speak for themselves,
+                    // and a heading over "No rooms found" would announce a section with
+                    // nothing in it.
+                    if rejoin != nil || !home.nearby.isEmpty {
+                        sectionTitle("Nearby")
+                            .transition(.opacity)
                     }
                     if let rejoin {
                         RejoinCard(room: rejoin, advert: home.rejoinAdvert, primary: true) {
@@ -842,11 +845,11 @@ private struct NearbyStatusCard: View {
         case .denied:
             askBlock(Text("Open Settings"), action: onOpenSettings)
         case .searching:
-            statusLine(Text("Searching for rooms…"), showsProgress: true)
+            statusLine(Text("Searching for rooms nearby…"), showsProgress: true)
         case .noWifi:
             statusLine(Text("Connect to Wi-Fi to find rooms nearby"), icon: "wifi.slash")
         case .none:
-            statusLine(Text("No rooms found"))
+            statusLine(Text("No rooms found nearby"))
         }
     }
 

@@ -67,7 +67,7 @@ final class StoreScreenshotTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["HexStacker"].waitForExistence(timeout: 10))
         // Assert and capture before MainScreen's 8 s search grace period settles this
         // to "No rooms found"; the queries below are slow on CI simulators.
-        XCTAssertTrue(app.staticTexts["Searching for rooms…"].exists)
+        XCTAssertTrue(app.staticTexts["Searching for rooms nearby…"].exists)
         snap("01-home-\(suffix)")
         XCTAssertTrue(app.staticTexts["Tiny Track"].firstMatch.exists)
         XCTAssertTrue(app.staticTexts["Powder"].firstMatch.exists)

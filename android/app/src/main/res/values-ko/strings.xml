@@ -9,8 +9,8 @@
     <string name="nearby_perm">근처 기기</string>
     <string name="nearby_allow">허용</string>
     <string name="nearby_no_wifi">근처 방을 찾으려면 Wi-Fi에 연결하세요</string>
-    <string name="nearby_none">방을 찾지 못했어요</string>
-    <string name="nearby_searching">방 검색 중…</string>
+    <string name="nearby_none">근처에서 방을 찾지 못했어요</string>
+    <string name="nearby_searching">근처 방 검색 중…</string>
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">브라우저</string>
@@ -21,7 +21,7 @@
     <string name="trailer_fullscreen">전체 화면으로 재생</string>
     <string name="trailer_close">동영상 닫기</string>
 
-    <string name="rooms_title">방</string>
+    <string name="nearby_title">근처</string>
     <string name="games_title">게임</string>
     <string name="join_start_game">TV나 브라우저에서 게임을 시작하세요.</string>
     <string name="scan_code">코드 스캔</string>

@@ -8,8 +8,8 @@
     <string name="nearby_perm">Dispositivos por perto</string>
     <string name="nearby_allow">Permitir</string>
     <string name="nearby_no_wifi">Conecte-se ao Wi-Fi para encontrar salas por perto</string>
-    <string name="nearby_none">Nenhuma sala encontrada</string>
-    <string name="nearby_searching">Procurando salas…</string>
+    <string name="nearby_none">Nenhuma sala encontrada por perto</string>
+    <string name="nearby_searching">Procurando salas por perto…</string>
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">Navegador</string>
@@ -20,7 +20,7 @@
     <string name="trailer_fullscreen">Reproduzir em tela cheia</string>
     <string name="trailer_close">Fechar vídeo</string>
 
-    <string name="rooms_title">Salas</string>
+    <string name="nearby_title">Por perto</string>
     <string name="games_title">Jogos</string>
     <string name="join_start_game">Inicie um jogo na sua TV ou no navegador.</string>
     <string name="scan_code">Escanear código</string>

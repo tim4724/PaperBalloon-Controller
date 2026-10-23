@@ -1813,66 +1813,66 @@
         }
       }
     },
-    "No rooms found" : {
+    "No rooms found nearby" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Keine Räume gefunden"
+            "value" : "Keine Räume in der Nähe gefunden"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No se encontraron salas"
+            "value" : "No se encontraron salas cercanas"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucune salle trouvée"
+            "value" : "Aucune salle trouvée à proximité"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nessuna stanza trovata"
+            "value" : "Nessuna stanza trovata nelle vicinanze"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ルームが見つかりません"
+            "value" : "近くにルームが見つかりません"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "방을 찾지 못했어요"
+            "value" : "근처에서 방을 찾지 못했어요"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nenhuma sala encontrada"
+            "value" : "Nenhuma sala encontrada por perto"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Комнаты не найдены"
+            "value" : "Комнаты поблизости не найдены"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oda bulunamadı"
+            "value" : "Yakınlarda oda bulunamadı"
           }
         },
         "zh" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未找到房间"
+            "value" : "未找到附近的房间"
           }
         }
       }
@@ -2266,66 +2266,66 @@
         }
       }
     },
-    "Rooms" : {
+    "Nearby" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Räume"
+            "value" : "In der Nähe"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salas"
+            "value" : "Cerca de ti"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salles"
+            "value" : "À proximité"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stanze"
+            "value" : "Nelle vicinanze"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ルーム"
+            "value" : "近くのルーム"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "방"
+            "value" : "근처"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salas"
+            "value" : "Por perto"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Комнаты"
+            "value" : "Поблизости"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Odalar"
+            "value" : "Yakınlarda"
           }
         },
         "zh" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "房间"
+            "value" : "附近"
           }
         }
       }
@@ -2654,66 +2654,66 @@
         }
       }
     },
-    "Searching for rooms…" : {
+    "Searching for rooms nearby…" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suche nach Räumen…"
+            "value" : "Suche nach Räumen in der Nähe…"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Buscando salas…"
+            "value" : "Buscando salas cercanas…"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Recherche de salles…"
+            "value" : "Recherche de salles à proximité…"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ricerca di stanze…"
+            "value" : "Ricerca di stanze nelle vicinanze…"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ルームを検索中…"
+            "value" : "近くのルームを検索中…"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "방 검색 중…"
+            "value" : "근처 방 검색 중…"
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Procurando salas…"
+            "value" : "Procurando salas por perto…"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Поиск комнат…"
+            "value" : "Поиск комнат поблизости…"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Odalar aranıyor…"
+            "value" : "Yakındaki odalar aranıyor…"
           }
         },
         "zh" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在搜索房间…"
+            "value" : "正在搜索附近的房间…"
           }
         }
       }

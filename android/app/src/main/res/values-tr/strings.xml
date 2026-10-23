@@ -8,8 +8,8 @@
     <string name="nearby_perm">Yakındaki cihazlar</string>
     <string name="nearby_allow">İzin ver</string>
     <string name="nearby_no_wifi">Yakındaki odaları bulmak için Wi-Fi\'ye bağlan</string>
-    <string name="nearby_none">Oda bulunamadı</string>
-    <string name="nearby_searching">Odalar aranıyor…</string>
+    <string name="nearby_none">Yakınlarda oda bulunamadı</string>
+    <string name="nearby_searching">Yakındaki odalar aranıyor…</string>
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">Tarayıcı</string>
@@ -20,7 +20,7 @@
     <string name="trailer_fullscreen">Tam ekranda oynat</string>
     <string name="trailer_close">Videoyu kapat</string>
 
-    <string name="rooms_title">Odalar</string>
+    <string name="nearby_title">Yakınlarda</string>
     <string name="games_title">Oyunlar</string>
     <string name="join_start_game">TV\'nde veya tarayıcında bir oyun başlat.</string>
     <string name="scan_code">Kodu tara</string>

@@ -7,7 +7,10 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -16,6 +19,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -504,22 +508,6 @@ fun MainScreen(
           // rather than a bottom snackbar — the player was returned here, so the notice
           // needs to land where their eye already is.
           GameEndBanner(message = gameEndBanner, onDismiss = onDismissGameEndBanner)
-          // Always over something: a room card, or the status line saying why there's none.
-          SectionTitle(stringResource(R.string.rooms_title))
-          // A relay-confirmed room springs the rejoin card in; when the room dies it
-          // springs back out. Retain the last target so the exit animation still has
-          // content to render after `rejoin` clears (mirrors iOS's scale+fade).
-          var lastRejoin by remember { mutableStateOf<RecentRoom?>(null) }
-          LaunchedEffect(rejoin) { rejoin?.let { lastRejoin = it } }
-          AnimatedVisibility(
-            visible = rejoin != null,
-            enter = fadeIn() + scaleIn(initialScale = 0.96f),
-            exit = fadeOut() + scaleOut(targetScale = 0.96f),
-          ) {
-            lastRejoin?.let { room ->
-              RejoinCard(room, home.rejoinAdvert, primary = true) { resolveAndJoin(room.joinUrl) }
-            }
-          }
           // "Searching…" / "No rooms found" are claims about having looked and come up
           // empty — false while a room card is already on screen, rejoin included. The
           // ask is an offer rather than a claim, so it stays regardless: hiding it behind
@@ -533,41 +521,59 @@ fun MainScreen(
             else -> NearbyStatus.Searching
           }
           val offering = nearbyState == NearbyStatus.Ask || nearbyState == NearbyStatus.Denied
-          if (offering || (nearby.isEmpty() && rejoin == null)) {
-            NearbyStatusCard(
-              state = nearbyState,
-              onAsk = {
-                if (Build.VERSION.SDK_INT >= 37) {
-                  markLocalNetworkAsked(context)
-                  localNetworkPermission.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
-                } else {
-                  // No permission to ask for below enforcement — the tap is the grant.
-                  setNearbyOptedIn(context)
-                  refreshDiscovery()
-                }
-              },
-              onOpenSettings = {
-                context.startActivity(
-                  Intent(
-                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.fromParts("package", context.packageName, null),
-                  ),
-                )
-              },
+          val onAsk = {
+            if (Build.VERSION.SDK_INT >= 37) {
+              markLocalNetworkAsked(context)
+              localNetworkPermission.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
+            } else {
+              // No permission to ask for below enforcement — the tap is the grant.
+              setNearbyOptedIn(context)
+              refreshDiscovery()
+            }
+          }
+          val onOpenSettings = {
+            context.startActivity(
+              Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", context.packageName, null),
+              ),
             )
           }
-          // Same retain-the-last-value trick as the rejoin card, so the exit
-          // animation still has content to render after the list empties.
-          var lastNearby by remember { mutableStateOf<List<NearbyRoom>>(emptyList()) }
-          LaunchedEffect(nearby) { if (nearby.isNotEmpty()) lastNearby = nearby }
-          AnimatedVisibility(
-            visible = nearby.isNotEmpty(),
-            enter = fadeIn() + scaleIn(initialScale = 0.96f),
-            exit = fadeOut() + scaleOut(targetScale = 0.96f),
-          ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-              lastNearby.forEachIndexed { i, room ->
-                NearbyCard(room, primary = rejoin == null && i == 0) { requireName(AfterName.Join(room.target)) }
+          val slot = RoomSlot(
+            rejoin = rejoin,
+            rejoinAdvert = home.rejoinAdvert,
+            nearby = nearby,
+            status = nearbyState.takeIf { offering || (nearby.isEmpty() && rejoin == null) },
+          )
+          // The room slot moves as ONE: a room arriving crossfades the whole slot from
+          // "Searching…" to heading-and-card while its height follows on the same clock —
+          // pieces animating on their own clocks showed up and went away in a jumble.
+          // Keyed on what is shown, not the data: a poll re-reading the same room updates
+          // in place, and the exiting content keeps the state it was drawn with.
+          AnimatedContent(
+            targetState = slot,
+            contentKey = { it.hasRooms to it.status },
+            transitionSpec = {
+              (fadeIn(tween(SLOT_MS)) togetherWith fadeOut(tween(SLOT_MS)))
+                .using(SizeTransform(clip = false) { _, _ -> tween(SLOT_MS) })
+            },
+            contentAlignment = Alignment.TopStart,
+            label = "roomSlot",
+          ) { s ->
+            // A second room joining the first changes the size without a key change.
+            Column(
+              Modifier.fillMaxWidth().animateContentSize(tween(SLOT_MS)),
+              verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              // Heads rooms only: the ask and the status lines speak for themselves, and a
+              // heading over "No rooms found" would announce a section with nothing in it.
+              if (s.hasRooms) SectionTitle(stringResource(R.string.nearby_title))
+              s.rejoin?.let { room ->
+                RejoinCard(room, s.rejoinAdvert, primary = true) { resolveAndJoin(room.joinUrl) }
+              }
+              s.status?.let { NearbyStatusCard(it, onAsk, onOpenSettings) }
+              s.nearby.forEachIndexed { i, room ->
+                NearbyCard(room, primary = s.rejoin == null && i == 0) { requireName(AfterName.Join(room.target)) }
               }
             }
           }
@@ -790,6 +796,20 @@ private fun GameEndBanner(message: String?, onDismiss: () -> Unit) {
       }
     }
   }
+}
+
+// One clock for the room slot's crossfade and its height.
+private const val SLOT_MS = 300
+
+// What the home's room slot shows: the rooms the player can enter, and where discovery
+// stands when that needs saying.
+private class RoomSlot(
+  val rejoin: RecentRoom?,
+  val rejoinAdvert: NearbyRoom?,
+  val nearby: List<NearbyRoom>,
+  val status: NearbyStatus?,
+) {
+  val hasRooms get() = rejoin != null || nearby.isNotEmpty()
 }
 
 /**

@@ -8,8 +8,8 @@
     <string name="nearby_perm">附近的设备</string>
     <string name="nearby_allow">允许</string>
     <string name="nearby_no_wifi">连接 Wi-Fi 以查找附近的房间</string>
-    <string name="nearby_none">未找到房间</string>
-    <string name="nearby_searching">正在搜索房间…</string>
+    <string name="nearby_none">未找到附近的房间</string>
+    <string name="nearby_searching">正在搜索附近的房间…</string>
     <string name="device_apple_tv">Apple TV</string>
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">浏览器</string>
@@ -20,7 +20,7 @@
     <string name="trailer_fullscreen">全屏播放</string>
     <string name="trailer_close">关闭视频</string>
 
-    <string name="rooms_title">房间</string>
+    <string name="nearby_title">附近</string>
     <string name="games_title">游戏</string>
     <string name="join_start_game">在电视或浏览器上启动游戏。</string>
     <string name="scan_code">扫描二维码</string>
