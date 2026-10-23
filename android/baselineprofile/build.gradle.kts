@@ -19,7 +19,7 @@ android {
     // Macrobenchmark's floor, not the app's (24): profile generation only ever
     // runs on a modern emulator, and installs nowhere else.
     minSdk = 28
-    targetSdk = 36
+    targetSdk = 37
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
   compileOptions {

@@ -23,7 +23,7 @@ xcodegen generate    # brew install xcodegen, once
 open PaperBalloon.xcodeproj
 ```
 
-Android: minSdk 24 / target 36, applicationId and namespace both
+Android: minSdk 24 / target 37, applicationId and namespace both
 `games.paperballoon.controller`. iOS: 17+, bundle id `games.paperballoon.controller`, no
 third-party dependencies. There is no automated test suite.
 

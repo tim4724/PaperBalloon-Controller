@@ -1,5 +1,5 @@
 [versions]
-aboutLibraries = "15.2.0"
+aboutLibraries = "15.3.0"
 androidGradlePlugin = "9.4.1"
 androidxCore = "1.19.1"
 androidxLifecycle = "2.11.0"
@@ -14,7 +14,7 @@ kotlin = "2.4.21"
 nav3Core = "1.2.0"
 profileinstaller = "1.4.1"
 uiautomator = "2.4.0"
-webkit = "1.17.1"
+webkit = "1.18.0"
 
 [libraries]
 # Open-source license list — the Gradle plugin generates R.raw.aboutlibraries at
