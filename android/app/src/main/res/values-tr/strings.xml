@@ -20,6 +20,7 @@
     <string name="trailer_fullscreen">Tam ekranda oynat</string>
     <string name="trailer_close">Videoyu kapat</string>
 
+    <string name="rooms_title">Odalar</string>
     <string name="games_title">Oyunlar</string>
     <string name="join_start_game">TV\'nde veya tarayıcında bir oyun başlat.</string>
     <string name="scan_code">Kodu tara</string>

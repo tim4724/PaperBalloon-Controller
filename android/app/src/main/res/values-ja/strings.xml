@@ -21,6 +21,7 @@
     <string name="trailer_fullscreen">全画面で再生</string>
     <string name="trailer_close">動画を閉じる</string>
 
+    <string name="rooms_title">ルーム</string>
     <string name="games_title">ゲーム</string>
     <string name="join_start_game">テレビまたはブラウザでゲームを始めてください。</string>
     <string name="scan_code">コードをスキャン</string>

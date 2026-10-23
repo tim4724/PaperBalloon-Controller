@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -329,19 +330,25 @@ fun JoinButtons(onScan: () -> Unit, onEnterCode: () -> Unit) {
 /** The one primary action: scan. Shared by the home dock and the info sheet. */
 @Composable
 fun ScanButton(onScan: () -> Unit, modifier: Modifier = Modifier) {
-  // The sunset fills a screen's one primary button and nothing else. M3 buttons take only
-  // a solid container, so the gradient is painted under a transparent one.
-  Button(
-    onClick = onScan,
-    modifier = modifier
-      .height(56.dp)
-      .background(Brush.verticalGradient(ActionSunset), CircleShape),
-    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
-  ) {
+  SunsetButton(onScan, modifier.height(56.dp)) {
     Icon(painterResource(R.drawable.ic_qr_scan), contentDescription = null, Modifier.size(22.dp))
     Spacer(Modifier.width(10.dp))
     Text(stringResource(R.string.scan_code), style = MaterialTheme.typography.titleMedium)
   }
+}
+
+/**
+ * The sunset pill. It fills a screen's one primary button and nothing else. M3 buttons take
+ * only a solid container, so the gradient is painted under a transparent one.
+ */
+@Composable
+fun SunsetButton(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
+  Button(
+    onClick = onClick,
+    modifier = modifier.background(Brush.verticalGradient(ActionSunset), CircleShape),
+    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = Color.White),
+    content = content,
+  )
 }
 
 /**

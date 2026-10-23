@@ -414,13 +414,16 @@ struct ScanButton: View {
     }
 }
 
+/// The primary action's fill, top to bottom.
+let sunsetGradient = LinearGradient(colors: PBPalette.actionSunset, startPoint: .top, endPoint: .bottom)
+
 /// The sunset laid over Liquid Glass where the OS has it (iOS 26): the gradient at 85%
 /// over regular glass, so the glass still catches the light at the rim and the posters
 /// move faintly through it; the filled pill painted with the gradient before. 56pt, like
 /// Android's. A modifier rather than an inline `if #available` so the SDK-17 build
 /// compiles.
 private struct SunsetButton: ViewModifier {
-    private let sunset = LinearGradient(colors: PBPalette.actionSunset, startPoint: .top, endPoint: .bottom)
+    private let sunset = sunsetGradient
 
     func body(content: Content) -> some View {
         let pill = content

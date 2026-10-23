@@ -84,8 +84,9 @@ struct MainScreen: View {
 
             ScrollView {
                 // One rhythm for the whole stack: the banner, every room card and every
-                // poster are cards in a single list, so they all sit 12 apart. The one
-                // real break is rooms-you-can-enter → the catalog, padded for below.
+                // poster are cards in a single list, so they all sit 12 apart. The two
+                // sections, rooms you can enter and the catalog, each open under a heading
+                // with room above it.
                 VStack(spacing: 12) {
                     // The game-end notice sits atop the content, above the rejoin card
                     // (present only while the room is alive) — a high-contrast strip
@@ -99,8 +100,12 @@ struct MainScreen: View {
                     // and all, rather than standing up a second card for the room the
                     // player is already being offered.
                     let home = homeRooms(Array(resolvedNearby.values), rejoin: rejoin)
+                    // A clip shows no status line, so with no room there it has nothing to head.
+                    if !PB.isAppClip || rejoin != nil || !home.nearby.isEmpty {
+                        sectionTitle("Rooms")
+                    }
                     if let rejoin {
-                        RejoinCard(room: rejoin, advert: home.rejoinAdvert) {
+                        RejoinCard(room: rejoin, advert: home.rejoinAdvert, primary: true) {
                             resolveAndJoin(rejoin.joinUrl)
                         }
                         .transition(.opacity.combined(with: .scale(scale: 0.96)))
@@ -130,15 +135,15 @@ struct MainScreen: View {
                         .transition(.opacity)
                     }
                     ForEach(home.nearby) { room in
-                        NearbyCard(room: room) { requireName(.join(room.target)) }
+                        NearbyCard(room: room, primary: rejoin == nil && room.id == home.nearby.first?.id) {
+                            requireName(.join(room.target))
+                        }
                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     }
 
                     VStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Games")
-                                .font(.title3.weight(.bold))
-                                .foregroundStyle(palette.onSurface)
+                            sectionTitle("Games")
                             // Path-free: on a TV the game is an app, on a laptop a website.
                             Text("Start a game on your TV or in your browser.")
                                 .font(.pbBodyLarge)
@@ -149,10 +154,10 @@ struct MainScreen: View {
                             GameCard(game: game) { infoGame = game }
                         }
                     }
-                    .padding(.top, 8)
+                    .padding(.top, 20)
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.top, 20)
                 .padding(.bottom, 16)
                 .background(alignment: .top) { SkyBackdrop() }
                 .animation(.spring(duration: 0.45), value: messages.gameEndBanner)
@@ -408,6 +413,14 @@ struct MainScreen: View {
         return trimmed.isEmpty ? String(localized: "Set name") : trimmed
     }
 
+    /// The heading each home section opens under.
+    private func sectionTitle(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.title3.weight(.bold))
+            .foregroundStyle(palette.onSurface)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func chipButton() -> some View {
         Button {
             // A second tap can land before the sheet covers the chip; a fresh request
@@ -648,7 +661,9 @@ private struct GameEndBanner: View {
 /// the pieces come from differs, which is what `RejoinCard` and `NearbyCard` supply.
 ///
 /// Glass on iOS 26 like the toolbar pills, a frosted fill before — the header's material,
-/// which the game cards share. The game's colour lives on the icon and nowhere else:
+/// which the game cards share. Play under the row carries the sunset on the `primary` room
+/// only — the first one — so a second room doesn't put a second primary on screen; the
+/// rest get the secondary button. The game's colour lives on the icon and nowhere else:
 /// routing it through the card's edge or fill made every HexStacker card near-CTA red
 /// (its accent is #FF6B6B beside the sunset), which both read as an alert and spent the
 /// one colour that's supposed to mean "this is how you play".
@@ -660,6 +675,7 @@ private struct RoomCard: View {
     let label: String
     /// `pbp` — which box the room is on (§6). Nil when the URL declared nothing.
     let platform: String?
+    let primary: Bool
     let onTap: () -> Void
 
     @Environment(\.pbPalette) private var palette
@@ -670,35 +686,52 @@ private struct RoomCard: View {
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                GameIcon(game: game, tint: palette.onSurface)
-                VStack(alignment: .leading, spacing: 2) {
-                    cardTitle(title, roomCode,
-                              codeColor: palette.onSurface.opacity(0.55))
+        VStack(spacing: 12) {
+            Button(action: onTap) {
+                row.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if primary {
+                Button(action: onTap) {
+                    Text("Play")
                         .font(.pbTitleMedium)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        // Flat, unlike the dock's sunset over glass: the card under it is
+                        // glass already.
+                        .background(sunsetGradient, in: Capsule())
+                }
+                .buttonStyle(PressableCardButtonStyle())
+            } else {
+                SecondaryButton(action: onTap) { Text("Play") }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity)
+        .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
+                              fallback: palette.frosted, tint: palette.cardGlassTint))
+    }
+
+    private var row: some View {
+        HStack(spacing: 14) {
+            GameIcon(game: game, tint: palette.onSurface)
+            VStack(alignment: .leading, spacing: 2) {
+                cardTitle(title, roomCode,
+                          codeColor: palette.onSurface.opacity(0.55))
+                    .font(.pbTitleMedium)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if !locator.isEmpty {
+                    Text(locator)
+                        .font(.pbBodyMedium)
+                        .opacity(0.72)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    if !locator.isEmpty {
-                        Text(locator)
-                            .font(.pbBodyMedium)
-                            .opacity(0.72)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .opacity(0.65)
             }
-            .foregroundStyle(palette.onSurface)
-            .padding(14)
-            .frame(maxWidth: .infinity)
-            .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
-                                  fallback: palette.frosted, tint: palette.cardGlassTint))
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .modifier(GlassCardPress())
+        .foregroundStyle(palette.onSurface)
     }
 }
 
@@ -726,6 +759,7 @@ private struct GlassCardPress: ViewModifier {
 private struct RejoinCard: View {
     let room: RecentRoom
     var advert: NearbyRoom? = nil
+    let primary: Bool
     let onTap: () -> Void
 
     var body: some View {
@@ -734,6 +768,7 @@ private struct RejoinCard: View {
                  roomCode: room.roomCode,
                  label: advert?.label ?? "",
                  platform: advert?.platform ?? room.platform,
+                 primary: primary,
                  onTap: onTap)
     }
 }
@@ -741,6 +776,7 @@ private struct RejoinCard: View {
 /// A room a display on this network is advertising (contract §8).
 private struct NearbyCard: View {
     let room: NearbyRoom
+    let primary: Bool
     let onTap: () -> Void
 
     var body: some View {
@@ -749,6 +785,7 @@ private struct NearbyCard: View {
                  roomCode: room.roomCode,
                  label: room.label,
                  platform: room.platform,
+                 primary: primary,
                  onTap: onTap)
     }
 }
@@ -855,9 +892,9 @@ private struct NearbyStatusCard: View {
 
 /// The room cards' material (glass on iOS 26, frosted before), the poster whole and
 /// untouched on top, and the name under it with its tag beside it, the player count at
-/// the right and where it runs below. The whole card is the tap. Android's GameCard keeps
-/// the solid card and hairline: without glass's own rim, its frosted fill has no edge on
-/// the light paper.
+/// the right and where it runs below. The whole card is the tap. Android's room and game
+/// cards both keep the solid card and hairline: without glass's own rim, a frosted fill
+/// has no edge on the light paper.
 private struct GameCard: View {
     let game: Game
     let onTap: () -> Void
@@ -1167,13 +1204,13 @@ private struct PreviewStrip<Content: View>: View {
         NearbyStatusCard(state: .none, onAsk: {}, onOpenSettings: {})
         NearbyStatusCard(state: .noWifi, onAsk: {}, onOpenSettings: {})
         NearbyStatusCard(state: .denied, onAsk: {}, onOpenSettings: {})
-        NearbyCard(room: CardSamples.nearbyFull) {}
-        NearbyCard(room: CardSamples.nearbyDeviceOnly) {}
-        NearbyCard(room: CardSamples.nearbyLabelOnly) {}
-        NearbyCard(room: CardSamples.nearbyBare) {}
-        NearbyCard(room: CardSamples.nearbyAndroidTv) {}
-        NearbyCard(room: CardSamples.nearbyIconless) {}
-        NearbyCard(room: CardSamples.nearbyLongName) {}
+        NearbyCard(room: CardSamples.nearbyFull, primary: true) {}
+        NearbyCard(room: CardSamples.nearbyDeviceOnly, primary: false) {}
+        NearbyCard(room: CardSamples.nearbyLabelOnly, primary: false) {}
+        NearbyCard(room: CardSamples.nearbyBare, primary: false) {}
+        NearbyCard(room: CardSamples.nearbyAndroidTv, primary: false) {}
+        NearbyCard(room: CardSamples.nearbyIconless, primary: false) {}
+        NearbyCard(room: CardSamples.nearbyLongName, primary: false) {}
     }
 }
 
@@ -1184,32 +1221,32 @@ private struct PreviewStrip<Content: View>: View {
         NearbyStatusCard(state: .none, onAsk: {}, onOpenSettings: {})
         NearbyStatusCard(state: .noWifi, onAsk: {}, onOpenSettings: {})
         NearbyStatusCard(state: .denied, onAsk: {}, onOpenSettings: {})
-        NearbyCard(room: CardSamples.nearbyFull) {}
-        NearbyCard(room: CardSamples.nearbyAndroidTv) {}
-        NearbyCard(room: CardSamples.nearbyIconless) {}
-        NearbyCard(room: CardSamples.nearbyLongName) {}
+        NearbyCard(room: CardSamples.nearbyFull, primary: true) {}
+        NearbyCard(room: CardSamples.nearbyAndroidTv, primary: false) {}
+        NearbyCard(room: CardSamples.nearbyIconless, primary: false) {}
+        NearbyCard(room: CardSamples.nearbyLongName, primary: false) {}
     }
     .preferredColorScheme(.dark)
 }
 
 #Preview("Rejoin — light") {
     PreviewStrip {
-        RejoinCard(room: CardSamples.rejoinPlain) {}
-        RejoinCard(room: CardSamples.rejoinIconless) {}
-        RejoinCard(room: CardSamples.rejoinPageTitle) {}
-        RejoinCard(room: CardSamples.rejoinNoCode) {}
-        RejoinCard(room: CardSamples.rejoinWithDevice) {}
+        RejoinCard(room: CardSamples.rejoinPlain, primary: true) {}
+        RejoinCard(room: CardSamples.rejoinIconless, primary: false) {}
+        RejoinCard(room: CardSamples.rejoinPageTitle, primary: false) {}
+        RejoinCard(room: CardSamples.rejoinNoCode, primary: false) {}
+        RejoinCard(room: CardSamples.rejoinWithDevice, primary: false) {}
         // The room's display is still advertising: its name joins the locator, and its
         // relay-declared platform stands in for a remembered URL that named no box.
-        RejoinCard(room: CardSamples.rejoinPlain, advert: CardSamples.nearbyFull) {}
-        RejoinCard(room: CardSamples.rejoinWeb) {}
+        RejoinCard(room: CardSamples.rejoinPlain, advert: CardSamples.nearbyFull, primary: false) {}
+        RejoinCard(room: CardSamples.rejoinWeb, primary: false) {}
     }
 }
 
 #Preview("Rejoin — dark") {
     PreviewStrip {
-        RejoinCard(room: CardSamples.rejoinPlain) {}
-        RejoinCard(room: CardSamples.rejoinIconless) {}
+        RejoinCard(room: CardSamples.rejoinPlain, primary: true) {}
+        RejoinCard(room: CardSamples.rejoinIconless, primary: false) {}
     }
     .preferredColorScheme(.dark)
 }

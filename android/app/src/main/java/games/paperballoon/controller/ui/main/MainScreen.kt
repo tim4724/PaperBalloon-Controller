@@ -45,18 +45,19 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -182,6 +183,7 @@ import games.paperballoon.controller.ui.components.rememberArt
 import games.paperballoon.controller.ui.components.deviceName
 import games.paperballoon.controller.ui.components.findActivity
 import games.paperballoon.controller.ui.components.ScanButton
+import games.paperballoon.controller.ui.components.SunsetButton
 import games.paperballoon.controller.ui.components.JoiningCover
 import games.paperballoon.controller.ui.components.PlayerChip
 import games.paperballoon.controller.ui.components.StatusTag
@@ -489,12 +491,12 @@ fun MainScreen(
         Spacer(Modifier.windowInsetsTopHeight(stableScreenInsets))
         HomeTopBar(profile = profile, onEditProfile = { showProfile = true }, onOpenAbout = onOpenAbout)
         // One rhythm for the whole stack: the banner, every room card and every poster
-        // are cards in a single list, so they all sit 12dp apart. The one real break is
-        // rooms-you-can-enter → the catalog, which GamesSection pads for.
+        // are cards in a single list, so they all sit 12dp apart. The two sections, rooms
+        // you can enter and the catalog, each open under a heading with room above it.
         Column(
           Modifier
             .padding(horizontal = 16.dp)
-            .padding(top = 8.dp),
+            .padding(top = 20.dp),
           verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
           // The game-end notice sits at the top of the content, above the rejoin card
@@ -502,6 +504,8 @@ fun MainScreen(
           // rather than a bottom snackbar — the player was returned here, so the notice
           // needs to land where their eye already is.
           GameEndBanner(message = gameEndBanner, onDismiss = onDismissGameEndBanner)
+          // Always over something: a room card, or the status line saying why there's none.
+          SectionTitle(stringResource(R.string.rooms_title))
           // A relay-confirmed room springs the rejoin card in; when the room dies it
           // springs back out. Retain the last target so the exit animation still has
           // content to render after `rejoin` clears (mirrors iOS's scale+fade).
@@ -513,7 +517,7 @@ fun MainScreen(
             exit = fadeOut() + scaleOut(targetScale = 0.96f),
           ) {
             lastRejoin?.let { room ->
-              RejoinCard(room, home.rejoinAdvert) { resolveAndJoin(room.joinUrl) }
+              RejoinCard(room, home.rejoinAdvert, primary = true) { resolveAndJoin(room.joinUrl) }
             }
           }
           // "Searching…" / "No rooms found" are claims about having looked and come up
@@ -562,12 +566,12 @@ fun MainScreen(
             exit = fadeOut() + scaleOut(targetScale = 0.96f),
           ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-              lastNearby.forEach { room ->
-                NearbyCard(room) { requireName(AfterName.Join(room.target)) }
+              lastNearby.forEachIndexed { i, room ->
+                NearbyCard(room, primary = rejoin == null && i == 0) { requireName(AfterName.Join(room.target)) }
               }
             }
           }
-          GamesSection(games, underBar, Modifier.padding(top = 8.dp), onOpen = { infoGame = it })
+          GamesSection(games, underBar, Modifier.padding(top = 20.dp), onOpen = { infoGame = it })
           Spacer(Modifier.height(with(LocalDensity.current) { dockHeightPx.toDp() } + 28.dp))
         }
       }
@@ -793,11 +797,12 @@ private fun GameEndBanner(message: String?, onDismiss: () -> Unit) {
  * advertising. The two are the same object to a player, so they are one card; only where
  * the pieces come from differs, which is what [RejoinCard] and [NearbyCard] supply.
  *
- * On the frosted surface of the name chip and About: rooms share the header's material,
- * apart from the solid game cards below. The game's colour lives on the icon and nowhere
- * else: routing it through the card's edge or fill made every HexStacker card near-CTA
- * red (its accent is #FF6B6B beside the sunset), which both read as an alert and spent
- * the one colour that's supposed to mean "this is how you play".
+ * The game cards' container, so the two sections read as one family. Play under the row
+ * carries the sunset on the [primary] room only — the first one — so a second room doesn't
+ * put a second primary on screen; the rest get the ghost button. The game's colour lives
+ * on the icon and nowhere else: routing it through the card's edge or fill made every
+ * HexStacker card near-CTA red (its accent is #FF6B6B beside the sunset), which both read
+ * as an alert and spent the one colour that's supposed to mean "this is how you play".
  */
 @Composable
 private fun RoomCard(
@@ -808,6 +813,7 @@ private fun RoomCard(
   label: String,
   /** `pbp` — which box the room is on (§6). Null when the URL declared nothing. */
   platform: String?,
+  primary: Boolean,
   onClick: () -> Unit,
 ) {
   val interaction = remember { MutableInteractionSource() }
@@ -823,39 +829,59 @@ private fun RoomCard(
     interactionSource = interaction,
     shape = MaterialTheme.shapes.large,
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.frosted,
+      containerColor = MaterialTheme.colorScheme.card,
       contentColor = onCard,
     ),
+    // As GameCard: by day the hairline is the card's only edge, by night the lifted fill is.
+    border = if (MaterialTheme.colorScheme.isDark) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
   ) {
-    Row(
-      Modifier.padding(14.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-      GameIcon(game, tint = onCard)
-      Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-          cardTitle(title, roomCode, onCard.copy(alpha = 0.55f)),
-          style = MaterialTheme.typography.titleMedium,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        if (locator.isNotBlank()) {
+    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+      ) {
+        GameIcon(game, tint = onCard)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
           Text(
-            locator,
-            style = MaterialTheme.typography.bodyMedium,
-            color = onCard.copy(alpha = 0.72f),
+            cardTitle(title, roomCode, onCard.copy(alpha = 0.55f)),
+            style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
           )
+          if (locator.isNotBlank()) {
+            Text(
+              locator,
+              style = MaterialTheme.typography.bodyMedium,
+              color = onCard.copy(alpha = 0.72f),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
         }
       }
-      Icon(
-        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = null,
-        tint = onCard.copy(alpha = 0.65f),
-      )
+      PlayButton(primary, onClick)
     }
+  }
+}
+
+// The room card's Play: the sunset on the primary room, the ghost button on the rest.
+@Composable
+private fun PlayButton(primary: Boolean, onClick: () -> Unit) {
+  val label = @Composable { Text(stringResource(R.string.join), style = MaterialTheme.typography.titleMedium) }
+  val modifier = Modifier.fillMaxWidth().height(48.dp)
+  if (primary) {
+    SunsetButton(onClick, modifier) { label() }
+  } else {
+    OutlinedButton(
+      onClick = onClick,
+      modifier = modifier,
+      colors = ButtonDefaults.outlinedButtonColors(
+        containerColor = MaterialTheme.colorScheme.ghost,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+      ),
+      border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.ghostLine),
+      content = { label() },
+    )
   }
 }
 
@@ -870,23 +896,25 @@ private fun RoomCard(
  * its box moments after this one leaves — so the platform lives on the room itself.
  */
 @Composable
-private fun RejoinCard(room: RecentRoom, advert: NearbyRoom? = null, onClick: () -> Unit) = RoomCard(
+private fun RejoinCard(room: RecentRoom, advert: NearbyRoom? = null, primary: Boolean, onClick: () -> Unit) = RoomCard(
   game = room.game,
   title = room.title ?: room.game.name,
   roomCode = room.roomCode,
   label = advert?.label.orEmpty(),
   platform = advert?.platform ?: room.platform,
+  primary = primary,
   onClick = onClick,
 )
 
 /** A room a display on this network is advertising (contract §8). */
 @Composable
-private fun NearbyCard(room: NearbyRoom, onClick: () -> Unit) = RoomCard(
+private fun NearbyCard(room: NearbyRoom, primary: Boolean, onClick: () -> Unit) = RoomCard(
   game = room.game,
   title = room.game.name,
   roomCode = room.roomCode,
   label = room.label,
   platform = room.platform,
+  primary = primary,
   onClick = onClick,
 )
 
@@ -1014,11 +1042,7 @@ private fun GamesSection(
 ) {
   Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
     Column(Modifier.padding(bottom = 2.dp)) {
-      Text(
-        stringResource(R.string.games_title),
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
-      )
+      SectionTitle(stringResource(R.string.games_title))
       // Path-free: on a TV the game is an app, on a laptop a website.
       Text(
         stringResource(R.string.join_start_game),
@@ -1028,6 +1052,12 @@ private fun GamesSection(
     }
     games.forEach { game -> GameCard(game, underBar, onOpen) }
   }
+}
+
+// The heading each home section opens under.
+@Composable
+private fun SectionTitle(text: String) {
+  Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 }
 
 // Relative luminance above which the status bar's dark icons beat its white ones:
@@ -1433,13 +1463,13 @@ private fun NearbyCardsPreview() {
     NearbyStatusCard(NearbyStatus.Searching, onAsk = {}, onOpenSettings = {})
     NearbyStatusCard(NearbyStatus.None, onAsk = {}, onOpenSettings = {})
     NearbyStatusCard(NearbyStatus.Denied, onAsk = {}, onOpenSettings = {})
-    NearbyCard(CardSamples.nearbyFull) {}
-    NearbyCard(CardSamples.nearbyDeviceOnly) {}
-    NearbyCard(CardSamples.nearbyLabelOnly) {}
-    NearbyCard(CardSamples.nearbyBare) {}
-    NearbyCard(CardSamples.nearbyAndroidTv) {}
-    NearbyCard(CardSamples.nearbyIconless) {}
-    NearbyCard(CardSamples.nearbyLongName) {}
+    NearbyCard(CardSamples.nearbyFull, primary = true) {}
+    NearbyCard(CardSamples.nearbyDeviceOnly, primary = false) {}
+    NearbyCard(CardSamples.nearbyLabelOnly, primary = false) {}
+    NearbyCard(CardSamples.nearbyBare, primary = false) {}
+    NearbyCard(CardSamples.nearbyAndroidTv, primary = false) {}
+    NearbyCard(CardSamples.nearbyIconless, primary = false) {}
+    NearbyCard(CardSamples.nearbyLongName, primary = false) {}
   }
 }
 
@@ -1448,15 +1478,15 @@ private fun NearbyCardsPreview() {
 @Composable
 private fun RejoinCardsPreview() {
   PreviewStrip {
-    RejoinCard(CardSamples.rejoinPlain) {}
-    RejoinCard(CardSamples.rejoinIconless) {}
-    RejoinCard(CardSamples.rejoinPageTitle) {}
-    RejoinCard(CardSamples.rejoinNoCode) {}
-    RejoinCard(CardSamples.rejoinWithDevice) {}
+    RejoinCard(CardSamples.rejoinPlain, primary = true) {}
+    RejoinCard(CardSamples.rejoinIconless, primary = false) {}
+    RejoinCard(CardSamples.rejoinPageTitle, primary = false) {}
+    RejoinCard(CardSamples.rejoinNoCode, primary = false) {}
+    RejoinCard(CardSamples.rejoinWithDevice, primary = false) {}
     // The room's display is still advertising: its name joins the locator, and its
     // relay-declared platform stands in for a remembered URL that named no box.
-    RejoinCard(CardSamples.rejoinPlain, CardSamples.nearbyFull) {}
-    RejoinCard(CardSamples.rejoinWeb) {}
+    RejoinCard(CardSamples.rejoinPlain, CardSamples.nearbyFull, primary = false) {}
+    RejoinCard(CardSamples.rejoinWeb, primary = false) {}
   }
 }
 

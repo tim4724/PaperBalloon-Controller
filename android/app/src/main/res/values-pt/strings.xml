@@ -20,6 +20,7 @@
     <string name="trailer_fullscreen">Reproduzir em tela cheia</string>
     <string name="trailer_close">Fechar vídeo</string>
 
+    <string name="rooms_title">Salas</string>
     <string name="games_title">Jogos</string>
     <string name="join_start_game">Inicie um jogo na sua TV ou no navegador.</string>
     <string name="scan_code">Escanear código</string>

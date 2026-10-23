@@ -21,6 +21,7 @@
     <string name="trailer_fullscreen">전체 화면으로 재생</string>
     <string name="trailer_close">동영상 닫기</string>
 
+    <string name="rooms_title">방</string>
     <string name="games_title">게임</string>
     <string name="join_start_game">TV나 브라우저에서 게임을 시작하세요.</string>
     <string name="scan_code">코드 스캔</string>

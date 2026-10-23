@@ -22,6 +22,7 @@
     <string name="trailer_close">Close video</string>
 
     <!-- Games + the join dock -->
+    <string name="rooms_title">Rooms</string>
     <string name="games_title">Games</string>
     <string name="join_start_game">Start a game on your TV or in your browser.</string>
     <string name="scan_code">Scan code</string>
