@@ -19,6 +19,7 @@ import androidx.core.view.WindowCompat
 import games.paperballoon.controller.theme.PaperBalloonTheme
 import games.paperballoon.controller.ui.components.themeLightBarIcons
 import games.paperballoon.controller.ui.game.WebViewWarmer
+import games.paperballoon.controller.ui.main.liftOff
 
 class MainActivity : ComponentActivity() {
   // The URL of a pending App Link, observed by the nav host. Null on a normal launch.
@@ -31,6 +32,7 @@ class MainActivity : ComponentActivity() {
     if (savedInstanceState == null) pendingDeepLink = intent?.dataString
 
     applyEdgeToEdge()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) splashScreen.setOnExitAnimationListener(::liftOff)
     // Engine warm-up for the first game join; runs on a post-launch idle slot.
     WebViewWarmer.schedule(this)
     setContent {

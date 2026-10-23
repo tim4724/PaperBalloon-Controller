@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Dark parent + dark pb_surface (values-night/colors.xml): without this
-         override the pre-Compose frames flash white in system dark mode. The
-         splash attribute is API 31+ but harmlessly ignored below (targetApi
-         tells lint that's intentional). -->
+    <!-- Dark parent + dark pb_surface and pb_splash (values-night/colors.xml):
+         without this override the pre-Compose frames flash white in system dark
+         mode. The splash attributes are API 31+ but harmlessly ignored below
+         (targetApi tells lint that's intentional). -->
     <style name="Theme.PaperBalloon" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/pb_surface</item>
-        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/pb_surface</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/pb_splash</item>
+        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@drawable/splash_balloon</item>
     </style>
 </resources>
