@@ -60,7 +60,7 @@ struct ProminentGlassButton: ViewModifier {
 
 // MARK: - ChromeGlass
 
-/// Liquid Glass behind chrome controls on iOS 26, matching the home toolbar's glass pills.
+/// Liquid Glass on iOS 26 behind the home toolbar's pills and the room and game cards.
 /// Earlier releases have no glass in their toolbars, so they get `fallback`.
 struct ChromeGlass<S: Shape>: ViewModifier {
     let shape: S

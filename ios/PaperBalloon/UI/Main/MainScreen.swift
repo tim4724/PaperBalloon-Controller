@@ -647,11 +647,11 @@ private struct GameEndBanner: View {
 /// advertising. The two are the same object to a player, so they are one card; only where
 /// the pieces come from differs, which is what `RejoinCard` and `NearbyCard` supply.
 ///
-/// Glass on iOS 26 like the toolbar pills, a frosted fill before: rooms share the header's
-/// material, apart from the solid game cards below. The game's colour lives on the icon
-/// and nowhere else: routing it through the card's edge or fill made every HexStacker
-/// card near-CTA red (its accent is #FF6B6B beside the sunset), which both read as an
-/// alert and spent the one colour that's supposed to mean "this is how you play".
+/// Glass on iOS 26 like the toolbar pills, a frosted fill before — the header's material,
+/// which the game cards share. The game's colour lives on the icon and nowhere else:
+/// routing it through the card's edge or fill made every HexStacker card near-CTA red
+/// (its accent is #FF6B6B beside the sunset), which both read as an alert and spent the
+/// one colour that's supposed to mean "this is how you play".
 private struct RoomCard: View {
     let game: Game
     let title: String
@@ -698,14 +698,14 @@ private struct RoomCard: View {
             .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
                                   fallback: palette.frosted))
         }
-        .modifier(RoomCardPress())
+        .modifier(GlassCardPress())
     }
 }
 
 /// Interactive glass gives its own press feedback on iOS 26; the card's spring scale is
 /// the cue before that. A modifier rather than an inline `if #available` so the SDK-17
 /// build compiles.
-private struct RoomCardPress: ViewModifier {
+private struct GlassCardPress: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content.buttonStyle(.plain)
@@ -853,9 +853,11 @@ private struct NearbyStatusCard: View {
 
 // MARK: - GameCard
 
-/// The language's card: flat, the card fill with one hairline, the poster whole and
+/// The room cards' material (glass on iOS 26, frosted before), the poster whole and
 /// untouched on top, and the name under it with its tag beside it, the player count at
-/// the right and where it runs below. The whole card is the tap.
+/// the right and where it runs below. The whole card is the tap. Android's GameCard keeps
+/// the solid card and hairline: without glass's own rim, its frosted fill has no edge on
+/// the light paper.
 private struct GameCard: View {
     let game: Game
     let onTap: () -> Void
@@ -920,14 +922,11 @@ private struct GameCard: View {
                 }
                 .padding(EdgeInsets(top: 12, leading: 14, bottom: 14, trailing: 14))
             }
-            .background(palette.card)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(palette.outlineVariant, lineWidth: 1)
-            )
+            .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
+                                  fallback: palette.frosted))
         }
-        .buttonStyle(PressableCardButtonStyle())
+        .modifier(GlassCardPress())
     }
 }
 

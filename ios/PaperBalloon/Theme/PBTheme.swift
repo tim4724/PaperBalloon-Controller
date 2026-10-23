@@ -21,11 +21,12 @@ extension Color {
 /// The Paper Balloon design language (Couch-Games assets/theme.css ⇄ Android
 /// theme/Color.kt + Theme.kt ⇄ this file) mapped onto Material 3 roles, plus the tokens
 /// that have no M3 role; must stay value-identical to the Android theme, minus the
-/// tonal-button roles only Android's FilledTonalButton reads. The app icon sets the
+/// tonal-button roles only Android's FilledTonalButton reads and the solid card fill only
+/// Android's game cards use. The app icon sets the
 /// palette: a sunset on a sky. Warm paper by day, near-black with a hint of the night
 /// sky's violet by night; ink and paper carry the structure and the game posters carry
 /// the colour. From the language's rules: the sunset fills a screen's one primary button and nothing
-/// else, cards are flat with a hairline, tags are quiet tints. Interactive controls
+/// else, cards are flat (glass on iOS 26), tags are quiet tints. Interactive controls
 /// stay the platform's own. Members are `var` only so the copy helpers can mutate a
 /// copy; `.light`/`.dark` are the sole instances handed out.
 struct PBPalette: Equatable {
@@ -35,10 +36,7 @@ struct PBPalette: Equatable {
     var surfaceVariant, onSurfaceVariant, outline, outlineVariant: Color
     var surfaceContainerLowest, surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest, surfaceBright: Color
     var error, onError, inverseSurface, inverseOnSurface, scrim: Color
-    /// The card fill: white on paper, one step up from the night ground.
-    var card: Color
-    /// The room cards' fill on the home sky where Liquid Glass is unavailable (before
-    /// iOS 26).
+    /// The room and game cards' fill where Liquid Glass is unavailable (before iOS 26).
     var frosted: Color
     /// The ghost button's fill and 1.5pt line.
     var ghost, ghostLine: Color
@@ -71,7 +69,6 @@ struct PBPalette: Equatable {
         inverseSurface: Color(pbHex: 0x313033),
         inverseOnSurface: Color(pbHex: 0xF4EFF4),
         scrim: Color(pbHex: 0x000000),
-        card: Color(pbHex: 0xFFFFFF),
         frosted: Color.white.opacity(0.72),
         ghost: Color(pbHex: 0xFFFFFF),
         ghostLine: Color(pbHex: 0xDCC7BE),
@@ -105,7 +102,6 @@ struct PBPalette: Equatable {
         inverseSurface: Color(pbHex: 0xE6E1E5),
         inverseOnSurface: Color(pbHex: 0x313033),
         scrim: Color(pbHex: 0x000000),
-        card: Color(pbHex: 0x201A2A),
         frosted: Color.white.opacity(0.10),
         ghost: Color.white.opacity(0.08),
         ghostLine: Color.white.opacity(0.18),
