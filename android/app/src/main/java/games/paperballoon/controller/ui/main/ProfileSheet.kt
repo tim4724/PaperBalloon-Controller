@@ -94,8 +94,7 @@ fun ProfileSheet(
 
   KeyboardSheet(
     fullHeight = compact,
-    // The same surface as AppSheet (see there).
-    color = surfaceTint ?: MaterialTheme.colorScheme.surfaceContainerHigh,
+    color = surfaceTint,
     onClosed = {
       val profile = saved
       if (profile != null) onSave(profile) else onDismiss()

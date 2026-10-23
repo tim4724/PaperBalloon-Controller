@@ -21,12 +21,11 @@ extension Color {
 /// The Paper Balloon design language (Couch-Games assets/theme.css ⇄ Android
 /// theme/Color.kt + Theme.kt ⇄ this file) mapped onto Material 3 roles, plus the tokens
 /// that have no M3 role; must stay value-identical to the Android theme, minus the
-/// tonal-button roles only Android's FilledTonalButton reads and the solid card fill only
-/// Android's game cards use. The app icon sets the
+/// tonal-button roles only Android's FilledTonalButton reads. The app icon sets the
 /// palette: a sunset on a sky. Warm paper by day, near-black with a hint of the night
 /// sky's violet by night; ink and paper carry the structure and the game posters carry
 /// the colour. From the language's rules: the sunset fills a screen's one primary button and nothing
-/// else, cards are flat (glass on iOS 26), tags are quiet tints. Interactive controls
+/// else, cards are glass (Liquid Glass on iOS 26), tags are quiet tints. Interactive controls
 /// stay the platform's own. Members are `var` only so the copy helpers can mutate a
 /// copy; `.light`/`.dark` are the sole instances handed out.
 struct PBPalette: Equatable {
@@ -36,11 +35,15 @@ struct PBPalette: Equatable {
     var surfaceVariant, onSurfaceVariant, outline, outlineVariant: Color
     var surfaceContainerLowest, surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest, surfaceBright: Color
     var error, onError, inverseSurface, inverseOnSurface, scrim: Color
-    /// The room and game cards' fill where Liquid Glass is unavailable (before iOS 26).
-    var frosted: Color
     /// The room and game cards' glass tint on iOS 26: none by day; by night a lilac wash
-    /// that lifts them off the sky (untinted glass sinks below it) to Android's card.
+    /// that lifts them off the sky (untinted glass sinks below it).
     var cardGlassTint: Color?
+    /// The room and game cards' drawn glass before iOS 26 (`CardGlass`), top to bottom:
+    /// white easing into the paper by day, white mixed into the ground by night; and its
+    /// rim, lit along the top (stops at 0, 30% and 100%).
+    var glass, glassRim: [Color]
+    /// The sheets' drawn glass before iOS 26: the cards', with a faint lilac by night.
+    var sheetGlass: [Color]
     /// The ghost button's fill and 1.5pt line.
     var ghost, ghostLine: Color
     /// The Beta tag's amber tint and the ink on it.
@@ -64,16 +67,18 @@ struct PBPalette: Equatable {
         surfaceContainerLowest: Color(pbHex: 0xFFFFFF),
         surfaceContainerLow: Color(pbHex: 0xFCF3EE),
         surfaceContainer: Color(pbHex: 0xF8ECE6),
-        surfaceContainerHigh: Color(pbHex: 0xF4E6DE),
-        surfaceContainerHighest: Color(pbHex: 0xF0DED4),
+        surfaceContainerHigh: Color(pbHex: 0xFFFFFF),
+        surfaceContainerHighest: Color(pbHex: 0xF8ECE6),
         surfaceBright: Color(pbHex: 0xFFF8F3),
         error: Color(pbHex: 0xB3261E),
         onError: Color(pbHex: 0xFFFFFF),
         inverseSurface: Color(pbHex: 0x313033),
         inverseOnSurface: Color(pbHex: 0xF4EFF4),
         scrim: Color(pbHex: 0x000000),
-        frosted: Color.white.opacity(0.72),
         cardGlassTint: nil,
+        glass: [Color(pbHex: 0xFFFFFF), Color(pbHex: 0xFFFCFA)],
+        glassRim: [Color(pbHex: 0xFFFFFF), Color(pbHex: 0xEEDDD3), Color(pbHex: 0xD9C3B7)],
+        sheetGlass: [Color(pbHex: 0xFFFFFF), Color(pbHex: 0xFFFCFA)],
         ghost: Color(pbHex: 0xFFFFFF),
         ghostLine: Color(pbHex: 0xDCC7BE),
         betaTag: Color(pbHex: 0xFCE3CC),
@@ -98,16 +103,18 @@ struct PBPalette: Equatable {
         surfaceContainerLowest: Color(pbHex: 0x0D0B11),
         surfaceContainerLow: Color(pbHex: 0x201A2A),
         surfaceContainer: Color(pbHex: 0x251F30),
-        surfaceContainerHigh: Color(pbHex: 0x2A2435),
-        surfaceContainerHighest: Color(pbHex: 0x2C2635),
+        surfaceContainerHigh: Color(pbHex: 0x242229),
+        surfaceContainerHighest: Color(pbHex: 0x42404C),
         surfaceBright: Color(pbHex: 0x434147),
         error: Color(pbHex: 0xF2B8B5),
         onError: Color(pbHex: 0x601410),
         inverseSurface: Color(pbHex: 0xE6E1E5),
         inverseOnSurface: Color(pbHex: 0x313033),
         scrim: Color(pbHex: 0x000000),
-        frosted: Color.white.opacity(0.14),
         cardGlassTint: Color(pbHex: 0xB4A3E6).opacity(0.16),
+        glass: [Color(pbHex: 0x242229), Color(pbHex: 0x1C1921)],
+        glassRim: [Color(pbHex: 0x353239), Color(pbHex: 0x242229), Color(pbHex: 0x1D1B22)],
+        sheetGlass: [Color(pbHex: 0x322F3C), Color(pbHex: 0x2B2735)],
         ghost: Color.white.opacity(0.12),
         ghostLine: Color.white.opacity(0.22),
         betaTag: Color(pbHex: 0xFFC14D).opacity(0.14),
@@ -119,10 +126,11 @@ struct PBPalette: Equatable {
     static let actionSunset = [Color(pbHex: 0xE0185F), Color(pbHex: 0xD83A1A)]
 
     /// The home sky (MainScreen's SkyBackdrop), fading into the background below: zenith
-    /// then horizon, lilac over peach, by day; by night navy, then dusk violet, then the
-    /// sunset's last light low at the horizon.
+    /// then horizon, lilac over peach, by day; by night the afterglow in the ground's own
+    /// hue, darker up high, then a faint rose at the horizon only a touch lighter than the
+    /// ground.
     static let skyLight = [Color(pbHex: 0xE6DAF2), Color(pbHex: 0xFFE0CC)]
-    static let skyNight = [Color(pbHex: 0x13142B), Color(pbHex: 0x2B1E40), Color(pbHex: 0x4D2338)]
+    static let skyNight = [Color(pbHex: 0x0C0A12), Color(pbHex: 0x16111E), Color(pbHex: 0x21141F)]
 
     /// The fleet flying in the sky: the icon's balloon in four colours, top to bottom of
     /// the envelope. Sunset leads and is always the biggest; sea, gold and dusk follow.

@@ -3,6 +3,7 @@
     <!-- SurfaceLightBase in Color.kt — keep in sync. Used for the launch window,
          i.e. the frames drawn before Compose. -->
     <color name="pb_surface">#FFF8F3</color>
-    <!-- SkyLight[0] in Color.kt — keep in sync: the Android 12+ splash is the top of the home sky. -->
-    <color name="pb_splash">#E6DAF2</color>
+    <!-- The Android 12+ splash: halfway between SkyLight's two stops in Color.kt (the
+         site's sky-mid) — keep in sync. -->
+    <color name="pb_splash">#F3DDDF</color>
 </resources>

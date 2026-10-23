@@ -174,8 +174,7 @@ private fun Tile(iconRes: Int, label: String, soon: Boolean, modifier: Modifier)
     modifier
       .fillMaxHeight()
       .clip(MaterialTheme.shapes.large)
-      // Highest, not High — the sheet surface itself is surfaceContainerHigh
-      // (AppSheet), so the tile needs the next step to be visible on it.
+      // Highest: the step that shows on the sheet's glass (AppSheet).
       .background(MaterialTheme.colorScheme.surfaceContainerHighest)
       .padding(vertical = 12.dp, horizontal = 6.dp),
     horizontalAlignment = Alignment.CenterHorizontally,

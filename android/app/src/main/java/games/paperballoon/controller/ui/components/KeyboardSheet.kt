@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import games.paperballoon.controller.R
+import games.paperballoon.controller.theme.sheetGlass
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -80,7 +81,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun KeyboardSheet(
   fullHeight: Boolean,
-  color: Color,
+  /** The sheet's fill; null for the house glass (AppSheet's). */
+  color: Color?,
   onClosed: () -> Unit,
   content: @Composable (close: () -> Unit) -> Unit,
 ) {
@@ -156,12 +158,15 @@ fun KeyboardSheet(
             translationY = size.height * (1 - progress.value) - lift
           },
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        color = color,
+        color = color ?: Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
       ) {
         // Ignoring visibility: the bar a game hides is hidden on this window too, but a
         // padding that came and went with it would move the sheet.
-        Box(if (fullHeight) Modifier else Modifier.windowInsetsPadding(nav)) { content(close) }
+        Box(
+          (if (color == null) Modifier.background(MaterialTheme.colorScheme.sheetGlass) else Modifier)
+            .then(if (fullHeight) Modifier else Modifier.windowInsetsPadding(nav)),
+        ) { content(close) }
       }
     }
   }

@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.view.View
 import android.view.Window
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -13,16 +14,20 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.ViewCompat
+import games.paperballoon.controller.theme.sheetGlass
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -41,13 +46,20 @@ fun AppSheet(
     onDismissRequest = onDismiss,
     sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     dragHandle = null,
-    // The default surfaceContainerLow is one step above our darkened dark background —
-    // the sheet edge vanished at night. High keeps it legible.
-    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    // The glass is drawn by the content, which takes the insets inside it so the glass
+    // reaches under the nav bar.
+    containerColor = Color.Transparent,
+    contentWindowInsets = { WindowInsets(0) },
   ) {
     // Scrolls only when the content outgrows the screen (small displays,
     // large font scale) — ModalBottomSheet clips a plain Column otherwise.
-    Column(Modifier.verticalScroll(rememberScrollState()), content = content)
+    Column(
+      Modifier
+        .background(MaterialTheme.colorScheme.sheetGlass)
+        .windowInsetsPadding(BottomSheetDefaults.windowInsets)
+        .verticalScroll(rememberScrollState()),
+      content = content,
+    )
   }
 }
 

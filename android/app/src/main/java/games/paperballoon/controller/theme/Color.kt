@@ -6,10 +6,10 @@ import androidx.compose.ui.graphics.luminance
 // The Paper Balloon design language (Couch-Games assets/theme.css ⇄ this file ⇄ iOS
 // PBTheme.swift) mapped onto M3 roles. The app icon sets the palette: a sunset on a sky.
 // By day the home sky is lilac over peach, fading into warm paper; by night the ground is
-// near-black with a hint of violet, one step below the cards. Ink and paper carry the
-// structure and the game posters carry the colour. From the language's rules: the sunset fills a screen's one primary button and
-// nothing else, cards are flat with a hairline, tags are quiet tints, and the fleet's
-// four colours go on the balloons and nowhere else. Interactive controls stay the
+// near-black with a hint of violet. Ink and paper carry the structure and the game
+// posters carry the colour. From the language's rules: the sunset fills a screen's one
+// primary button and nothing else, cards are glass, tags are quiet tints, and the
+// fleet's four colours go on the balloons and nowhere else. Interactive controls stay the
 // platform's own (the secondary button is M3's tonal button). Container roles the
 // language doesn't name are steps between its paper, panel and chip.
 val PrimaryLight = Color(0xFF2A2030) // ink
@@ -31,7 +31,7 @@ val OnSurfaceVariantLight = Color(0xFF5E4F66) // muted
 val OutlineLight = Color(0xFF8E8296)
 val OutlineVariantLight = Color(0xFFEEDDD3) // line
 
-val SecondaryContainerDark = Color(0xFF3A3246)
+val SecondaryContainerDark = Color(0xFF44404F) // a step above the sheets' lilac glass
 val OnSecondaryContainerDark = Color(0xFFF1EFEC)
 val SurfaceVariantDark = Color(0xFF2C2635) // chip
 val OnSurfaceVariantDark = Color(0xFFABA9B0) // muted
@@ -50,10 +50,10 @@ val OnSurfaceDark = Color(0xFFF1EFEC)
 val ActionSunset = listOf(Color(0xFFE0185F), Color(0xFFD83A1A))
 
 // The home sky (MainScreen's SkyBackdrop), fading into the background below: zenith then
-// horizon, lilac over peach, by day; by night navy, then dusk violet, then the sunset's
-// last light low at the horizon.
+// horizon, lilac over peach, by day; by night the afterglow in the ground's own hue, darker
+// up high, then a faint rose at the horizon only a touch lighter than the ground.
 val SkyLight = listOf(Color(0xFFE6DAF2), Color(0xFFFFE0CC))
-val SkyNight = listOf(Color(0xFF13142B), Color(0xFF2B1E40), Color(0xFF4D2338))
+val SkyNight = listOf(Color(0xFF0C0A12), Color(0xFF16111E), Color(0xFF21141F))
 
 // The fleet flying in the sky: the icon's balloon in four colours, top to bottom of the
 // envelope. Sunset leads and is always the biggest; sea, gold and dusk follow. By night
@@ -66,8 +66,14 @@ val FleetDusk = listOf(Color(0xFF6A4CF0), Color(0xFFC062E8))
 val FleetDuskNight = listOf(Color(0xFFA07CFF), Color(0xFFE48BF7))
 
 // Per-scheme tokens with no M3 role: see the ColorScheme extensions in Theme.kt.
-internal val CardLight = Color(0xFFFFFFFF)
-internal val CardDark = Color(0xFF2A2339)
+// The cards' glass, top to bottom: white easing into the paper by day, white mixed into
+// the ground by night; its rim lit along the top (stops at 0, 30% and 100%).
+internal val GlassLight = listOf(Color(0xFFFFFFFF), Color(0xFFFFFCFA))
+internal val GlassRimLight = listOf(Color(0xFFFFFFFF), Color(0xFFEEDDD3), Color(0xFFD9C3B7))
+internal val GlassDark = listOf(Color(0xFF242229), Color(0xFF1C1921))
+internal val GlassRimDark = listOf(Color(0xFF353239), Color(0xFF242229), Color(0xFF1D1B22))
+// Sheets wear the cards' glass; by night with a 10% wash of iOS's lilac (B4A3E6) over it.
+internal val SheetGlassDark = listOf(Color(0xFF322F3C), Color(0xFF2B2735))
 // Chips over the sky: frosted white.
 internal val FrostedLight = Color(0xB8FFFFFF)
 internal val FrostedDark = Color(0x24FFFFFF)

@@ -170,7 +170,8 @@ import games.paperballoon.controller.theme.FleetSunset
 import games.paperballoon.controller.theme.FleetSunsetNight
 import games.paperballoon.controller.theme.SkyLight
 import games.paperballoon.controller.theme.SkyNight
-import games.paperballoon.controller.theme.card
+import games.paperballoon.controller.theme.glass
+import games.paperballoon.controller.theme.glassRim
 import games.paperballoon.controller.theme.frosted
 import games.paperballoon.controller.theme.ghost
 import games.paperballoon.controller.theme.ghostLine
@@ -845,15 +846,15 @@ private fun RoomCard(
     onClick = onClick,
     modifier = Modifier
       .fillMaxWidth()
-      .graphicsLayer { scaleX = scale; scaleY = scale },
+      .graphicsLayer { scaleX = scale; scaleY = scale }
+      .background(MaterialTheme.colorScheme.glass, MaterialTheme.shapes.large),
     interactionSource = interaction,
     shape = MaterialTheme.shapes.large,
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.card,
+      containerColor = Color.Transparent,
       contentColor = onCard,
     ),
-    // As GameCard: by day the hairline is the card's only edge, by night the lifted fill is.
-    border = if (MaterialTheme.colorScheme.isDark) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.glassRim),
   ) {
     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
       Row(
@@ -1085,7 +1086,7 @@ private fun SectionTitle(text: String) {
 // crossover (~0.18).
 private const val ICON_FLIP_LUMINANCE = 0.4f
 
-// The language's card: flat, the card fill with one hairline, the poster whole and
+// The language's card: glass, the poster whole and
 // untouched on top, and the name under it with its tag beside it, the player count at
 // the right and where it runs below. The whole card is the tap.
 @Composable
@@ -1110,15 +1111,15 @@ private fun GameCard(game: Game, underBar: SnapshotStateMap<String, Boolean>, on
     onClick = { onOpen(game) },
     modifier = Modifier
       .fillMaxWidth()
-      .graphicsLayer { scaleX = scale; scaleY = scale },
+      .graphicsLayer { scaleX = scale; scaleY = scale }
+      .background(MaterialTheme.colorScheme.glass, MaterialTheme.shapes.large),
     interactionSource = interaction,
     shape = MaterialTheme.shapes.large,
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.card,
+      containerColor = Color.Transparent,
       contentColor = MaterialTheme.colorScheme.onSurface,
     ),
-    // By day the hairline is the card's only edge on the paper; by night the lifted fill is.
-    border = if (MaterialTheme.colorScheme.isDark) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.glassRim),
   ) {
     // 16:9 matches the screenshots — a shorter crop would slice the per-player
     // HUD chips in the corners of each quadrant.
@@ -1204,8 +1205,8 @@ private fun posterLuminance(art: Art, fraction: Float): Float =
 
 // The home sky behind the catalog, scrolling with it. One dusk: lilac at the zenith, peach
 // at the horizon, fading into the paper by the first card — with flat white clouds by day;
-// by night its afterglow (navy, dusk violet, the sunset's last light at the horizon), with
-// the clouds gone and the stars out. The fleet flies beside the large title: the sunset
+// by night its afterglow, a faint rose low and wide at the horizon, with the clouds gone
+// and the stars out. The fleet flies beside the large title: the sunset
 // balloon leads, sea, gold and dusk follow. Placed in dp from the top of the screen (sky)
 // or the bottom of the status bar (the fleet, which keeps station with the title) and
 // from the right edge; iOS's SkyBackdrop draws the same sky around its own title.
@@ -1222,8 +1223,8 @@ private fun SkyBackdrop(scrolled: () -> Int) {
       drawRect(
         if (dark) {
           Brush.verticalGradient(
-            0f to SkyNight[0], SKY_NIGHT_DUSK_DP / SKY_PAPER_DP to SkyNight[1],
-            SKY_NIGHT_GLOW_DP / SKY_PAPER_DP to SkyNight[2], 1f to scheme.background, endY = paperAt,
+            0f to SkyNight[0], SKY_NIGHT_MID_DP / SKY_PAPER_DP to SkyNight[1],
+            SKY_NIGHT_HORIZON_DP / SKY_PAPER_DP to SkyNight[2], 1f to scheme.background, endY = paperAt,
           )
         } else {
           Brush.verticalGradient(
@@ -1275,11 +1276,11 @@ private fun SkyBackdrop(scrolled: () -> Int) {
   }
 }
 
-// The sky's stops, in dp from the top of the screen: the horizon (peach), the night's dusk
-// violet and its afterglow, and where either sky has become the paper.
+// The sky's stops, in dp from the top of the screen: the horizon (peach), the night's
+// halfway colour and its rose horizon, and where either sky has become the paper.
 private const val SKY_HORIZON_DP = 220f
-private const val SKY_NIGHT_DUSK_DP = 140f
-private const val SKY_NIGHT_GLOW_DP = 250f
+private const val SKY_NIGHT_MID_DP = 150f
+private const val SKY_NIGHT_HORIZON_DP = 330f
 private const val SKY_PAPER_DP = 520f
 // x as a fraction of the width, y in dp from the top of the screen, radius dp.
 private val SKY_STARS = listOf(

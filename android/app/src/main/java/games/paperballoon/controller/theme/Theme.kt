@@ -8,6 +8,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -30,12 +31,13 @@ private val DarkColors = darkColorScheme(
   onSurface = OnSurfaceDark,
   surfaceDim = SurfaceDarkBase,
   surfaceBright = lerp(SurfaceDarkBase, Color.White, 0.20f),
-  // Night steps: the TV black, the card, then the violet up to the chip.
+  // Night steps: the TV black, then the violet; dialogs (High) are the cards' glass, and
+  // the tiles on sheets (Highest) a step above the sheets' lilac glass.
   surfaceContainerLowest = Color(0xFF0D0B11),
-  surfaceContainerLow = CardDark,
+  surfaceContainerLow = Color(0xFF201A2A),
   surfaceContainer = Color(0xFF251F30),
-  surfaceContainerHigh = Color(0xFF2A2435),
-  surfaceContainerHighest = SurfaceVariantDark,
+  surfaceContainerHigh = GlassDark[0],
+  surfaceContainerHighest = Color(0xFF42404C),
 )
 
 private val LightColors = lightColorScheme(
@@ -60,8 +62,9 @@ private val LightColors = lightColorScheme(
   surfaceContainerLowest = Color.White,
   surfaceContainerLow = Color(0xFFFCF3EE),
   surfaceContainer = Color(0xFFF8ECE6),
-  surfaceContainerHigh = Color(0xFFF4E6DE),
-  surfaceContainerHighest = Color(0xFFF0DED4),
+  // Dialogs are the cards' glass; the tiles on sheets take the panel tint.
+  surfaceContainerHigh = GlassLight[0],
+  surfaceContainerHighest = Color(0xFFF8ECE6),
 )
 
 /**
@@ -71,9 +74,15 @@ private val LightColors = lightColorScheme(
 val ColorScheme.isDark: Boolean
   get() = background.luminance() < 0.5f
 
-/** The card fill: white on paper, one step up from the night ground. */
-val ColorScheme.card: Color
-  get() = if (isDark) CardDark else CardLight
+/** The cards' glass (site theme.css --glass): a faint sheen, and a rim lit along the top in place of a hairline. */
+val ColorScheme.glass: Brush
+  get() = Brush.verticalGradient(if (isDark) GlassDark else GlassLight)
+val ColorScheme.glassRim: Brush
+  get() = (if (isDark) GlassRimDark else GlassRimLight).let { Brush.verticalGradient(0f to it[0], 0.3f to it[1], 1f to it[2]) }
+
+/** The sheets' fill: the cards' glass, with a faint lilac by night. */
+val ColorScheme.sheetGlass: Brush
+  get() = Brush.verticalGradient(if (isDark) SheetGlassDark else GlassLight)
 
 /** Frosted white behind the chips that sit over the home sky. */
 val ColorScheme.frosted: Color

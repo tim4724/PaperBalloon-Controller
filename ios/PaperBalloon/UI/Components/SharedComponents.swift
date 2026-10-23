@@ -60,17 +60,15 @@ struct ProminentGlassButton: ViewModifier {
 
 // MARK: - ChromeGlass
 
-/// Liquid Glass on iOS 26 behind the home toolbar's pills and the room and game cards,
-/// tinted by `tint` when given. Earlier releases have no glass in their toolbars, so they
-/// get `fallback`.
+/// Liquid Glass on iOS 26 behind the home toolbar's pills. Earlier releases have no glass
+/// in their toolbars, so they get `fallback`.
 struct ChromeGlass<S: Shape>: ViewModifier {
     let shape: S
     var fallback: Color = .clear
-    var tint: Color? = nil
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.tint(tint).interactive(), in: shape)
+            content.glassEffect(.regular.interactive(), in: shape)
         } else {
             content.background(fallback, in: shape)
         }
@@ -494,12 +492,11 @@ struct PressableCardButtonStyle: ButtonStyle {
 // MARK: - AppSheetContainer
 
 /// House-style sheet: opens fully expanded at its content height, no grabber,
-/// 28pt corners, surfaceContainerHigh background.
+/// 28pt corners, the cards' glass (`SheetBackground`).
 struct AppSheetContainer<Content: View>: View {
-    @Environment(\.pbPalette) private var palette
     @State private var measuredHeight: CGFloat = 0
     /// A game's theme-color, used as the sheet surface so an in-game sheet reads as
-    /// part of the game. Nil (the default) keeps the neutral surface. Callers pick the
+    /// part of the game. Nil (the default) keeps the glass. Callers pick the
     /// light or dark palette to match it, so the sheet's text stays legible.
     private let surfaceTint: Color?
     private let content: () -> Content
@@ -535,7 +532,29 @@ struct AppSheetContainer<Content: View>: View {
         .presentationDetents([measuredHeight > 0 ? .height(measuredHeight) : .medium])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(28)
-        .presentationBackground(surfaceTint ?? palette.surfaceContainerHigh)
+        .modifier(SheetBackground(surfaceTint: surfaceTint))
+    }
+}
+
+/// The sheet's own fill when a caller gives one; otherwise the cards' glass: on iOS 26
+/// Liquid Glass tinted 85% with the sheet glass's colour (any thinner and the home shows
+/// through busily), the drawn sheet glass before. A modifier rather than an inline
+/// `if #available` so the SDK-17 build compiles.
+private struct SheetBackground: ViewModifier {
+    let surfaceTint: Color?
+
+    @Environment(\.pbPalette) private var palette
+
+    func body(content: Content) -> some View {
+        if let surfaceTint {
+            content.presentationBackground(surfaceTint)
+        } else if #available(iOS 26.0, *) {
+            content.presentationBackground {
+                Color.clear.glassEffect(.regular.tint(palette.sheetGlass[0].opacity(0.85)), in: Rectangle())
+            }
+        } else {
+            content.presentationBackground(LinearGradient(colors: palette.sheetGlass, startPoint: .top, endPoint: .bottom))
+        }
     }
 }
 

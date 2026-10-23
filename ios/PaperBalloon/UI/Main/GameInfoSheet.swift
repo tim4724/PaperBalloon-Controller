@@ -145,9 +145,8 @@ private struct PlatformTiles: View {
             }
         }
         // Top-aligned so icons and names line up across tiles even when one
-        // tile carries the extra "Coming soon" line. Highest, not High — the
-        // sheet surface itself is surfaceContainerHigh, so the tile needs the
-        // next step to be visible on it.
+        // tile carries the extra "Coming soon" line. Highest: the step that
+        // shows on the sheet's glass (SheetBackground).
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.vertical, 12)
         .padding(.horizontal, 6)

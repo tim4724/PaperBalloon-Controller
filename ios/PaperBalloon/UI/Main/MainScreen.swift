@@ -663,9 +663,8 @@ private struct GameEndBanner: View {
 /// advertising. The two are the same object to a player, so they are one card; only where
 /// the pieces come from differs, which is what `RejoinCard` and `NearbyCard` supply.
 ///
-/// Glass on iOS 26 like the toolbar pills, a frosted fill before — the header's material,
-/// which the game cards share. Play under the row carries the sunset on the `primary` room
-/// only — the first one — so a second room doesn't put a second primary on screen; the
+/// Glass like the game cards (`CardGlass`). Play under the row carries the sunset on the
+/// `primary` room only — the first one — so a second room doesn't put a second primary on screen; the
 /// rest get the secondary button. The game's colour lives on the icon and nowhere else:
 /// routing it through the card's edge or fill made every HexStacker card near-CTA red
 /// (its accent is #FF6B6B beside the sunset), which both read as an alert and spent the
@@ -711,8 +710,7 @@ private struct RoomCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity)
-        .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
-                              fallback: palette.frosted, tint: palette.cardGlassTint))
+        .modifier(CardGlass())
     }
 
     private var row: some View {
@@ -735,6 +733,31 @@ private struct RoomCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .foregroundStyle(palette.onSurface)
+    }
+}
+
+/// The room and game cards' glass: Liquid Glass on iOS 26, like the toolbar pills; before
+/// that the site's (theme.css --glass) drawn, a faint sheen and a rim lit along the top in
+/// place of a hairline. A modifier rather than an inline `if #available` so the SDK-17
+/// build compiles.
+private struct CardGlass: ViewModifier {
+    @Environment(\.pbPalette) private var palette
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.tint(palette.cardGlassTint).interactive(), in: shape)
+        } else {
+            content
+                .background(LinearGradient(colors: palette.glass, startPoint: .top, endPoint: .bottom), in: shape)
+                .overlay {
+                    shape.strokeBorder(LinearGradient(stops: [
+                        .init(color: palette.glassRim[0], location: 0),
+                        .init(color: palette.glassRim[1], location: 0.3),
+                        .init(color: palette.glassRim[2], location: 1),
+                    ], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                }
+        }
     }
 }
 
@@ -893,11 +916,9 @@ private struct NearbyStatusCard: View {
 
 // MARK: - GameCard
 
-/// The room cards' material (glass on iOS 26, frosted before), the poster whole and
-/// untouched on top, and the name under it with its tag beside it, the player count at
-/// the right and where it runs below. The whole card is the tap. Android's room and game
-/// cards both keep the solid card and hairline: without glass's own rim, a frosted fill
-/// has no edge on the light paper.
+/// The language's card: glass, the poster whole and untouched on top, and the name under
+/// it with its tag beside it, the player count at the right and where it runs below. The
+/// whole card is the tap.
 private struct GameCard: View {
     let game: Game
     let onTap: () -> Void
@@ -963,8 +984,7 @@ private struct GameCard: View {
                 .padding(EdgeInsets(top: 12, leading: 14, bottom: 14, trailing: 14))
             }
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .modifier(ChromeGlass(shape: RoundedRectangle(cornerRadius: 20, style: .continuous),
-                                  fallback: palette.frosted, tint: palette.cardGlassTint))
+            .modifier(CardGlass())
         }
         .modifier(GlassCardPress())
     }
@@ -974,8 +994,8 @@ private struct GameCard: View {
 
 /// The home sky behind the catalog, scrolling with it. One dusk: lilac at the zenith,
 /// peach at the horizon, fading into the paper by the first card — with flat white
-/// clouds by day; by night its afterglow (navy, dusk violet, the sunset's last light at
-/// the horizon), with the clouds gone and the stars out.
+/// clouds by day; by night its afterglow, a faint rose low and wide at the horizon, with
+/// the clouds gone and the stars out.
 /// The fleet flies beside the large title: the sunset balloon leads, sea, gold and dusk
 /// follow. The background of the scroll content, so it travels with the title; placed in
 /// points from the top of the content (just under the large title; negative is above
@@ -989,12 +1009,13 @@ private struct SkyBackdrop: View {
     // spare for a pull-down bounce.
     private static let above: CGFloat = 1000
     // The sky's stops, from the content top: where the screen's top sits on the phone
-    // the language was drawn for, the horizon (peach), the night's dusk violet and its
-    // afterglow, and where either sky has become the paper.
+    // the language was drawn for, the horizon (peach), the night's halfway colour and its
+    // rose horizon, lower and wider than the day's, and where either sky has become the
+    // paper.
     private static let screenTop: CGFloat = -193
     private static let horizon: CGFloat = 27
-    private static let nightDusk: CGFloat = -53
-    private static let nightGlow: CGFloat = 57
+    private static let nightMid: CGFloat = -43
+    private static let nightHorizon: CGFloat = 137
     private static let paper: CGFloat = 327
     // x as a fraction of the width, y, radius.
     private static let stars: [(x: CGFloat, y: CGFloat, r: CGFloat)] = [
@@ -1033,8 +1054,8 @@ private struct SkyBackdrop: View {
                 LinearGradient(
                     stops: dark ? [
                         .init(color: PBPalette.skyNight[0], location: (Self.above + Self.screenTop) / height),
-                        .init(color: PBPalette.skyNight[1], location: (Self.above + Self.nightDusk) / height),
-                        .init(color: PBPalette.skyNight[2], location: (Self.above + Self.nightGlow) / height),
+                        .init(color: PBPalette.skyNight[1], location: (Self.above + Self.nightMid) / height),
+                        .init(color: PBPalette.skyNight[2], location: (Self.above + Self.nightHorizon) / height),
                         .init(color: palette.background, location: 1),
                     ] : [
                         .init(color: PBPalette.skyLight[0], location: (Self.above + Self.screenTop) / height),

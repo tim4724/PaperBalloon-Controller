@@ -2,6 +2,6 @@
 <resources>
     <!-- SurfaceDarkBase in Color.kt — keep in sync. -->
     <color name="pb_surface">#141119</color>
-    <!-- SkyNight[0] in Color.kt — keep in sync. -->
-    <color name="pb_splash">#13142B</color>
+    <!-- SkyNight[1] in Color.kt — keep in sync. -->
+    <color name="pb_splash">#16111E</color>
 </resources>
