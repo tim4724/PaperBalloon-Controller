@@ -70,4 +70,5 @@
     <string name="play_step_start">テレビで%1$sを起動してください。</string>
     <string name="play_step_scan">表示されたルームコードをスキャンしてください。</string>
     <string name="version_label">バージョン %1$s</string>
+    <string name="made_with_love">♥を込めて</string>
 </resources>

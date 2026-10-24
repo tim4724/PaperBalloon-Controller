@@ -1010,6 +1010,10 @@ private struct SkyBackdrop: View {
     @State private var clockStart = Date.now
     @State private var heldAt: Date?
     @State private var shootingStarAt: Date?
+    /// The hidden sky's craft flies only while a pull shows it: the seconds it flew in
+    /// earlier pulls, and the sky time this one brought it into view.
+    @State private var craftFlown: TimeInterval = 0
+    @State private var hiddenSkyAt: TimeInterval?
     // Per balloon: a tap's count (the swing's trigger) and which way it pushed, and its
     // slips (that animation's trigger) and when it last slipped.
     @State private var swings = [Int](repeating: 0, count: Self.fleet.count)
@@ -1022,6 +1026,9 @@ private struct SkyBackdrop: View {
     @State private var lastTap = Date.distantPast
     /// Once a launch: a second visit to the night sky doesn't get another.
     @MainActor private static var shootingStarShown = false
+    /// Once a launch: which of each sky's craft tows the banner.
+    private static let dayCraft = SkyCraft.allCases.filter { !$0.night }.randomElement()!
+    private static let nightCraft = SkyCraft.allCases.filter(\.night).randomElement()!
 
     // How far the sky reaches above the content: past the top of the screen, with room to
     // spare for a pull-down bounce.
@@ -1221,6 +1228,24 @@ private struct SkyBackdrop: View {
                 // never takes a touch.
                 .allowsHitTesting(false)
             }
+            // Outside the sky's ticks, which would rebuild it while it is out of sight, on a
+            // clock of its own: a craft a pull has found gets every frame, the sky its ticks.
+            .overlay(alignment: .topLeading) {
+                TimelineView(.animation(paused: !ticking || hiddenSkyAt == nil)) { timeline in
+                    let t = (heldAt ?? timeline.date).timeIntervalSince(clockStart)
+                    HiddenSky(dark: dark, craft: dark ? Self.nightCraft : Self.dayCraft,
+                              flight: craftFlown + (hiddenSkyAt.map { max(0, t - $0) } ?? 0))
+                }
+                .frame(width: width)
+                .onGeometryChange(for: Bool.self) { $0.frame(in: .global).maxY > 0 } action: { revealed in
+                    // The next pull finds it where this one left it.
+                    let t = (heldAt ?? .now).timeIntervalSince(clockStart)
+                    if !revealed, let at = hiddenSkyAt { craftFlown += t - at }
+                    hiddenSkyAt = revealed ? t : nil
+                }
+                .position(x: width / 2, y: Self.screenTop + HiddenSky.center)
+                .allowsHitTesting(false)
+            }
             // In the content's own space: y 0 is the top of the content.
             .background { WindowTaps { tapped(at: $0, width: width) } }
         }
@@ -1313,6 +1338,86 @@ private struct WindowTaps: UIViewRepresentable {
                 return
             }
             onTap(recognizer.location(in: self))
+        }
+    }
+}
+
+/// Above the top of the screen, for a pull-down to find: a craft towing a banner just out
+/// of sight, flying right a little further with each pull, and above it, for a firmer
+/// pull, the sun by day or a crescent moon among a few more stars by night. Both start at
+/// the left: the toolbar pills a pull draws them past sit at the right, and the name pill
+/// grows with the name. Laid out around its own middle, `center` points above the top of
+/// the screen. Android: MainScreen.kt's HiddenSky, which its RubberBand lets a pull show.
+private struct HiddenSky: View {
+    let dark: Bool
+    let craft: SkyCraft
+    /// Seconds the craft has flown while pulls showed it.
+    let flight: TimeInterval
+
+    static let center: CGFloat = -105
+    private static let height: CGFloat = 190
+    // From the top of this view: the craft's top edge 36 points above the screen's top,
+    // the sun or moon's middle 80.
+    private static let craftTop: CGFloat = 164
+    private static let orbMiddle: CGFloat = 120
+    /// Where the first pull finds the craft; it flies right from there, wrapping round once
+    /// it has left on the right.
+    private static let craftStart: CGFloat = 18
+    /// Wider than any craft and its banner in any language, so it wraps out of sight.
+    private static let craftRoom: CGFloat = 240
+    // x as a fraction of the width, y and radius in points from the top of this view.
+    private static let stars: [(x: CGFloat, y: CGFloat, r: CGFloat)] = [
+        (0.08, 40, 1), (0.42, 22, 1.2), (0.55, 90, 0.9), (0.86, 46, 1.1), (0.94, 120, 0.8), (0.3, 112, 1),
+    ]
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            ZStack(alignment: .topLeading) {
+                // Its own view, so the craft's every frame passes it by.
+                Lights(dark: dark, width: width)
+                let flown = (Self.craftStart + Self.craftRoom + craft.speed * flight)
+                    .truncatingRemainder(dividingBy: width + Self.craftRoom)
+                TowedBanner(craft: craft, t: flight)
+                    .offset(x: flown - Self.craftRoom, y: Self.craftTop + craft.bob(flight))
+            }
+        }
+        .frame(height: Self.height)
+    }
+
+    /// The stars and the sun, or the moon: a crescent cut from a full disc.
+    private struct Lights: View {
+        let dark: Bool
+        let width: CGFloat
+
+        @Environment(\.pbPalette) private var palette
+
+        var body: some View {
+            ZStack(alignment: .topLeading) {
+                if dark {
+                    ForEach(HiddenSky.stars.indices, id: \.self) { i in
+                        let star = HiddenSky.stars[i]
+                        Circle()
+                            .fill(palette.onSurface.opacity(0.75))
+                            .frame(width: star.r * 2, height: star.r * 2)
+                            .position(x: star.x * width, y: star.y)
+                    }
+                    Circle()
+                        .subtracting(Circle().offset(x: 12, y: -9))
+                        .fill(palette.onSurface)
+                        .frame(width: 38, height: 38)
+                        .position(x: width * 0.13, y: HiddenSky.orbMiddle)
+                } else {
+                    ZStack {
+                        Circle().fill(PBPalette.fleetGold[1].opacity(0.25)).frame(width: 66, height: 66)
+                        Circle()
+                            .fill(LinearGradient(colors: [PBPalette.fleetGold[1], PBPalette.fleetGold[0]],
+                                                 startPoint: .top, endPoint: .bottom))
+                            .frame(width: 44, height: 44)
+                    }
+                    .position(x: width * 0.13, y: HiddenSky.orbMiddle)
+                }
+            }
         }
     }
 }

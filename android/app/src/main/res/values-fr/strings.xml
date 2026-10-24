@@ -69,4 +69,5 @@
     <string name="play_step_start">Lance %1$s sur ta TV.</string>
     <string name="play_step_scan">Scanne le code de salle affiché.</string>
     <string name="version_label">Version %1$s</string>
+    <string name="made_with_love">Fait avec ♥</string>
 </resources>

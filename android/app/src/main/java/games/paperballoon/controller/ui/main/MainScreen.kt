@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -92,6 +93,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.Canvas
@@ -118,6 +120,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -139,7 +143,9 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -206,6 +212,7 @@ import games.paperballoon.controller.ui.game.GameHaptics
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -509,8 +516,10 @@ fun MainScreen(
         },
     ) {
       val scroll = rememberScrollState()
+      // iOS's band at the ends rather than a stretch, so a pull-down shows the sky above.
+      val band = rememberRubberBand()
       SkyBackdrop(
-        scrolled = { scroll.value },
+        scrolled = { scroll.value - band.offset },
         taps = skyTaps,
         // Still while anything covers it: the camera above all, which a weak phone needs
         // every cycle for, and a sheet's trailer.
@@ -521,11 +530,13 @@ fun MainScreen(
       Column(
         Modifier
           .fillMaxSize()
+          .onSizeChanged { band.extent = it.height.toFloat() }
           .drawWithContent {
             listLayer.record { this@drawWithContent.drawContent() }
             drawLayer(listLayer)
           }
-          .verticalScroll(scroll),
+          .verticalScroll(scroll, overscrollEffect = band)
+          .offset { IntOffset(0, band.offset.roundToInt()) },
       ) {
         // Clears the status bar so the header starts below it, but scrolls away with
         // the content — posters slide under the transparent bar, not into a hard cut.
@@ -623,7 +634,7 @@ fun MainScreen(
       val bottomInset = with(LocalDensity.current) { stableScreenInsets.getBottom(this).toDp() }
       DockEdge(
         list = listLayer,
-        scrolled = { scroll.value },
+        scrolled = { scroll.value - band.offset },
         modifier = Modifier.align(Alignment.BottomCenter).height(bottomInset + 12.dp + 56.dp + DOCK_EDGE_ABOVE),
       )
       JoinDock(
@@ -1251,19 +1262,33 @@ private fun posterLuminance(art: Art, fraction: Float): Float =
 // twinkle, and once a launch a shooting star may cross the night. A tapped balloon
 // swings; tap one five times running and it slips away, and a new one inflates in its
 // place. The bob and twinkle hold still with animations switched off, in Battery Saver
-// and on a low-RAM phone.
+// and on a low-RAM phone. Above the top of the screen, for a pull-down to find, waits
+// [HiddenSky].
 @Composable
-private fun SkyBackdrop(scrolled: () -> Int, taps: Flow<Offset>, moving: Boolean) {
+private fun SkyBackdrop(scrolled: () -> Float, taps: Flow<Offset>, moving: Boolean) {
   val scheme = MaterialTheme.colorScheme
   val dark = scheme.isDark
   val density = LocalDensity.current
   val statusTop = with(density) { stableScreenInsets.getTop(this).toDp() }
+  // The insets arrive after the first frame; the long-lived collectors must see them.
+  val fleetTop by rememberUpdatedState(statusTop)
   val context = LocalContext.current
   // Seconds of sky time, read only in the draw phase, so the motion never recomposes. It
   // runs only while the sky moves (the frame clock pauses with the activity too) and
   // carries on from where it stopped, so the fleet never jumps. It ticks about 30 times a
   // second rather than every frame: the bob covers a few pixels a second.
   var time by remember { mutableFloatStateOf(0f) }
+  // The hidden sky's craft flies only while a pull shows it: the seconds it flew in
+  // earlier pulls, and the sky time this one brought it into view.
+  var craftFlown by remember { mutableFloatStateOf(0f) }
+  var hiddenSkyAt by remember { mutableStateOf<Float?>(null) }
+  LaunchedEffect(Unit) {
+    // The next pull finds it where this one left it.
+    snapshotFlow { -scrolled() > with(density) { (HIDDEN_SKY_BELOW + fleetTop + HIDDEN_SKY_LIFT).toPx() } }.collect { revealed ->
+      hiddenSkyAt?.let { if (!revealed) craftFlown += time - it }
+      hiddenSkyAt = if (revealed) time else null
+    }
+  }
   LaunchedEffect(moving) {
     if (!moving || coroutineContext[MotionDurationScale]?.scaleFactor == 0f || skyHeldStill(context)) {
       return@LaunchedEffect
@@ -1271,7 +1296,8 @@ private fun SkyBackdrop(scrolled: () -> Int, taps: Flow<Offset>, moving: Boolean
     val origin = withInfiniteAnimationFrameNanos { it } - (time * 1e9f).toLong()
     while (true) {
       withInfiniteAnimationFrameNanos { time = (it - origin) / 1e9f }
-      delay(SKY_TICK_MS)
+      // A craft a pull has found gets every frame.
+      if (hiddenSkyAt == null) delay(SKY_TICK_MS)
     }
   }
   val shootingStar = remember { Animatable(0f) }
@@ -1292,8 +1318,6 @@ private fun SkyBackdrop(scrolled: () -> Int, taps: Flow<Offset>, moving: Boolean
   var widthPx by remember { mutableIntStateOf(0) }
   val haptics = LocalHapticFeedback.current
   val slipHaptics = remember { GameHaptics(context, touch = true) }
-  // The insets arrive after the first frame; the long-lived collector must see them.
-  val fleetTop by rememberUpdatedState(statusTop)
   LaunchedEffect(taps) {
     // The run of taps on one balloon; a tap on another starts a new one.
     var runBalloon = -1
@@ -1348,6 +1372,9 @@ private fun SkyBackdrop(scrolled: () -> Int, taps: Flow<Offset>, moving: Boolean
   ) {
     Canvas(Modifier.fillMaxSize()) {
       val paperAt = SKY_PAPER_DP.dp.toPx()
+      // Past the top of the screen, as far as a pull can reach.
+      val above = SKY_ABOVE.toPx()
+      drawRect(if (dark) SkyNight[0] else SkyLight[0], Offset(0f, -above), Size(size.width, above))
       drawRect(
         if (dark) {
           Brush.verticalGradient(
@@ -1434,9 +1461,91 @@ private fun SkyBackdrop(scrolled: () -> Int, taps: Flow<Offset>, moving: Boolean
           },
       )
     }
+    HiddenSky(
+      dark,
+      craft = if (dark) NIGHT_CRAFT else DAY_CRAFT,
+      flight = { craftFlown + (hiddenSkyAt?.let { time - it } ?: 0f) },
+      width = { widthPx },
+      lift = statusTop + HIDDEN_SKY_LIFT,
+    )
   }
 }
 
+// Above the top of the screen, for a pull-down to find: a craft towing a banner just out
+// of sight, flying right a little further with each pull, and above it, for a firmer
+// pull, the sun by day or a crescent moon among a few more stars by night. Both start at
+// the left: the chips a pull draws them past sit at the right, and the name chip grows
+// with the name. Laid out from its own top, HIDDEN_SKY_ABOVE over the top of the screen
+// and [lift] further. iOS: MainScreen.swift's HiddenSky.
+@Composable
+private fun HiddenSky(dark: Boolean, craft: SkyCraft, flight: () -> Float, width: () -> Int, lift: Dp) {
+  val onSurface = MaterialTheme.colorScheme.onSurface
+  Box(
+    Modifier
+      .fillMaxWidth()
+      .height(HIDDEN_SKY_ABOVE - HIDDEN_SKY_BELOW)
+      .offset(y = -HIDDEN_SKY_ABOVE - lift),
+  ) {
+    Canvas(Modifier.fillMaxSize()) {
+      if (dark) {
+        for ((x, y, r) in HIDDEN_SKY_STARS) drawCircle(onSurface.copy(alpha = 0.75f), r.dp.toPx(), Offset(x * size.width, y.dp.toPx()))
+      }
+      val orb = Offset(size.width * 0.13f, HIDDEN_SKY_ORB.toPx())
+      if (dark) {
+        // The moon: a crescent cut from a full disc.
+        val r = 19.dp.toPx()
+        val moon = Path.combine(
+          PathOperation.Difference,
+          Path().apply { addOval(Rect(orb, r)) },
+          Path().apply { addOval(Rect(orb + Offset(12.dp.toPx(), -9.dp.toPx()), r)) },
+        )
+        drawPath(moon, onSurface)
+      } else {
+        drawCircle(FleetGold[1].copy(alpha = 0.25f), 33.dp.toPx(), orb)
+        val r = 22.dp.toPx()
+        drawCircle(Brush.verticalGradient(FleetGold.reversed(), startY = orb.y - r, endY = orb.y + r), r, orb)
+      }
+    }
+    TowedBanner(
+      craft,
+      flight,
+      Modifier.graphicsLayer {
+        val t = flight()
+        val room = CRAFT_ROOM.toPx()
+        val flown = (CRAFT_START.toPx() + room + craft.speed.dp.toPx() * t) % (width() + room)
+        translationX = flown - room
+        translationY = (CRAFT_TOP + craft.bob(t).dp).toPx()
+      },
+    )
+  }
+}
+
+// The hidden sky's reach above the top of the screen, and its bottom's: a pull past that
+// starts to show it. It sits higher by the status bar and the lift: iOS's bars soften the
+// top of the screen, so a pull there must bring it further before it shows; Android's
+// clear bars show it at once, so here it waits further up.
+private val HIDDEN_SKY_ABOVE = 200.dp
+private val HIDDEN_SKY_BELOW = 10.dp
+private val HIDDEN_SKY_LIFT = 24.dp
+// From the hidden sky's top: the craft's top edge, 26dp above its bottom, and the sun or
+// moon's middle, 70 above it.
+private val CRAFT_TOP = 164.dp
+private val HIDDEN_SKY_ORB = 120.dp
+// Where the first pull finds the craft; it flies right from there, wrapping round once it
+// has left on the right, with room past the edge for any craft and its banner.
+private val CRAFT_START = 18.dp
+private val CRAFT_ROOM = 240.dp
+// x as a fraction of the width, y and radius in dp from the hidden sky's top.
+private val HIDDEN_SKY_STARS = listOf(
+  Triple(0.08f, 40f, 1f), Triple(0.42f, 22f, 1.2f), Triple(0.55f, 90f, 0.9f),
+  Triple(0.86f, 46f, 1.1f), Triple(0.94f, 120f, 0.8f), Triple(0.3f, 112f, 1f),
+)
+// Once a launch: which of each sky's craft tows the banner.
+private val DAY_CRAFT = SkyCraft.entries.filter { !it.night }.random()
+private val NIGHT_CRAFT = SkyCraft.entries.filter { it.night }.random()
+
+// How far the sky reaches past the top of the screen, for a pull to show.
+private val SKY_ABOVE = 1000.dp
 // The sky's stops, in dp from the top of the screen: the horizon (peach), the night's
 // halfway colour and its rose horizon, and where either sky has become the paper.
 private const val SKY_HORIZON_DP = 220f
@@ -1510,7 +1619,7 @@ private const val SLIP_HAPTIC = "slow_rise,0.5,0"
 // they reach the buttons. Below API 31 (no render effects) the list
 // fades into the paper instead.
 @Composable
-private fun DockEdge(list: GraphicsLayer, scrolled: () -> Int, modifier: Modifier) {
+private fun DockEdge(list: GraphicsLayer, scrolled: () -> Float, modifier: Modifier) {
   val blurs = List(DOCK_EDGE_BLURS.size) { rememberGraphicsLayer() }
   val masked = List(DOCK_EDGE_BLURS.size) { rememberGraphicsLayer() }
   val background = MaterialTheme.colorScheme.background

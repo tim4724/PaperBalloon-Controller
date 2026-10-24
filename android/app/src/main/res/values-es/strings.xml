@@ -69,4 +69,5 @@
     <string name="play_step_start">Inicia %1$s en tu TV.</string>
     <string name="play_step_scan">Escanea el código de sala que aparece.</string>
     <string name="version_label">Versión %1$s</string>
+    <string name="made_with_love">Hecho con ♥</string>
 </resources>

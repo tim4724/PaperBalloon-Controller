@@ -69,4 +69,5 @@
     <string name="play_step_start">Starte %1$s auf deinem Fernseher.</string>
     <string name="play_step_scan">Scanne den angezeigten Raumcode.</string>
     <string name="version_label">Version %1$s</string>
+    <string name="made_with_love">Mit ♥ gemacht</string>
 </resources>

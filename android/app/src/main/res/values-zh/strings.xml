@@ -69,4 +69,5 @@
     <string name="play_step_start">在电视上启动 %1$s。</string>
     <string name="play_step_scan">扫描显示的房间代码。</string>
     <string name="version_label">版本 %1$s</string>
+    <string name="made_with_love">用♥制作</string>
 </resources>

@@ -69,4 +69,5 @@
     <string name="play_step_start">Запусти %1$s на телевизоре.</string>
     <string name="play_step_scan">Отсканируй показанный код комнаты.</string>
     <string name="version_label">Версия %1$s</string>
+    <string name="made_with_love">Сделано с ♥</string>
 </resources>
