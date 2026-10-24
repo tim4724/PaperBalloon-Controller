@@ -162,7 +162,11 @@ struct MainScreen: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 20)
                 .padding(.bottom, 16)
-                .background(alignment: .top) { SkyBackdrop() }
+                // Still while anything covers it: the camera above all, and a sheet's trailer.
+                .background(alignment: .top) {
+                    SkyBackdrop(moving: isTopVisible && scanRequest == nil && infoGame == nil
+                                && profileRequest == nil && !showCodeEntry && !joining)
+                }
                 .animation(.spring(duration: 0.45), value: messages.gameEndBanner)
                 .animation(.spring(duration: 0.45), value: resolvedNearby.count)
             }
@@ -1007,9 +1011,37 @@ private struct GameCard: View {
 /// points from the top of the content (just under the large title; negative is above
 /// it) and from the screen's edges. Android's SkyBackdrop (MainScreen.kt) draws the
 /// same sky around its own title.
+///
+/// It is alive while it's `moving`: the balloons bob on their strings, some stars
+/// twinkle, and once a launch a shooting star may cross the night. A tapped balloon
+/// swings; tap one five times running and it slips away, and a new one inflates in its
+/// place. The bob and twinkle hold still with Reduce Motion and in Low Power Mode.
 private struct SkyBackdrop: View {
+    /// Home is the visible top with nothing over it: the sky only moves while it's seen.
+    let moving: Bool
+
     @Environment(\.colorScheme) private var scheme
     @Environment(\.pbPalette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    // Sky time runs only while the sky ticks and carries on from where it stopped, so the
+    // fleet never jumps: `clockStart` is when sky time 0 would have been, `heldAt` when
+    // it last stopped.
+    @State private var clockStart = Date.now
+    @State private var heldAt: Date?
+    @State private var shootingStarAt: Date?
+    // Per balloon: a tap's count (the swing's trigger) and which way it pushed, and its
+    // slips (that animation's trigger) and when it last slipped.
+    @State private var swings = [Int](repeating: 0, count: Self.fleet.count)
+    @State private var pushes = [Double](repeating: 1, count: Self.fleet.count)
+    @State private var slips = [Int](repeating: 0, count: Self.fleet.count)
+    @State private var slippedAt = [Date](repeating: .distantPast, count: Self.fleet.count)
+    // The run of taps on one balloon; a tap on another starts a new one.
+    @State private var runBalloon = -1
+    @State private var runTaps = 0
+    @State private var lastTap = Date.distantPast
+    /// Once a launch: a second visit to the night sky doesn't get another.
+    @MainActor private static var shootingStarShown = false
 
     // How far the sky reaches above the content: past the top of the screen, with room to
     // spare for a pull-down bounce.
@@ -1044,6 +1076,36 @@ private struct SkyBackdrop: View {
         (40, 48, -75), (24, 104, -43), (15, 20, -81), (17, 5, -45),
     ]
     private static let balloonAspect: CGFloat = 58 / 82.43  // SkyBalloon's viewBox
+    /// Each balloon's bob, in seconds per cycle — no two alike, so the fleet never moves as one.
+    private static let bobPeriods: [Double] = [6.2, 5.1, 7.3, 5.7]
+    /// About 30 sky ticks a second rather than every frame: the bob covers a few points a
+    /// second (Android: MainScreen.kt `SKY_TICK_MS`).
+    private static let tick: TimeInterval = 1.0 / 30
+    /// The band the stars and the shooting star use, from the top of the content: the
+    /// star canvas covers only that, not the whole sky, as the twinkle redraws it every tick.
+    private static let starBand: (top: CGFloat, height: CGFloat) = (-200, 430)
+    /// The smallest target a balloon gets: the small ones are far narrower than a finger.
+    private static let target: CGFloat = 48
+    /// A slipped balloon's rise, slow off the knot and quickening (Android: MainScreen.kt
+    /// `SLIP_EASING`), and how long it is gone: the rise and a moment before a new one
+    /// inflates.
+    private static let slipRise: TimeInterval = 5
+    private static let slipCurve = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.55, y: 0),
+                                                    endControlPoint: UnitPoint(x: 1, y: 1))
+    private static let slipAway: TimeInterval = 5.3
+    private static let tapsToSlip = 5
+    private static let tapRunGap: TimeInterval = 1.5
+    /// Late enough that a quick visit never sees it, early enough that a lingering one might.
+    private static let shootingStarAfter: ClosedRange<Double> = 10...40
+    private static let shootingStarDuration: TimeInterval = 0.9
+    private static let shootingStarAngle = 25 * Double.pi / 180
+    // Where it starts: x as a fraction of the width, y below the top of the screen.
+    @State private var shootingFrom = CGPoint(x: .random(in: 0.05...0.45), y: .random(in: 20...120))
+
+    /// Read whenever `moving` changes (Android also holds still on a low-RAM phone).
+    private var ticking: Bool {
+        moving && !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
 
     var body: some View {
         let dark = scheme == .dark
@@ -1056,56 +1118,243 @@ private struct SkyBackdrop: View {
         let height = Self.above + Self.paper
         GeometryReader { geo in
             let width = geo.size.width
-            ZStack(alignment: .topLeading) {
-                LinearGradient(
-                    stops: dark ? [
-                        .init(color: PBPalette.skyNight[0], location: (Self.above + Self.screenTop) / height),
-                        .init(color: PBPalette.skyNight[1], location: (Self.above + Self.nightMid) / height),
-                        .init(color: PBPalette.skyNight[2], location: (Self.above + Self.nightHorizon) / height),
-                        .init(color: palette.background, location: 1),
-                    ] : [
-                        .init(color: PBPalette.skyLight[0], location: (Self.above + Self.screenTop) / height),
-                        .init(color: PBPalette.skyLight[1], location: (Self.above + Self.horizon) / height),
-                        .init(color: palette.background, location: 1),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(width: width, height: height)
-                if dark {
-                    ForEach(Self.stars.indices, id: \.self) { i in
-                        let star = Self.stars[i]
-                        Circle()
-                            .fill(palette.onSurface.opacity(0.75))
-                            .frame(width: star.r * 2, height: star.r * 2)
-                            .position(x: star.x * width, y: Self.above + star.y)
+            // A shooting star in flight gets every frame: it crosses the sky in under a second.
+            TimelineView(.animation(minimumInterval: shootingStarAt == nil ? Self.tick : nil, paused: !ticking)) { timeline in
+                let t = (heldAt ?? timeline.date).timeIntervalSince(clockStart)
+                ZStack(alignment: .topLeading) {
+                    LinearGradient(
+                        stops: dark ? [
+                            .init(color: PBPalette.skyNight[0], location: (Self.above + Self.screenTop) / height),
+                            .init(color: PBPalette.skyNight[1], location: (Self.above + Self.nightMid) / height),
+                            .init(color: PBPalette.skyNight[2], location: (Self.above + Self.nightHorizon) / height),
+                            .init(color: palette.background, location: 1),
+                        ] : [
+                            .init(color: PBPalette.skyLight[0], location: (Self.above + Self.screenTop) / height),
+                            .init(color: PBPalette.skyLight[1], location: (Self.above + Self.horizon) / height),
+                            .init(color: palette.background, location: 1),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(width: width, height: height)
+                    if dark {
+                        Canvas { context, _ in
+                            for (i, star) in Self.stars.enumerated() {
+                                // Every third star twinkles, each on its own slow beat.
+                                let opacity = i % 3 == 0
+                                    ? 0.45 + 0.3 * sin(t * 2 * .pi / (2.4 + Double(i % 4) * 0.6) + Double(i))
+                                    : 0.75
+                                context.fill(Circle().path(in: CGRect(x: star.x * width - star.r,
+                                                                      y: star.y - Self.starBand.top - star.r,
+                                                                      width: star.r * 2, height: star.r * 2)),
+                                             with: .color(palette.onSurface.opacity(opacity)))
+                            }
+                            if let at = shootingStarAt {
+                                // A streak falling right at 25°: its tail grows as it goes, and it
+                                // flares and fades.
+                                let p = timeline.date.timeIntervalSince(at) / Self.shootingStarDuration
+                                if p > 0, p < 1 {
+                                    let (dx, dy) = (cos(Self.shootingStarAngle), sin(Self.shootingStarAngle))
+                                    let head = CGPoint(x: shootingFrom.x * width + dx * 260 * p,
+                                                       y: Self.screenTop - Self.starBand.top + shootingFrom.y + dy * 260 * p)
+                                    let tailLength = min(1, p * 3) * 90
+                                    let tail = CGPoint(x: head.x - dx * tailLength, y: head.y - dy * tailLength)
+                                    var streak = Path()
+                                    streak.move(to: tail)
+                                    streak.addLine(to: head)
+                                    context.stroke(streak, with: .linearGradient(
+                                        Gradient(colors: [.clear, palette.onSurface.opacity(sin(p * .pi))]),
+                                        startPoint: tail, endPoint: head),
+                                        style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                                }
+                            }
+                        }
+                        .frame(width: width, height: Self.starBand.height)
+                        .offset(y: Self.above + Self.starBand.top)
+                    } else {
+                        ForEach(Self.clouds.indices, id: \.self) { i in
+                            let cloud = Self.clouds[i]
+                            Puff()
+                                .fill(.white)
+                                .frame(width: cloud.width, height: cloud.width * 0.45)
+                                .offset(x: cloud.fromRight ? width + cloud.x - cloud.width : cloud.x,
+                                        y: Self.above + cloud.y)
+                        }
                     }
-                } else {
-                    ForEach(Self.clouds.indices, id: \.self) { i in
-                        let cloud = Self.clouds[i]
-                        Puff()
-                            .fill(.white)
-                            .frame(width: cloud.width, height: cloud.width * 0.45)
-                            .offset(x: cloud.fromRight ? width + cloud.x - cloud.width : cloud.x,
-                                    y: Self.above + cloud.y)
+                    ForEach(Self.fleet.indices, id: \.self) { i in
+                        let balloon = Self.fleet[i]
+                        let balloonHeight = balloon.width / Self.balloonAspect
+                        let period = Self.bobPeriods[i]
+                        // The silhouette masks the balloon's gradient.
+                        LinearGradient(colors: fleetColors[i], startPoint: .top, endPoint: .bottom)
+                            .mask(Image("SkyBalloon").resizable())
+                            .frame(width: balloon.width, height: balloonHeight)
+                            .keyframeAnimator(initialValue: Swing(), trigger: swings[i]) { content, swing in
+                                content
+                                    .rotationEffect(.degrees(swing.angle), anchor: .bottom)
+                                    .offset(y: swing.lift)
+                            } keyframes: { _ in
+                                // Pushed from the left it swings right, about its knot.
+                                KeyframeTrack(\.angle) {
+                                    CubicKeyframe(pushes[i] * 9, duration: 0.12)
+                                    SpringKeyframe(0, duration: 1.6, spring: Spring(response: 0.45, dampingRatio: 0.25))
+                                }
+                                KeyframeTrack(\.lift) {
+                                    CubicKeyframe(-4, duration: 0.1)
+                                    SpringKeyframe(0, duration: 1.2, spring: Spring(response: 0.45, dampingRatio: 0.4))
+                                }
+                            }
+                            .keyframeAnimator(initialValue: Slip(), trigger: slips[i]) { content, slip in
+                                content
+                                    .scaleEffect(slip.scale, anchor: .bottom)
+                                    .offset(x: slip.sway, y: slip.rise)
+                            } keyframes: { _ in
+                                // Rising, swaying as it goes, out past the top of the sky, so a
+                                // pull-down never finds it waiting up there; a moment later a
+                                // new one inflates in its place.
+                                KeyframeTrack(\.rise) {
+                                    LinearKeyframe(-(Self.above + balloon.top + balloonHeight), duration: Self.slipRise,
+                                                   timingCurve: Self.slipCurve)
+                                    LinearKeyframe(-(Self.above + balloon.top + balloonHeight), duration: Self.slipAway - Self.slipRise)
+                                    MoveKeyframe(0)
+                                }
+                                KeyframeTrack(\.sway) {
+                                    CubicKeyframe(balloon.width * 0.2, duration: Self.slipRise / 6)
+                                    CubicKeyframe(-balloon.width * 0.2, duration: Self.slipRise / 3)
+                                    CubicKeyframe(balloon.width * 0.2, duration: Self.slipRise / 3)
+                                    CubicKeyframe(0, duration: Self.slipRise / 6)
+                                }
+                                KeyframeTrack(\.scale) {
+                                    LinearKeyframe(1, duration: Self.slipAway)
+                                    MoveKeyframe(0)
+                                    SpringKeyframe(1, duration: 1.2, spring: Spring(response: 0.5, dampingRatio: 0.45))
+                                }
+                            }
+                            // The smaller, further balloons bob less. All of it pivots on the knot.
+                            .rotationEffect(.degrees(3 * sin(t * 2 * .pi / (period * 1.4) + Double(i))), anchor: .bottom)
+                            .offset(y: sin(t * 2 * .pi / period + Double(i) * 1.7) * balloon.width * 0.06)
+                            .offset(x: width - balloon.end - balloon.width, y: Self.above + balloon.top)
                     }
                 }
-                ForEach(Self.fleet.indices, id: \.self) { i in
-                    let balloon = Self.fleet[i]
-                    let balloonHeight = balloon.width / Self.balloonAspect
-                    // The silhouette masks the balloon's gradient.
-                    LinearGradient(colors: fleetColors[i], startPoint: .top, endPoint: .bottom)
-                        .mask(Image("SkyBalloon").resizable())
-                        .frame(width: balloon.width, height: balloonHeight)
-                        .offset(x: width - balloon.end - balloon.width, y: Self.above + balloon.top)
-                }
+                .offset(y: -Self.above)
+                // Its balloons' taps come from the window (WindowTaps): the sky itself
+                // never takes a touch.
+                .allowsHitTesting(false)
             }
-            .offset(y: -Self.above)
+            // In the content's own space: y 0 is the top of the content.
+            .background { WindowTaps { tapped(at: $0, width: width) } }
         }
-        .allowsHitTesting(false)
         .accessibilityHidden(true)
+        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.7), trigger: swings)
+        .onChange(of: ticking, initial: true) { _, isTicking in
+            if !isTicking {
+                heldAt = heldAt ?? .now
+            } else if let held = heldAt {
+                clockStart += Date.now.timeIntervalSince(held)
+                heldAt = nil
+            }
+        }
+        .task(id: dark && ticking) {
+            guard dark, ticking, !Self.shootingStarShown else { return }
+            try? await Task.sleep(for: .seconds(Double.random(in: Self.shootingStarAfter)))
+            guard !Task.isCancelled else { return }
+            shootingStarAt = .now
+            Self.shootingStarShown = true
+            // Back to the slower ticks once it's gone, cancelled or not.
+            try? await Task.sleep(for: .seconds(Self.shootingStarDuration))
+            shootingStarAt = nil
+        }
+    }
+
+    private func tapped(at point: CGPoint, width: CGFloat) {
+        // Never behind a game: the window's taps reach here while home is covered too.
+        guard moving else { return }
+        // A balloon's target is its whole outline, widened to a fingertip for the small
+        // ones; where two overlap, the nearer middle wins.
+        let targets = Self.fleet.map { balloon in
+            let height = balloon.width / Self.balloonAspect
+            return CGRect(x: width - balloon.end - balloon.width, y: balloon.top, width: balloon.width, height: height)
+                .insetBy(dx: -max(Self.target - balloon.width, 0) / 2, dy: -max(Self.target - height, 0) / 2)
+        }
+        let distance = { (r: CGRect) in hypot(r.midX - point.x, r.midY - point.y) }
+        guard let i = targets.indices.filter({ targets[$0].contains(point) })
+            .min(by: { distance(targets[$0]) < distance(targets[$1]) }) else { return }
+        // Gone off the top: nothing there to tap until its replacement starts to inflate.
+        if Date.now.timeIntervalSince(slippedAt[i]) < Self.slipAway { return }
+        pushes[i] = point.x < targets[i].midX ? 1 : -1
+        swings[i] += 1
+        runTaps = i == runBalloon && Date.now.timeIntervalSince(lastTap) < Self.tapRunGap ? runTaps + 1 : 1
+        runBalloon = i
+        lastTap = .now
+        guard runTaps >= Self.tapsToSlip else { return }
+        runTaps = 0
+        slippedAt[i] = .now
+        slips[i] += 1
+        launcherHaptics.play(slipHaptic)
     }
 }
+
+/// Taps anywhere in the window, in this view's coordinates. The fleet flies beside the
+/// large title, where the navigation bar takes every touch, so the sky listens at the
+/// window instead: alongside everything else, cancelling and delaying nothing. A tap on
+/// something presented over the navigation stack, a sheet, isn't the sky's.
+private struct WindowTaps: UIViewRepresentable {
+    let onTap: (CGPoint) -> Void
+
+    func makeUIView(context: Context) -> TapView { TapView() }
+    func updateUIView(_ view: TapView, context: Context) { view.onTap = onTap }
+
+    final class TapView: UIView, UIGestureRecognizerDelegate {
+        var onTap: (CGPoint) -> Void = { _ in }
+        private lazy var recognizer: UITapGestureRecognizer = {
+            let recognizer = UITapGestureRecognizer(target: self, action: #selector(tapped))
+            recognizer.cancelsTouchesInView = false
+            recognizer.delaysTouchesEnded = false
+            recognizer.delegate = self
+            return recognizer
+        }()
+
+        override func willMove(toWindow newWindow: UIWindow?) {
+            window?.removeGestureRecognizer(recognizer)
+            newWindow?.addGestureRecognizer(recognizer)
+        }
+
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+        @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
+            guard let window else { return }
+            var responder: UIResponder? = self
+            while let next = responder, !(next is UINavigationController) { responder = next.next }
+            if let stack = (responder as? UINavigationController)?.view,
+               window.hitTest(recognizer.location(in: window), with: nil)?.isDescendant(of: stack) != true {
+                return
+            }
+            onTap(recognizer.location(in: self))
+        }
+    }
+}
+
+/// A tapped balloon's swing (degrees) and bounce (points).
+private struct Swing {
+    var angle = 0.0
+    var lift = 0.0
+}
+
+/// A balloon slipping its string: how far it has risen and swayed, and the new
+/// one's inflation.
+private struct Slip {
+    var rise = 0.0
+    var sway = 0.0
+    var scale = 1.0
+}
+
+/// The launcher's own haptics, in CONTRACT.md §12's primitives (Android: MainScreen.kt
+/// `SLIP_HAPTIC`): a balloon slipping its string swells slowly.
+@MainActor private let launcherHaptics = GameHaptics(idleShutdown: true)
+private let slipHaptic = [HapticStep(primitive: .slowRise, scale: 0.5, delay: 0)]
 
 /// A flat cloud: a rounded bar with three circles rising from it, on a 200×90 grid.
 private struct Puff: Shape {

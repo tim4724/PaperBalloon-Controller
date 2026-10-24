@@ -44,6 +44,13 @@ struct HapticStep {
     /// interruption, backgrounding, a server reset) — the next pattern restarts it.
     private var running = false
     private var player: CHHapticPatternPlayer?
+    private let idleShutdown: Bool
+
+    /// `idleShutdown` lets the engine stop itself between haptics: the launcher's own
+    /// (a balloon slipping away) are rare, so an engine kept running for them is waste.
+    init(idleShutdown: Bool = false) {
+        self.idleShutdown = idleShutdown
+    }
 
     /// `pattern` is milliseconds, alternating vibrate/pause, already shape-checked and
     /// capped by `parseVibrationPattern`. Empty = the API's cancel call.
@@ -199,10 +206,10 @@ struct HapticStep {
     private func startedEngine() -> CHHapticEngine? {
         if engine == nil {
             guard let created = try? CHHapticEngine() else { return nil }
-            // Kept alive for the whole game host instead of auto-shutting down: a
-            // controller buzzes on nearly every tap, and a per-tap engine start would
-            // put an audio-server round trip in front of the feedback.
-            created.isAutoShutdownEnabled = false
+            // A game host's is kept alive for its whole life instead of auto-shutting
+            // down: a controller buzzes on nearly every tap, and a per-tap engine start
+            // would put an audio-server round trip in front of the feedback.
+            created.isAutoShutdownEnabled = idleShutdown
             // Plays no audio events, which lets the engine skip audio setup and start
             // with less latency.
             created.playsHapticsOnly = true

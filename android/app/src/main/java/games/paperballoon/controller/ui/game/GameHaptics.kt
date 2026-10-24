@@ -24,9 +24,14 @@ import kotlin.math.roundToLong
  * Tagged as a game's (media usage), never left untagged: Android files an untagged
  * short effect under touch feedback — the WebView's own navigator.vibrate included —
  * and the system touch-feedback switch must not silence a game that has its own
- * haptics setting.
+ * haptics setting. The launcher's own haptics (a balloon slipping away) are touch
+ * feedback, so they pass `touch` and that switch governs them.
  */
-internal class GameHaptics(context: Context) {
+internal class GameHaptics(context: Context, touch: Boolean = false) {
+  private val audio = if (touch) TOUCH_AUDIO else GAME_AUDIO
+  @SuppressLint("InlinedApi") // only API 33+ passes it on
+  private val usage = if (touch) VibrationAttributes.USAGE_TOUCH else VibrationAttributes.USAGE_MEDIA
+
   private val vibrator: Vibrator =
     if (Build.VERSION.SDK_INT >= 31) {
       context.getSystemService(VibratorManager::class.java).defaultVibrator
@@ -92,7 +97,7 @@ internal class GameHaptics(context: Context) {
     when {
       Build.VERSION.SDK_INT < 26 -> {
         @Suppress("DEPRECATION")
-        vibrator.vibrate(timings, -1, GAME_AUDIO)
+        vibrator.vibrate(timings, -1, audio)
       }
       amplitudeControl -> vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
       else -> vibrate(VibrationEffect.createWaveform(timings, -1))
@@ -102,10 +107,10 @@ internal class GameHaptics(context: Context) {
   @RequiresApi(26)
   private fun vibrate(effect: VibrationEffect) {
     if (Build.VERSION.SDK_INT >= 33) {
-      vibrator.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_MEDIA))
+      vibrator.vibrate(effect, VibrationAttributes.createForUsage(usage))
     } else {
       @Suppress("DEPRECATION")
-      vibrator.vibrate(effect, GAME_AUDIO)
+      vibrator.vibrate(effect, audio)
     }
   }
 
@@ -126,8 +131,10 @@ internal class GameHaptics(context: Context) {
     private const val MAX_ENCODED_LENGTH = 2048
 
     // Before VibrationAttributes (API 33) usage came from audio attributes; GAME is
-    // what the framework later files under media.
+    // what the framework later files under media, and sonification what it files under touch.
     private val GAME_AUDIO: AudioAttributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).build()
+    private val TOUCH_AUDIO: AudioAttributes =
+      AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION).build()
 
     // Pulse lengths are sized against Android's own pre-composition fallbacks (click
     // 20 ms, heavy click 30 ms; config_*VibePattern): an on/off motor needs that long

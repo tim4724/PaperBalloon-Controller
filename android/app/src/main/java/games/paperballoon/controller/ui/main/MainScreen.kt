@@ -1,20 +1,27 @@
 package games.paperballoon.controller.ui.main
 
 import android.Manifest
+import android.app.ActivityManager
+import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -23,6 +30,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -77,6 +87,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,11 +103,14 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.CompositingStrategy as LayerCompositingStrategy
@@ -104,13 +119,17 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -193,10 +212,17 @@ import games.paperballoon.controller.ui.components.JoiningCover
 import games.paperballoon.controller.ui.components.PlayerChip
 import games.paperballoon.controller.ui.components.StatusTag
 import games.paperballoon.controller.ui.components.stableScreenInsets
+import games.paperballoon.controller.ui.game.GameHaptics
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.random.Random
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
 @Composable
@@ -469,6 +495,10 @@ fun MainScreen(
   // the inset padding — the camera runs edge to edge and pads its own controls.
   var dockHeightPx by remember { mutableStateOf(0) }
   Box(modifier.fillMaxSize()) {
+    // The fleet flies behind the list, which takes every touch first: taps are watched
+    // on the container, after everything in front has had its turn, and the sky decides
+    // whether one landed on a balloon.
+    val skyTaps = remember { MutableSharedFlow<Offset>(extraBufferCapacity = 1) }
     // Only the horizontal (cutout) inset pads the container. The status bar and nav
     // bar are applied INSIDE the scroll (top spacer + card bottom inset) so the
     // catalog scrolls edge to edge UNDER the transparent bars instead of being
@@ -476,10 +506,22 @@ fun MainScreen(
     Box(
       Modifier
         .fillMaxSize()
-        .windowInsetsPadding(stableScreenInsets.only(WindowInsetsSides.Horizontal)),
+        .windowInsetsPadding(stableScreenInsets.only(WindowInsetsSides.Horizontal))
+        .pointerInput(Unit) {
+          awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
+            waitForUpOrCancellation(PointerEventPass.Final)?.let { skyTaps.tryEmit(it.position) }
+          }
+        },
     ) {
       val scroll = rememberScrollState()
-      SkyBackdrop(scrolled = { scroll.value })
+      SkyBackdrop(
+        scrolled = { scroll.value },
+        taps = skyTaps,
+        // Still while anything covers it: the camera above all, which a weak phone needs
+        // every cycle for, and a sheet's trailer.
+        moving = !showScanner && !joining && infoGame == null && !showProfile && !showCodeEntry,
+      )
       // The list is drawn through a layer so the dock's edge can draw it again, blurred.
       val listLayer = rememberGraphicsLayer()
       Column(
@@ -1210,14 +1252,105 @@ private fun posterLuminance(art: Art, fraction: Float): Float =
 // balloon leads, sea, gold and dusk follow. Placed in dp from the top of the screen (sky)
 // or the bottom of the status bar (the fleet, which keeps station with the title) and
 // from the right edge; iOS's SkyBackdrop draws the same sky around its own title.
+// It is alive while it's [moving]: the balloons bob on their strings, some stars
+// twinkle, and once a launch a shooting star may cross the night. A tapped balloon
+// swings; tap one five times running and it slips away, and a new one inflates in its
+// place. The bob and twinkle hold still with animations switched off, in Battery Saver
+// and on a low-RAM phone.
 @Composable
-private fun SkyBackdrop(scrolled: () -> Int) {
+private fun SkyBackdrop(scrolled: () -> Int, taps: Flow<Offset>, moving: Boolean) {
   val scheme = MaterialTheme.colorScheme
   val dark = scheme.isDark
-  val statusTop = with(LocalDensity.current) { stableScreenInsets.getTop(this).toDp() }
+  val density = LocalDensity.current
+  val statusTop = with(density) { stableScreenInsets.getTop(this).toDp() }
+  val context = LocalContext.current
+  // Seconds of sky time, read only in the draw phase, so the motion never recomposes. It
+  // runs only while the sky moves (the frame clock pauses with the activity too) and
+  // carries on from where it stopped, so the fleet never jumps. It ticks about 30 times a
+  // second rather than every frame: the bob covers a few pixels a second.
+  var time by remember { mutableFloatStateOf(0f) }
+  LaunchedEffect(moving) {
+    if (!moving || coroutineContext[MotionDurationScale]?.scaleFactor == 0f || skyHeldStill(context)) {
+      return@LaunchedEffect
+    }
+    val origin = withInfiniteAnimationFrameNanos { it } - (time * 1e9f).toLong()
+    while (true) {
+      withInfiniteAnimationFrameNanos { time = (it - origin) / 1e9f }
+      delay(SKY_TICK_MS)
+    }
+  }
+  val shootingStar = remember { Animatable(0f) }
+  val shootingFrom = remember { Offset(Random.nextFloat() * 0.4f + 0.05f, Random.nextFloat() * 100f + 20f) }
+  LaunchedEffect(dark, moving) {
+    if (!dark || !moving || shootingStarShown) return@LaunchedEffect
+    shootingStar.snapTo(0f)
+    delay(Random.nextLong(SHOOTING_STAR_AFTER_MS.first, SHOOTING_STAR_AFTER_MS.last))
+    shootingStarShown = true
+    shootingStar.animateTo(1f, tween(SHOOTING_STAR_MS, easing = LinearEasing))
+  }
+  // A tap swings a balloon (degrees) and bounces it (px); a balloon can also slip away
+  // (0 tied, 1 gone off the top) and be replaced by one inflating (scale).
+  val swing = remember { List(SKY_FLEET.size) { Animatable(0f) } }
+  val bounce = remember { List(SKY_FLEET.size) { Animatable(0f) } }
+  val escape = remember { List(SKY_FLEET.size) { Animatable(0f) } }
+  val inflate = remember { List(SKY_FLEET.size) { Animatable(1f) } }
+  var widthPx by remember { mutableIntStateOf(0) }
+  val haptics = LocalHapticFeedback.current
+  val slipHaptics = remember { GameHaptics(context, touch = true) }
+  // The insets arrive after the first frame; the long-lived collector must see them.
+  val fleetTop by rememberUpdatedState(statusTop)
+  LaunchedEffect(taps) {
+    // The run of taps on one balloon; a tap on another starts a new one.
+    var runBalloon = -1
+    var runTaps = 0
+    var lastTap = 0L
+    taps.collect { at ->
+      // A balloon's target is its whole outline, widened to a fingertip for the small ones;
+      // where two overlap, the nearer middle wins.
+      val (i, center) = with(density) {
+        SKY_FLEET.mapIndexedNotNull { i, (width, end, y) ->
+          val height = width / SKY_BALLOON_ASPECT
+          val left = widthPx - (end + width).dp.toPx()
+          val top = (fleetTop + y.dp).toPx() - scrolled()
+          val padX = (maxOf(SKY_BALLOON_TARGET - width.dp, 0.dp) / 2).toPx()
+          val padY = (maxOf(SKY_BALLOON_TARGET - height.dp, 0.dp) / 2).toPx()
+          val target = Rect(left - padX, top - padY, left + width.dp.toPx() + padX, top + height.dp.toPx() + padY)
+          if (target.contains(at)) i to target.center else null
+        }.minByOrNull { (_, c) -> (c - at).getDistance() }
+      } ?: return@collect
+      // Gone off the top: nothing there to tap until its replacement starts to inflate.
+      if (escape[i].isRunning || escape[i].value > 0f) return@collect
+      haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+      // Pushed from the left it swings right, about its knot.
+      val push = if (at.x < center.x) 1f else -1f
+      launch { swing[i].animateTo(0f, spring(dampingRatio = 0.25f, stiffness = Spring.StiffnessLow), push * 140f) }
+      launch {
+        bounce[i].animateTo(0f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessLow), with(density) { -60.dp.toPx() })
+      }
+      val now = System.currentTimeMillis()
+      runTaps = if (i == runBalloon && now - lastTap < TAP_RUN_GAP_MS) runTaps + 1 else 1
+      runBalloon = i
+      lastTap = now
+      if (runTaps < TAPS_TO_SLIP) return@collect
+      runTaps = 0
+      launch {
+        slipHaptics.play(GameHaptics.parseComposition(SLIP_HAPTIC))
+        escape[i].animateTo(1f, tween(SLIP_RISE_MS, easing = SLIP_EASING))
+        delay(SLIP_PAUSE_MS)
+        inflate[i].snapTo(0f)
+        escape[i].snapTo(0f)
+        inflate[i].animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow))
+      }
+    }
+  }
   // Moved in the draw phase (graphicsLayer reads the offset there), so scrolling never
   // recomposes it.
-  Box(Modifier.fillMaxSize().graphicsLayer { translationY = -scrolled().toFloat() }) {
+  Box(
+    Modifier
+      .fillMaxSize()
+      .onSizeChanged { widthPx = it.width }
+      .graphicsLayer { translationY = -scrolled().toFloat() },
+  ) {
     Canvas(Modifier.fillMaxSize()) {
       val paperAt = SKY_PAPER_DP.dp.toPx()
       drawRect(
@@ -1232,11 +1365,7 @@ private fun SkyBackdrop(scrolled: () -> Int) {
           )
         },
       )
-      if (dark) {
-        for ((x, y, r) in SKY_STARS) {
-          drawCircle(scheme.onSurface.copy(alpha = 0.75f), r.dp.toPx(), Offset(x * size.width, y.dp.toPx()))
-        }
-      } else {
+      if (!dark) {
         for (cloud in SKY_CLOUDS) {
           // A puff: a rounded bar with three circles rising from it, on a 200×90 grid.
           val s = cloud.width.dp.toPx() / 200f
@@ -1249,6 +1378,31 @@ private fun SkyBackdrop(scrolled: () -> Int) {
         }
       }
     }
+    if (dark) {
+      // On a layer of their own: the twinkle redraws them every tick, and the sky under
+      // them needn't be.
+      Canvas(Modifier.fillMaxSize().graphicsLayer()) {
+        SKY_STARS.forEachIndexed { i, (x, y, r) ->
+          // Every third star twinkles, each on its own slow beat.
+          val alpha = if (i % 3 == 0) 0.45f + 0.3f * sin(time * TWO_PI / (2.4f + i % 4 * 0.6f) + i) else 0.75f
+          drawCircle(scheme.onSurface.copy(alpha = alpha), r.dp.toPx(), Offset(x * size.width, y.dp.toPx()))
+        }
+        val p = shootingStar.value
+        if (p > 0f && p < 1f) {
+          // A streak falling right at 25°: its tail grows as it goes, and it flares and fades.
+          val dir = Offset(cos(SHOOTING_STAR_ANGLE), sin(SHOOTING_STAR_ANGLE))
+          val head = Offset(shootingFrom.x * size.width, shootingFrom.y.dp.toPx()) + dir * (p * 260.dp.toPx())
+          val tail = head - dir * (minOf(1f, p * 3) * 90.dp.toPx())
+          drawLine(
+            Brush.linearGradient(listOf(Color.Transparent, scheme.onSurface.copy(alpha = sin(p * PI.toFloat()))), tail, head),
+            tail,
+            head,
+            strokeWidth = 1.5.dp.toPx(),
+            cap = StrokeCap.Round,
+          )
+        }
+      }
+    }
     val fleet = listOf(
       if (dark) FleetSunsetNight else FleetSunset,
       FleetSea,
@@ -1257,6 +1411,7 @@ private fun SkyBackdrop(scrolled: () -> Int) {
     )
     SKY_FLEET.forEachIndexed { i, (width, end, top) ->
       val brush = Brush.verticalGradient(fleet[i])
+      val period = SKY_FLEET_BOB_S[i]
       Image(
         painterResource(R.drawable.sky_balloon),
         contentDescription = null,
@@ -1265,8 +1420,19 @@ private fun SkyBackdrop(scrolled: () -> Int) {
           .padding(top = statusTop + top.dp, end = end.dp)
           .width(width.dp)
           .aspectRatio(SKY_BALLOON_ASPECT)
-          // The silhouette becomes a mask for the balloon's gradient.
-          .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+          .graphicsLayer {
+            // The smaller, further balloons bob less. All of it pivots on the knot.
+            transformOrigin = TransformOrigin(0.5f, 1f)
+            translationY = sin(time * TWO_PI / period + i * 1.7f) * (width * 0.06f).dp.toPx() + bounce[i].value
+            rotationZ = 3f * sin(time * TWO_PI / (period * 1.4f) + i) + swing[i].value
+            // Slipping away: rising, swaying as it goes, far past the top of the screen.
+            translationY -= escape[i].value * (statusTop + top.dp + (width / SKY_BALLOON_ASPECT).dp + SLIP_BEYOND).toPx()
+            translationX = sin(escape[i].value * 3 * PI.toFloat()) * (width * 0.2f).dp.toPx()
+            scaleX = inflate[i].value
+            scaleY = inflate[i].value
+            // The silhouette becomes a mask for the balloon's gradient.
+            compositingStrategy = CompositingStrategy.Offscreen
+          }
           .drawWithContent {
             drawContent()
             drawRect(brush, blendMode = BlendMode.SrcIn)
@@ -1305,6 +1471,39 @@ private val SKY_FLEET = listOf(
   Triple(40f, 48f, 62f), Triple(24f, 104f, 94f), Triple(15f, 20f, 56f), Triple(17f, 5f, 92f),
 )
 private const val SKY_BALLOON_ASPECT = 58f / 82.43f // res/drawable/sky_balloon.xml's viewport
+// Each balloon's bob, in seconds per cycle — no two alike, so the fleet never moves as one.
+private val SKY_FLEET_BOB_S = listOf(6.2f, 5.1f, 7.3f, 5.7f)
+// The smallest target a balloon gets: the small ones are far narrower than a finger.
+private val SKY_BALLOON_TARGET = 48.dp
+private const val TAPS_TO_SLIP = 5
+// A slipped balloon's rise: slow off the knot and quickening, and as far past the top of
+// the screen as iOS's sky reaches, where a pull-down can show it going. The same pace as
+// iOS's slipRise / slipCurve.
+private const val SLIP_RISE_MS = 5000
+// The moment it's gone before a new one inflates; taps on it count again from then (iOS:
+// slipAway − slipRise).
+private const val SLIP_PAUSE_MS = 300L
+private val SLIP_EASING = CubicBezierEasing(0.55f, 0f, 1f, 1f)
+private val SLIP_BEYOND = 800.dp
+private const val TAP_RUN_GAP_MS = 1500L
+private const val TWO_PI = 2 * PI.toFloat()
+// The rest between sky ticks. With the wait for the next frame on top it makes about 30
+// ticks a second at 60 or 90 Hz (measured on a Pixel 7), 40 at 120 Hz.
+private const val SKY_TICK_MS = 20L
+private const val SHOOTING_STAR_ANGLE = 25 * PI.toFloat() / 180
+private const val SHOOTING_STAR_MS = 900
+// Late enough that a quick visit never sees it, early enough that a lingering one might.
+private val SHOOTING_STAR_AFTER_MS = 10_000L..40_000L
+// Once a launch: a second visit to the night sky doesn't get another.
+private var shootingStarShown = false
+// A weak phone, or one saving power, keeps the bob and twinkle still; read when the sky
+// starts moving.
+private fun skyHeldStill(context: Context): Boolean =
+  context.getSystemService(PowerManager::class.java).isPowerSaveMode ||
+    context.getSystemService(ActivityManager::class.java).isLowRamDevice
+
+// A balloon slipping its string swells slowly, in CONTRACT.md §12's notation.
+private const val SLIP_HAPTIC = "slow_rise,0.5,0"
 
 // The soft edge under the dock, like iOS's soft scroll edge: the list, drawn again from its
 // layer at three blur strengths that fade in over overlapping halves of the ramp, so the
