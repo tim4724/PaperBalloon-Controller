@@ -62,7 +62,7 @@
     <string name="error_not_paperballoon_room">Esse código não é de uma sala do Paper Balloon.</string>
     <string name="error_enter_room_code">Digite um código de sala.</string>
     <string name="error_code_unmatched">Este código não pode ser associado a um jogo no momento.</string>
-    <string name="error_room_not_found_or_expired">Sala não encontrada ou expirada.</string>
+    <string name="error_room_not_found">Sala não encontrada.</string>
     <string name="error_server_unreachable">Não foi possível conectar ao servidor. Tente de novo.</string>
     <string name="error_server_unreachable_short">Não foi possível conectar ao servidor.</string>
     <string name="action_retry">Tentar novamente</string>

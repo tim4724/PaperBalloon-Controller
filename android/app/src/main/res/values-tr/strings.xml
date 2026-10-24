@@ -62,7 +62,7 @@
     <string name="error_not_paperballoon_room">Bu kod bir Paper Balloon odasına ait değil.</string>
     <string name="error_enter_room_code">Bir oda kodu gir.</string>
     <string name="error_code_unmatched">Bu kod şu anda bir oyunla eşleştirilemiyor.</string>
-    <string name="error_room_not_found_or_expired">Oda bulunamadı veya süresi doldu.</string>
+    <string name="error_room_not_found">Oda bulunamadı.</string>
     <string name="error_server_unreachable">Sunucuya ulaşılamadı. Tekrar dene.</string>
     <string name="error_server_unreachable_short">Sunucuya ulaşılamadı.</string>
     <string name="action_retry">Yeniden dene</string>

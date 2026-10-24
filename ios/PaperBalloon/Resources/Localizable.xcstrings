@@ -207,7 +207,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erlaube den Zugriff auf die Kamera, um den Code zu scannen, oder gib den Raumcode ein."
+            "value" : "Erlaube den Zugriff auf die Kamera, um den Code auf deinem Fernseher zu scannen, oder gib den Raumcode ein."
           }
         },
         "es" : {
@@ -1501,7 +1501,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uniéndote a %@…"
+            "value" : "Entrando en %@…"
           }
         },
         "fr" : {
@@ -1565,7 +1565,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uniéndote…"
+            "value" : "Entrando…"
           }
         },
         "fr" : {
@@ -2196,72 +2196,72 @@
         "zh" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "房间未找到"
+            "value" : "找不到房间"
           }
         }
       }
     },
-    "Room not found or expired." : {
+    "Room not found." : {
       "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Raum nicht gefunden oder abgelaufen."
+            "value" : "Raum nicht gefunden."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sala no encontrada o caducada."
+            "value" : "Sala no encontrada."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salle introuvable ou expirée."
+            "value" : "Salle introuvable."
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Stanza non trovata o scaduta."
+            "value" : "Stanza non trovata."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ルームが見つからないか期限切れです。"
+            "value" : "ルームが見つかりません。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "방을 찾을 수 없거나 만료됐어요."
+            "value" : "방을 찾을 수 없어요."
           }
         },
         "pt" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sala não encontrada ou expirada."
+            "value" : "Sala não encontrada."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Комната не найдена или уже закрыта."
+            "value" : "Комната не найдена."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oda bulunamadı veya süresi doldu."
+            "value" : "Oda bulunamadı."
           }
         },
         "zh" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "房间未找到或已过期。"
+            "value" : "找不到房间。"
           }
         }
       }
@@ -2730,7 +2730,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Poner nombre"
+            "value" : "Elegir nombre"
           }
         },
         "fr" : {
@@ -2895,7 +2895,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Этот код не от комнаты Paper Balloon."
+            "value" : "Этот код не подходит ни к одной комнате Paper Balloon."
           }
         },
         "tr" : {

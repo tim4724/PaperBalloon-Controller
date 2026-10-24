@@ -145,7 +145,7 @@ fun resolveLookups(results: List<RoomLookup>, games: List<Game>): JoinOutcome {
     // template is what makes a code joinable, so this is a display bug, and the honest
     // answer is to say the code can't be placed rather than guess a game for it.
     founds.isNotEmpty() -> JoinOutcome.Failure(R.string.error_code_unmatched)
-    results.any { it is RoomLookup.NotFound } -> JoinOutcome.Failure(R.string.error_room_not_found_or_expired)
+    results.any { it is RoomLookup.NotFound } -> JoinOutcome.Failure(R.string.error_room_not_found)
     else -> JoinOutcome.Failure(R.string.error_server_unreachable)
   }
 }

@@ -72,7 +72,7 @@
     <string name="error_not_paperballoon_room">That code isn\'t a Paper Balloon room.</string>
     <string name="error_enter_room_code">Enter a room code.</string>
     <string name="error_code_unmatched">This code can\'t be matched to a game right now.</string>
-    <string name="error_room_not_found_or_expired">Room not found or expired.</string>
+    <string name="error_room_not_found">Room not found.</string>
     <string name="error_server_unreachable">Couldn\'t reach the server. Try again.</string>
     <string name="error_server_unreachable_short">Couldn\'t reach the server.</string>
     <string name="action_retry">Try again</string>

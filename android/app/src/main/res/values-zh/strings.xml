@@ -53,7 +53,7 @@
     <string name="imprint">法律声明</string>
     <string name="open_source_licenses">开源许可证</string>
 
-    <string name="game_end_room_not_found">房间未找到</string>
+    <string name="game_end_room_not_found">找不到房间</string>
     <string name="game_end_room_full">房间已满</string>
     <string name="game_end_replaced">你已从其他设备加入</string>
     <string name="game_end_generic">派对结束了</string>
@@ -62,7 +62,7 @@
     <string name="error_not_paperballoon_room">这不是 Paper Balloon 房间的代码。</string>
     <string name="error_enter_room_code">请输入房间代码。</string>
     <string name="error_code_unmatched">目前无法将此代码匹配到游戏。</string>
-    <string name="error_room_not_found_or_expired">房间未找到或已过期。</string>
+    <string name="error_room_not_found">找不到房间。</string>
     <string name="error_server_unreachable">无法连接服务器，请重试。</string>
     <string name="error_server_unreachable_short">无法连接服务器。</string>
     <string name="action_retry">重试</string>

@@ -59,10 +59,10 @@
     <string name="game_end_generic">Вечеринка закончилась</string>
 
     <string name="error_empty_code">Пустой код.</string>
-    <string name="error_not_paperballoon_room">Этот код не от комнаты Paper Balloon.</string>
+    <string name="error_not_paperballoon_room">Этот код не подходит ни к одной комнате Paper Balloon.</string>
     <string name="error_enter_room_code">Введи код комнаты.</string>
     <string name="error_code_unmatched">Сейчас этот код не подходит ни к одной игре.</string>
-    <string name="error_room_not_found_or_expired">Комната не найдена или уже закрыта.</string>
+    <string name="error_room_not_found">Комната не найдена.</string>
     <string name="error_server_unreachable">Не удалось связаться с сервером. Попробуй ещё раз.</string>
     <string name="error_server_unreachable_short">Не удалось связаться с сервером.</string>
     <string name="action_retry">Повторить</string>

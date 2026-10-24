@@ -62,7 +62,7 @@
     <string name="error_not_paperballoon_room">Ce code ne correspond pas à une salle Paper Balloon.</string>
     <string name="error_enter_room_code">Saisis un code de salle.</string>
     <string name="error_code_unmatched">Ce code ne peut pas être associé à un jeu pour le moment.</string>
-    <string name="error_room_not_found_or_expired">Salle introuvable ou expirée.</string>
+    <string name="error_room_not_found">Salle introuvable.</string>
     <string name="error_server_unreachable">Impossible de joindre le serveur. Réessaie.</string>
     <string name="error_server_unreachable_short">Impossible de joindre le serveur.</string>
     <string name="action_retry">Réessayer</string>

@@ -150,7 +150,7 @@ func resolveLookups(_ results: [RoomLookup], games: [Game]) -> JoinOutcome {
         return .failure(message: String(localized: "This code can’t be matched to a game right now."))
     }
     if results.contains(.notFound) {
-        return .failure(message: String(localized: "Room not found or expired."))
+        return .failure(message: String(localized: "Room not found."))
     }
     return .failure(message: String(localized: "Couldn’t reach the server. Try again."))
 }
