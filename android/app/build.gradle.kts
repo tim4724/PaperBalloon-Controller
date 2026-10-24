@@ -110,6 +110,8 @@ android {
     // Compile the wrapper's Kotlin (zxingcpp.BarcodeReader) and its JNI glue out of the
     // submodule — see the zxingCppWrapperSrc comment above.
     sourceSets["main"].kotlin.srcDir("$zxingCppWrapperSrc/java")
+    // Cross-platform test cases (tests/join-resolver.json), shared with the iOS unit tests.
+    sourceSets["test"].resources.srcDir("../../tests")
     externalNativeBuild {
         cmake {
             path = file("$zxingCppWrapperSrc/cpp/CMakeLists.txt")
@@ -226,6 +228,10 @@ dependencies {
 
   // WebView compat — document-start script injection for the legal viewer.
   implementation(libs.androidx.webkit)
+
+  // JVM unit tests (src/test), e.g. JoinResolverTest over tests/join-resolver.json
+  testImplementation(libs.junit)
+  testImplementation(libs.robolectric)
 
   // Instrumented smoke test + store-screenshot capture (androidTest/StoreScreenshotTest.kt)
   androidTestImplementation(platform(libs.androidx.compose.bom))

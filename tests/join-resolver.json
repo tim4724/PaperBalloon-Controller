@@ -1,0 +1,46 @@
+{
+  "about": "Shared JoinResolver cases, run by both apps' unit tests (JoinResolverTest.kt, JoinResolverTests.swift) so the two ports can't drift apart. A resolve case expects a join (game id + best-effort room code; the URL always loads verbatim, trimmed) or a rejection. Tests run debug builds, whose LAN dev-server allowance is deliberately not covered here.",
+  "games": [
+    { "id": "hexstacker", "hosts": ["hexstacker.com"] },
+    { "id": "tinytrack", "hosts": ["tinytrack.paperballoon.games"] }
+  ],
+  "resolve": [
+    { "input": "", "reject": true },
+    { "input": "A3KX9p", "reject": true, "note": "bare code: the relay directory places it" },
+    { "input": "https://paperballoon.games/A3KX9p", "reject": true, "note": "canonical launcher link: the relay directory places it" },
+    { "input": "https://www.paperballoon.games/A3KX9p", "reject": true },
+    { "input": "https://hexstacker.com/A3KX9p", "game": "hexstacker", "room": "A3KX9p" },
+    { "input": "  https://hexstacker.com/A3KX9p\n", "game": "hexstacker", "room": "A3KX9p" },
+    { "input": "https://HexStacker.COM/A3KX9p", "game": "hexstacker", "room": "A3KX9p" },
+    { "input": "https://main.hexstacker.com/A3KX9p", "game": "hexstacker", "room": "A3KX9p", "note": "a game's subdomain is a preview of that game" },
+    { "input": "https://hexstacker.com:8443/A3KX9p", "game": "hexstacker", "room": "A3KX9p" },
+    { "input": "https://tinytrack.paperballoon.games/A3KX9p", "game": "tinytrack", "room": "A3KX9p" },
+    { "input": "https://tinytrack-feat-drift.paperballoon.games/A3KX9p", "game": "tinytrack", "room": "A3KX9p", "note": "launcher subdomain: its prefix names the game" },
+    { "input": "https://preview-x.paperballoon.games/A3KX9p", "game": "paperballoon", "room": "A3KX9p", "note": "launcher subdomain naming no game: the stand-in game" },
+    { "input": "https://hexstacker.com/?room=A3KX9p&color=0", "game": "hexstacker", "room": "A3KX9p" },
+    { "input": "https://hexstacker.com/play", "game": "hexstacker", "room": "", "note": "no code to show; still joins" },
+    { "input": "https://hexstacker.com/A3KXIl", "game": "hexstacker", "room": "", "note": "I and l aren't Base58" },
+    { "input": "https://hexstacker.com/A3KX9pq", "game": "hexstacker", "room": "" },
+    { "input": "http://hexstacker.com/A3KX9p", "reject": true },
+    { "input": "intent://hexstacker.com/A3KX9p", "reject": true },
+    { "input": "javascript:alert(1)", "reject": true },
+    { "input": "https://example.com/A3KX9p", "reject": true },
+    { "input": "https://evilhexstacker.com/A3KX9p", "reject": true },
+    { "input": "https://hexstacker.com.evil.com/A3KX9p", "reject": true },
+    { "input": "https://evil.com%2f.hexstacker.com/A3KX9p", "reject": true, "note": "the host decodes to evil.com/…; only the hostname alphabet may suffix-match" },
+    { "input": "https://user:pw@hexstacker.com/A3KX9p", "reject": true },
+    { "input": "https://hexstacker.com@evil.com/A3KX9p", "reject": true }
+  ],
+  "originlessCode": [
+    { "input": "", "code": null },
+    { "input": "A3KX9p", "code": "A3KX9p" },
+    { "input": " A3KX9p ", "code": "A3KX9p" },
+    { "input": "paperballoon.games/A3KX9p", "code": "paperballoon.games/A3KX9p", "note": "no scheme reads as a typed code" },
+    { "input": "https://paperballoon.games/A3KX9p", "code": "A3KX9p" },
+    { "input": "https://WWW.paperballoon.games/A3KX9p", "code": "A3KX9p" },
+    { "input": "https://paperballoon.games/", "code": "" },
+    { "input": "https://paperballoon.games", "code": "" },
+    { "input": "https://tinytrack.paperballoon.games/A3KX9p", "code": null },
+    { "input": "https://hexstacker.com/A3KX9p", "code": null }
+  ]
+}
