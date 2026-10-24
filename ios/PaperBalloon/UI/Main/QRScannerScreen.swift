@@ -122,6 +122,10 @@ struct QRScannerScreen: View {
                         SecondaryButton(action: { finish(.enterCode) }) {
                             Text("Enter code manually")
                         }
+                        // On the dimmed camera in either theme: a white label on a white
+                        // wash, as the white controls around it (the app's tint is dark
+                        // in light mode).
+                        .tint(.white)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
