@@ -60,7 +60,6 @@ ANDROID_ONLY = {
 IOS_ONLY = {
     # AVFoundation scanner UI / failure modes (Android's CameraX copy differs)
     "Scan the room QR code",
-    "The code is on your TV.",
     "Camera unavailable",
     "No camera available",
     "Unable to scan with this camera",

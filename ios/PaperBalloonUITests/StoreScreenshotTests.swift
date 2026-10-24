@@ -103,18 +103,18 @@ final class StoreScreenshotTests: XCTestCase {
         XCTAssertTrue(nameField.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons[playerName].firstMatch.exists)
 
-        // ---- Manual code entry: empty-code gating; never submitted (no relay dependency) ----
+        // ---- Manual code entry: one character short, as the sixth submits (no relay dependency) ----
         app.buttons["Enter code manually"].firstMatch.tap()
-        let alert = app.alerts["Enter room code"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 5))
-        XCTAssertFalse(alert.buttons["Play"].isEnabled)
-        let codeField = alert.textFields.firstMatch
-        codeField.tap()
-        codeField.typeText(roomCode)
-        XCTAssertTrue(alert.buttons["Play"].isEnabled)
+        let codeTitle = app.staticTexts["Enter room code"]
+        XCTAssertTrue(codeTitle.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        app.typeText(String(roomCode.dropLast()))
+        XCTAssertTrue(app.staticTexts["Start a game on your TV or in your browser, then enter the code it shows."].exists)
         snap("04-enter-code-\(suffix)")
-        alert.buttons["Cancel"].tap()
-        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        // Dragged down off the screen, as a hand would (a swipe only takes the keyboard).
+        codeTitle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)))
+        XCTAssertTrue(codeTitle.waitForNonExistence(timeout: 5))
 
         // ---- About: legal hub reachable, version label present ----
         app.buttons["About"].firstMatch.tap()

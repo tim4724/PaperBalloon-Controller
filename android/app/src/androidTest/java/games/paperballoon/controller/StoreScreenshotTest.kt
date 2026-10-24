@@ -15,10 +15,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -170,15 +168,14 @@ class StoreScreenshotTest {
     waitForTextGone(str(R.string.save))
     compose.onNodeWithText(PLAYER_NAME).assertIsDisplayed()
 
-    // ---- Manual code entry: empty-code gating; never submitted (no relay dependency) ----
+    // ---- Manual code entry: one character short, as the sixth submits (no relay dependency) ----
     compose.onNodeWithContentDescription(str(R.string.enter_code_manually)).performClick()
     waitForText(str(R.string.enter_room_code))
-    val playButton = compose.onNode(hasText(str(R.string.join)) and hasAnyAncestor(isDialog()))
-    playButton.assertIsNotEnabled()
-    compose.onNode(hasSetTextAction()).performTextInput(ROOM_CODE)
-    playButton.assertIsEnabled()
+    compose.onNode(hasSetTextAction()).performTextInput(ROOM_CODE.dropLast(1))
+    compose.onNodeWithText(str(R.string.code_hint)).assertIsDisplayed()
     screenshot("04-enter-code-$suffix")
-    compose.onNodeWithText(str(R.string.cancel)).performClick()
+    Espresso.closeSoftKeyboard()
+    Espresso.pressBack()
     waitForTextGone(str(R.string.enter_room_code))
 
     // ---- About: legal hub reachable, version label present ----

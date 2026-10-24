@@ -28,6 +28,7 @@
 
     <string name="enter_room_code">Digitar código da sala</string>
     <string name="room_code">Código da sala</string>
+    <string name="code_hint">Inicie um jogo na sua TV ou no navegador e digite o código exibido.</string>
     <string name="joining">Entrando…</string>
     <string name="join">Jogar</string>
     <string name="cancel">Cancelar</string>

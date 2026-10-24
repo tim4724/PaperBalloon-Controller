@@ -2912,70 +2912,6 @@
         }
       }
     },
-    "The code is on your TV." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Der Code steht auf deinem Fernseher."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El código está en tu TV."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le code est affiché sur ta TV."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il codice è sulla tua TV."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コードはテレビに表示されています。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "코드는 TV에 표시되어 있어요."
-          }
-        },
-        "pt" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O código está na sua TV."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Код показан на телевизоре."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kod TV'nde görünüyor."
-          }
-        },
-        "zh" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "代码显示在电视上。"
-          }
-        }
-      }
-    },
     "The party ended" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3942,6 +3878,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭视频"
+          }
+        }
+      }
+    },
+    "Start a game on your TV or in your browser, then enter the code it shows." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starte ein Spiel auf deinem Fernseher oder in deinem Browser und gib dann den angezeigten Code ein."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia un juego en tu TV o en tu navegador y escribe el código que aparece en pantalla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lance un jeu sur ta TV ou dans ton navigateur, puis saisis le code affiché."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvia un gioco sulla tua TV o nel browser, poi inserisci il codice visualizzato."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テレビまたはブラウザでゲームを始めて、表示されたコードを入力してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TV나 브라우저에서 게임을 시작한 뒤 표시된 코드를 입력하세요."
+          }
+        },
+        "pt" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicie um jogo na sua TV ou no navegador e digite o código exibido."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запусти игру на телевизоре или в браузере и введи код с экрана."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TV'nde veya tarayıcında bir oyun başlat, ardından gösterilen kodu gir."
+          }
+        },
+        "zh" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在电视或浏览器上启动游戏，然后输入屏幕上显示的代码。"
           }
         }
       }

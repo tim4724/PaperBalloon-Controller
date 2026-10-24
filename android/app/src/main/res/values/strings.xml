@@ -28,9 +28,10 @@
     <string name="scan_code">Scan code</string>
     <string name="enter_code_manually">Enter code manually</string>
 
-    <!-- Code entry dialog -->
+    <!-- Code entry sheet -->
     <string name="enter_room_code">Enter room code</string>
     <string name="room_code">Room code</string>
+    <string name="code_hint">Start a game on your TV or in your browser, then enter the code it shows.</string>
     <string name="joining">Joining…</string>
     <string name="join">Play</string>
     <string name="cancel">Cancel</string>

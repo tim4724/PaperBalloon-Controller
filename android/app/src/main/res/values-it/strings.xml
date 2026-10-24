@@ -28,6 +28,7 @@
 
     <string name="enter_room_code">Inserisci il codice della stanza</string>
     <string name="room_code">Codice stanza</string>
+    <string name="code_hint">Avvia un gioco sulla tua TV o nel browser, poi inserisci il codice visualizzato.</string>
     <string name="joining">Connessione…</string>
     <string name="join">Gioca</string>
     <string name="cancel">Annulla</string>

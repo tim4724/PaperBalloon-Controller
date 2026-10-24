@@ -60,7 +60,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -73,13 +72,11 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -120,8 +117,6 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -138,11 +133,6 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -220,6 +210,7 @@ import kotlin.random.Random
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -256,8 +247,11 @@ fun MainScreen(
   var showCodeEntry by remember { mutableStateOf(false) }
   var codeLoading by remember { mutableStateOf(false) }
   var codeError by remember { mutableStateOf<String?>(null) }
-  // A join being resolved outside the code dialog (which reports progress on its own
-  // submit button): the directory probe a scan or App Link now takes can cost a round trip.
+  // The code being resolved: a sheet closed while it resolves cancels it, so a dismissed
+  // code never pulls the player into a game.
+  var codeJob by remember { mutableStateOf<Job?>(null) }
+  // A join being resolved outside the code sheet (which shows its own progress): the
+  // directory probe a scan or App Link takes can cost a round trip.
   var joining by remember { mutableStateOf(false) }
   var rejoin by remember { mutableStateOf<RecentRoom?>(null) }
   var infoGame by remember { mutableStateOf<Game?>(null) }
@@ -695,20 +689,21 @@ fun MainScreen(
   }
 
   if (showCodeEntry) {
-    CodeEntryDialog(
+    CodeSheet(
       loading = codeLoading,
       error = codeError,
+      onEdit = { codeError = null },
       onDismiss = {
-        if (!codeLoading) {
-          showCodeEntry = false
-          codeError = null
-        }
+        codeJob?.cancel()
+        codeLoading = false
+        showCodeEntry = false
+        codeError = null
       },
       onSubmit = { code ->
         codeError = null
         codeLoading = true
-        scope.launch {
-          val outcome = resolveJoin(code.trim(), games)
+        codeJob = scope.launch {
+          val outcome = resolveJoin(code, games)
           codeLoading = false
           when (outcome) {
             is JoinOutcome.Success -> {
@@ -1607,58 +1602,6 @@ private fun JoinDock(
       )
     }
   }
-}
-
-// Typed codes resolve via the relay directory (a bare code carries no domain).
-// Never auto-uppercases — room codes are case-sensitive base58.
-@Composable
-private fun CodeEntryDialog(
-  loading: Boolean,
-  error: String?,
-  onSubmit: (String) -> Unit,
-  onDismiss: () -> Unit,
-) {
-  var code by remember { mutableStateOf("") }
-  val canSubmit = code.isNotBlank() && !loading
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = { Text(stringResource(R.string.enter_room_code)) },
-    text = {
-      // Focus on open, so the keyboard rises with the dialog. The effect lives in the
-      // dialog's own composition, next to the field it focuses.
-      val focus = remember { FocusRequester() }
-      LaunchedEffect(Unit) { focus.requestFocus() }
-      OutlinedTextField(
-        value = code,
-        onValueChange = { if (it.length <= 16) code = it },
-        placeholder = { Text(stringResource(R.string.room_code)) },
-        singleLine = true,
-        // A Base58 code is not a word: the password layout keeps suggestions,
-        // correction and the keyboard's learning out of it (the text stays visible —
-        // no visual transformation is applied).
-        keyboardOptions = KeyboardOptions(
-          keyboardType = KeyboardType.Password,
-          capitalization = KeyboardCapitalization.None,
-          autoCorrectEnabled = false,
-          imeAction = ImeAction.Go,
-        ),
-        keyboardActions = KeyboardActions(onGo = { if (canSubmit) onSubmit(code) }),
-        isError = error != null,
-        // Null, not an empty lambda: a present slot reserves its line and opens a gap
-        // between the field and the buttons.
-        supportingText = error?.let { { Text(it) } },
-        modifier = Modifier.fillMaxWidth().focusRequester(focus),
-      )
-    },
-    confirmButton = {
-      TextButton(onClick = { onSubmit(code) }, enabled = canSubmit) {
-        Text(stringResource(if (loading) R.string.joining else R.string.join))
-      }
-    },
-    dismissButton = {
-      TextButton(onClick = onDismiss, enabled = !loading) { Text(stringResource(R.string.cancel)) }
-    },
-  )
 }
 
 // ---------------------------------------------------------------------------

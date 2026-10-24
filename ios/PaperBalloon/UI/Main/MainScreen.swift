@@ -58,12 +58,11 @@ struct MainScreen: View {
     // must receive their inputs through the item.
     @State private var profileRequest: ProfileSheetRequest? = nil
     @State private var afterName: AfterName? = nil
-    @State private var showCodeEntry = false
-    @State private var codeText = ""
-    // A join being resolved: the directory probe a scan, link or typed code takes can
-    // cost a round trip, and the cover below is the only sign the tap landed.
+    @State private var codeEntry: CodeEntry? = nil
+    // A join being resolved outside the code sheet (which shows its own progress): the
+    // directory probe a scan or link takes can cost a round trip, and the cover below is
+    // the only sign the tap landed.
     @State private var joining = false
-    @State private var codeError: String? = nil
     @State private var scanRequest: ScanRequest? = nil
     @State private var rejoin: RecentRoom? = nil
     @State private var infoGame: Game? = nil
@@ -165,7 +164,7 @@ struct MainScreen: View {
                 // Still while anything covers it: the camera above all, and a sheet's trailer.
                 .background(alignment: .top) {
                     SkyBackdrop(moving: isTopVisible && scanRequest == nil && infoGame == nil
-                                && profileRequest == nil && !showCodeEntry && !joining)
+                                && profileRequest == nil && codeEntry == nil && !joining)
                 }
                 .animation(.spring(duration: 0.45), value: messages.gameEndBanner)
                 .animation(.spring(duration: 0.45), value: resolvedNearby.count)
@@ -233,7 +232,7 @@ struct MainScreen: View {
             profileRequest = nil
             pendingSheetAction = nil
             afterName = nil
-            showCodeEntry = false
+            codeEntry = nil
             // A legal-page App Link opens the in-app doc viewer; anything else is a
             // join. The URL keeps its locale segment (/en/privacy vs /privacy), so
             // the viewer loads the right variant. Except in the clip, a link that names
@@ -249,11 +248,6 @@ struct MainScreen: View {
                 resolveAndJoin(link)
             }
             onDeepLinkConsumed()
-        }
-        .onChange(of: codeText) { _, newValue in
-            if newValue.count > 16 {
-                codeText = String(newValue.prefix(16))
-            }
         }
         .task(id: isTopVisible) {
             guard isTopVisible else { return }
@@ -327,25 +321,11 @@ struct MainScreen: View {
                 withAnimation(.spring(duration: 0.45)) { rejoin = nil }
             }
         }
-        .alert("Enter room code", isPresented: $showCodeEntry) {
-            TextField("Room code", text: $codeText)
-                // A Base58 code is not a word: ASCII layout, no capitalization,
-                // correction or predictions.
-                .keyboardType(.asciiCapable)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            Button("Cancel", role: .cancel) { codeError = nil; codeText = "" }
-            Button("Play") { submitCode(codeText) }
-                .disabled(codeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        } message: {
-            if let codeError {
-                Text(codeError)
-            } else {
-                Text("The code is on your TV.")
-            }
+        .appSheet(item: $codeEntry) { entry in
+            CodeSheet(entry: entry) { submitCode($0, in: entry) }
         }
         .fullScreenCover(item: $scanRequest, onDismiss: {
-            // Deferred, like the info sheet's actions: presenting the alert while the
+            // Deferred, like the info sheet's actions: presenting the code sheet while the
             // cover is still dismissing would be dropped by UIKit.
             if let action = pendingSheetAction {
                 pendingSheetAction = nil
@@ -398,7 +378,7 @@ struct MainScreen: View {
         }
         .appSheet(item: $infoGame, onDismiss: {
             // Fire the funnel only after the sheet is fully gone — presenting the
-            // scanner/alert mid-dismiss would be dropped by UIKit.
+            // scanner/code sheet mid-dismiss would be dropped by UIKit.
             if let action = pendingSheetAction {
                 pendingSheetAction = nil
                 requireName(action)
@@ -481,8 +461,8 @@ struct MainScreen: View {
         case .scan:
             scanRequest = ScanRequest(games: games)
         case .enterCode:
-            codeError = nil
-            showCodeEntry = true
+            guard codeEntry == nil else { return }  // same double-tap guard as the chip
+            codeEntry = CodeEntry()
         case .join(let target):
             launchJoin(target)
         }
@@ -519,24 +499,24 @@ struct MainScreen: View {
         }
     }
 
+    /// The sheet stays up while the code resolves and shows the outcome itself: an
+    /// error under the code, or it closes into the game. A sheet swiped away meanwhile
+    /// was a change of mind: its code doesn't join.
     @MainActor
-    private func submitCode(_ text: String) {
-        codeError = nil
-        joining = true
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func submitCode(_ code: String, in entry: CodeEntry) {
+        entry.error = nil
+        entry.loading = true
         Task { @MainActor in
-            let outcome = await resolveJoin(trimmed, games: games)
-            joining = false
+            let outcome = await resolveJoin(code, games: games)
+            entry.loading = false
+            guard codeEntry === entry else { return }
             switch outcome {
             case .success:
-                codeText = ""
+                codeEntry = nil
                 launchJoin(outcome)
             case .failure(let message):
-                // Alerts auto-dismiss on any action; re-present with the error
-                // as the message so the player can correct the code.
                 errorTick += 1
-                codeError = message
-                showCodeEntry = true
+                entry.error = message
             }
         }
     }

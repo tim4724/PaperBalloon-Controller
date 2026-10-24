@@ -28,6 +28,7 @@
 
     <string name="enter_room_code">输入房间代码</string>
     <string name="room_code">房间代码</string>
+    <string name="code_hint">在电视或浏览器上启动游戏，然后输入屏幕上显示的代码。</string>
     <string name="joining">加入中…</string>
     <string name="join">开始游戏</string>
     <string name="cancel">取消</string>
