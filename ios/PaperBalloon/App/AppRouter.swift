@@ -48,6 +48,9 @@ enum Route: Hashable {
         if case .gameHost = route, path.contains(where: { if case .gameHost = $0 { return true } else { return false } }) {
             return
         }
+        // A second tap that lands while the first push is still sliding in would stack
+        // the same screen twice.
+        if path.last == route { return }
         path.append(route)
     }
 

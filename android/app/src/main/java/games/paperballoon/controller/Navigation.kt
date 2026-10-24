@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -37,6 +38,11 @@ import kotlinx.coroutines.delay
 @Composable
 fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}) {
   val backStack = rememberNavBackStack(Main)
+  // A second tap that lands while the first push is still animating in would stack the
+  // same screen twice (iOS: AppRouter.push).
+  fun push(key: NavKey) {
+    if (backStack.lastOrNull() != key) backStack.add(key)
+  }
   val context = LocalContext.current
   // Config-aware resources for string lookups in callbacks (context.getString on
   // LocalContext.current is flagged by lint as not tracking config changes).
@@ -108,12 +114,12 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           deepLink = deepLink,
           onDeepLinkConsumed = onDeepLinkConsumed,
           onJoin = { joinUrl, title, allowedHosts ->
-            backStack.add(GameHost(joinUrl, title, allowedHosts))
+            push(GameHost(joinUrl, title, allowedHosts))
           },
           // A privacy/imprint App Link opens the in-app doc viewer over Main,
           // rather than routing the URL through the join resolver.
-          onOpenLegalDoc = { url -> backStack.add(WebDoc(url)) },
-          onOpenAbout = { backStack.add(About) },
+          onOpenLegalDoc = { url -> push(WebDoc(url)) },
+          onOpenAbout = { push(About) },
           gameEndBanner = gameEndBanner,
           onDismissGameEndBanner = { gameEndBanner = null },
           onBarIcons = { mainBars = it },
@@ -121,9 +127,9 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
       }
       entry<About> {
         AboutScreen(
-          onOpenPrivacy = { backStack.add(WebDoc(LegalLinks.PRIVACY_URL)) },
-          onOpenImprint = { backStack.add(WebDoc(LegalLinks.IMPRINT_URL)) },
-          onOpenLicenses = { backStack.add(Licenses) },
+          onOpenPrivacy = { push(WebDoc(LegalLinks.PRIVACY_URL)) },
+          onOpenImprint = { push(WebDoc(LegalLinks.IMPRINT_URL)) },
+          onOpenLicenses = { push(Licenses) },
           // The marketing site is a full website, not a legal doc, so it opens in
           // the system browser rather than the in-app WebDocScreen viewer.
           onOpenWebsite = {
@@ -146,7 +152,7 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           url = key.url,
           privacyTitle = stringResource(R.string.privacy_policy),
           imprintTitle = stringResource(R.string.imprint),
-          onOpenDoc = { backStack.add(WebDoc(it)) },
+          onOpenDoc = { push(WebDoc(it)) },
           onBack = { backStack.removeLastOrNull() },
         )
       }
