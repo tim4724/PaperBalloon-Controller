@@ -153,29 +153,76 @@ final class StoreScreenshotTests: XCTestCase {
             NSPredicate(format: "label BEGINSWITH 'Joining'")
         ).firstMatch
         // The shell fades the cover on its injected __firstFrame signal, so the
-        // cover's absence means the page has actually painted (not merely loaded).
+        // cover's absence means the page has rendered (not merely loaded).
         XCTAssertTrue(joining.waitForNonExistence(timeout: 30))
+        // ...but on a slow CI runner that frame can still be waiting for WebKit's
+        // compositor, leaving a flat page background on screen.
+        XCTAssertTrue(waitForPaint(timeout: 15))
         // Fonts and the touchpad canvas; Tiny Track's 3D car previews take longer.
         Thread.sleep(forTimeInterval: landscape ? 2 : 1)
-        snap(name, landscape: landscape)
+        let screenshot = XCUIScreen.main.screenshot()
+        // A page that ended its session (gameEnded — e.g. one that joined the fake room
+        // instead of laying out its scenario) has popped back home: fail rather than
+        // keep a capture of whatever replaced it.
+        XCTAssertTrue(app.webViews.firstMatch.exists)
+        if landscape {
+            let frame = app.windows.firstMatch.frame
+            XCTAssertGreaterThan(frame.width, frame.height)
+        }
+        attach(screenshot, name: name, landscape: landscape)
     }
 
-    /// Full-screen capture attached to the result bundle; extract with
+    /// Polls until the screen below the status bar holds more than a few coarse colours:
+    /// a blank page is one flat colour, any rendered controller well over a dozen.
+    private func waitForPaint(timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let image = XCUIScreen.main.screenshot().image.cgImage, coarseColours(image) > 4 { return true }
+            Thread.sleep(forTimeInterval: 0.5)
+        } while Date() < deadline
+        return false
+    }
+
+    private func coarseColours(_ image: CGImage) -> Int {
+        let w = 48, h = 96
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        let context = CGContext(
+            data: &pixels, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!
+        context.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var seen = Set<UInt32>()
+        for y in (h / 10)..<h {  // row 0 is the top: skip the status bar
+            for x in 0..<w {
+                let i = (y * w + x) * 4
+                seen.insert(UInt32(pixels[i] >> 4) << 8 | UInt32(pixels[i + 1] >> 4) << 4 | UInt32(pixels[i + 2] >> 4))
+            }
+        }
+        return seen.count
+    }
+
+    private func snap(_ name: String) {
+        attach(XCUIScreen.main.screenshot(), name: name, landscape: false)
+    }
+
+    /// Attaches a full-screen capture to the result bundle; extract with
     /// `xcrun xcresulttool export attachments --path <xcresult> --output-path <dir>`.
     ///
-    /// In landscape the capture's pixels stay in the portrait framebuffer, with the
-    /// orientation only in the image's metadata — which the PNG drops. [landscape]
-    /// redraws the image upright at its oriented (landscape) size.
-    private func snap(_ name: String, landscape: Bool = false) {
-        let screenshot = XCUIScreen.main.screenshot()
+    /// The capture's pixels are always the portrait framebuffer. The image's orientation
+    /// metadata, which the PNG drops anyway, isn't reliably set on CI either, so
+    /// [landscape] turns the pixels itself: the landscapeLeft UI sits a quarter turn
+    /// clockwise in the framebuffer, so it rotates them a quarter turn back.
+    private func attach(_ screenshot: XCUIScreenshot, name: String, landscape: Bool) {
         let attachment: XCTAttachment
-        if landscape {
-            let format = UIGraphicsImageRendererFormat()
-            format.scale = screenshot.image.scale
-            let upright = UIGraphicsImageRenderer(size: screenshot.image.size, format: format).image { _ in
-                screenshot.image.draw(at: .zero)
-            }
-            attachment = XCTAttachment(data: upright.pngData()!, uniformTypeIdentifier: "public.png")
+        if landscape, let image = screenshot.image.cgImage, image.width < image.height {
+            let context = CGContext(
+                data: nil, width: image.height, height: image.width, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )!
+            context.translateBy(x: CGFloat(image.height), y: 0)
+            context.rotate(by: .pi / 2)
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            attachment = XCTAttachment(data: UIImage(cgImage: context.makeImage()!).pngData()!, uniformTypeIdentifier: "public.png")
         } else {
             attachment = XCTAttachment(screenshot: screenshot)
         }
