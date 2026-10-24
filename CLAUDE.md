@@ -25,7 +25,12 @@ open PaperBalloon.xcodeproj
 
 Android: minSdk 24 / target 37, applicationId and namespace both
 `games.paperballoon.controller`. iOS: 17+, bundle id `games.paperballoon.controller`, no
-third-party dependencies. There is no automated test suite.
+third-party dependencies.
+
+Tests: unit tests (`cd android && ./gradlew :app:testDebugUnitTest`; iOS `PaperBalloonTests`
+in the app scheme) and the store-screenshot UI tests, which double as each app's smoke test
+(`StoreScreenshotTest.kt`, `StoreScreenshotTests.swift`). CI runs them from
+`.github/workflows/` — `checks.yml` (l10n + Android unit) on every push.
 
 ## The two apps are functional parity ports
 
@@ -54,6 +59,9 @@ iOS also builds the same sources a second time as an App Clip (`PB.isAppClip`; s
   It enforces locale coverage on both platforms, identical shared translations, and identical
   manifest copies. Platform-only strings must be declared in the script's `ANDROID_ONLY` /
   `IOS_ONLY` lists — an undeclared one-sided string fails the check.
+- **Join resolution**: `tests/join-resolver.json` is the shared spec both `JoinResolver`s
+  are tested against (`JoinResolverTest.kt`, `JoinResolverTests.swift`). A resolver change
+  adds or edits a case there, never a one-platform test.
 
 ## The CONTRACT is a compatibility boundary
 

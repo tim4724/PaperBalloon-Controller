@@ -1,0 +1,50 @@
+# Fast checks on every push to any branch, including direct pushes to main (a PR's
+# branch pushes report here too, so there's no separate pull_request trigger). The
+# iOS unit tests run in store-screenshots.yml, which already pays for the simulator.
+name: Checks
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  l10n:
+    name: Localization sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 tools/check_l10n_sync.py
+
+  android-unit:
+    name: Android unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # :app compiles zxing-cpp's Kotlin wrapper out of the submodule.
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Run unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-unit-test-reports
+          path: android/app/build/reports/tests
+          if-no-files-found: ignore

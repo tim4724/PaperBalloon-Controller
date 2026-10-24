@@ -1,6 +1,8 @@
 # Runs the two store-screenshot smoke tests (Android emulator + iOS simulator) and
 # uploads the captured PNGs as artifacts. Doubles as the app's UI smoke check: each
 # test asserts the catalog, sheets, code gating, and About content before capturing.
+# The iOS jobs also run the scheme's unit tests (PaperBalloonTests); Android's run in
+# checks.yml.
 #
 # Screenshot geometry is chosen for store requirements (phone-only by choice —
 # the app isn't a good tablet experience, so no Play tablet sets):
@@ -18,12 +20,14 @@ on:
       - "android/**"
       - "ios/**"
       - "assets/**"
+      - "tests/**"
       - ".github/workflows/store-screenshots.yml"
   pull_request:
     paths:
       - "android/**"
       - "ios/**"
       - "assets/**"
+      - "tests/**"
       - ".github/workflows/store-screenshots.yml"
   workflow_dispatch:
 
@@ -163,7 +167,7 @@ jobs:
           xcrun simctl spawn "$DEVICE" defaults write com.apple.keyboard.preferences KeyboardDidShowProductivityTutorial -bool true
           xcrun simctl spawn "$DEVICE" defaults write com.apple.keyboard.preferences DidShowGestureKeyboardIntroduction -bool true
 
-      - name: Run screenshot UI test
+      - name: Run unit + screenshot UI tests
         working-directory: ios
         run: |
           # retry-tests-on-failure absorbs simulator-infrastructure flakes

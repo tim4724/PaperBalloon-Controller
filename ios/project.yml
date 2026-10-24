@@ -97,6 +97,7 @@ targets:
       - target: PaperBalloonClip
     scheme:
       testTargets:
+        - PaperBalloonTests
         - PaperBalloonUITests
     info:
       path: PaperBalloon/Info.plist
@@ -212,6 +213,23 @@ targets:
         NSAppClip:
           NSAppClipRequestEphemeralUserNotification: false
           NSAppClipRequestLocationConfirmation: false
+  # Unit tests, e.g. JoinResolverTests over the shared tests/join-resolver.json.
+  PaperBalloonTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: PaperBalloonTests
+      - path: ../tests/join-resolver.json
+        buildPhase: resources
+    dependencies:
+      - target: PaperBalloon
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: games.paperballoon.controller.tests
+        SWIFT_VERSION: "5.10"
+        GENERATE_INFOPLIST_FILE: true
+        CODE_SIGN_STYLE: Automatic
   # Smoke test + store-screenshot capture (see StoreScreenshotTests.swift).
   PaperBalloonUITests:
     type: bundle.ui-testing

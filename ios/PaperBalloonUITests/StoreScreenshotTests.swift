@@ -54,6 +54,9 @@ final class StoreScreenshotTests: XCTestCase {
             // Local Network already asked (app DEBUG hook), so home shows "Searching for
             // rooms…" rather than the one-time ask.
             "-uitest.lanAsked", "YES",
+            // ...and keeps it there (app DEBUG hook) instead of settling to "No rooms
+            // found" after its grace period, which raced the assertions on CI.
+            "-uitest.holdSearch", "YES",
             "-AppleLanguages", "(en)",
             "-AppleLocale", "en_US",
             // Window-level override via the app's DEBUG hook — the documented
@@ -65,8 +68,6 @@ final class StoreScreenshotTests: XCTestCase {
 
         // ---- Home: catalog, tags, join dock, profile chip ----
         XCTAssertTrue(app.staticTexts["HexStacker"].waitForExistence(timeout: 10))
-        // Assert and capture before MainScreen's 8 s search grace period settles this
-        // to "No rooms found"; the queries below are slow on CI simulators.
         XCTAssertTrue(app.staticTexts["Searching for rooms nearby…"].exists)
         snap("01-home-\(suffix)")
         XCTAssertTrue(app.staticTexts["Tiny Track"].firstMatch.exists)

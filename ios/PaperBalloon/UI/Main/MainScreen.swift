@@ -300,6 +300,12 @@ struct MainScreen: View {
         .task(id: [lanAsked, lan.hasLan]) {
             nearbySearchSettled = false
             guard lanAsked else { return }
+            #if DEBUG
+            // UI-test hook: `-uitest.holdSearch YES` keeps "Searching…" up, which
+            // StoreScreenshotTests asserts and captures — on a slow CI simulator the
+            // grace period ran out first.
+            if UserDefaults.standard.bool(forKey: "uitest.holdSearch") { return }
+            #endif
             try? await Task.sleep(for: .seconds(8))
             nearbySearchSettled = true
         }
