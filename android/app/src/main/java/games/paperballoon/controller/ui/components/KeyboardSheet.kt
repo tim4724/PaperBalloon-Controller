@@ -5,6 +5,7 @@ import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.window.OnBackInvokedDispatcher
 import androidx.activity.ComponentDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
@@ -46,6 +47,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onInterceptKeyBeforeSoftKeyboard
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
@@ -75,7 +81,9 @@ import kotlinx.coroutines.launch
  * Content-height sheets sit on the keyboard; [fullHeight] ones (the landscape rename) fill
  * the screen at the keyboard's width and ignore it, the keyboard sliding in over their
  * lower part. Closing — by [content]'s close, the backdrop or back — slides the sheet out
- * with the keyboard, then [onClosed] tells the caller to drop it.
+ * with the keyboard, then [onClosed] tells the caller to drop it. One back closes it even
+ * with the keyboard up: the sheet is only there to type in, so a back that took just the
+ * keyboard would leave it stranded.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -101,7 +109,7 @@ fun KeyboardSheet(
   }
   LaunchedEffect(Unit) { progress.animateTo(1f, tween(250)) }
 
-  SheetWindow {
+  SheetWindow(onBack = close) {
     BackHandler(onBack = close)
     // The keyboard leaves with the sheet rather than after it. Hidden, not unfocused:
     // clearing focus first drops the field's connection, and the keyboard flashes its
@@ -127,7 +135,15 @@ fun KeyboardSheet(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    // A back key reaches the keyboard before the window; this sees it first. Gesture
+    // back under predictive back is no key event — SheetWindow's.
+    Box(
+      Modifier.fillMaxSize().onInterceptKeyBeforeSoftKeyboard { event ->
+        val back = event.key == Key.Back
+        if (back && event.type == KeyEventType.KeyUp) close()
+        back
+      },
+    ) {
       Box(
         Modifier.fillMaxSize()
           .graphicsLayer { alpha = progress.value }
@@ -174,9 +190,10 @@ fun KeyboardSheet(
 
 /** A full-screen window over the activity, set up before it shows (see [KeyboardSheet]). */
 @Composable
-private fun SheetWindow(content: @Composable () -> Unit) {
+private fun SheetWindow(onBack: () -> Unit, content: @Composable () -> Unit) {
   val context = LocalContext.current
   val composition = rememberCompositionContext()
+  val currentOnBack by rememberUpdatedState(onBack)
   val currentContent by rememberUpdatedState(content)
   DisposableEffect(Unit) {
     val dialog = ComponentDialog(context, R.style.KeyboardSheetWindow)
@@ -186,7 +203,12 @@ private fun SheetWindow(content: @Composable () -> Unit) {
       setContent { currentContent() }
     }
     dialog.setContentView(view, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-    dialog.setCancelable(false) // back is the content's BackHandler
+    dialog.setCancelable(false) // back is [onBack] and the content's BackHandler
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      // Overlay priority outranks the keyboard's own back callback. Never unregistered:
+      // it goes with the window.
+      window.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_OVERLAY) { currentOnBack() }
+    }
     window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     window.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
     WindowCompat.setDecorFitsSystemWindows(window, false)
