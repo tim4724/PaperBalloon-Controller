@@ -238,8 +238,10 @@ Patterns are capped at 128 entries and 5 s.
 
 ## 12. Game → launcher: `PaperBalloonHost.haptic(primitive, scale)`
 
-A weaker or shaped tap than §11 can make: one of Android's composition primitives at a
-strength — the vocabulary AirConsole's composition vibrate takes.
+A weaker or shaped tap than §11 can make: one of Android's composition primitives
+(`VibrationEffect.Composition`) at a given strength. On iOS, where Core Haptics has no
+built-in primitives, the launcher reconstructs each effect to match AOSP's target duration,
+intensity, and sharpness curves. (AirConsole offers the same primitives.)
 
 ```js
 if (window.PaperBalloonHost?.haptic) PaperBalloonHost.haptic('click', 0.7);
@@ -266,8 +268,9 @@ else navigator.vibrate?.(14);
 ### `PaperBalloonHost.hapticComposition(steps)`
 
 Several primitives in one call, timed — a rumble under a held control, a rhythm, a knock
-after a tap. The step shape and its clock are Android's composition API and AirConsole's
-composition vibrate, so a sequence written for AirConsole plays here unchanged:
+after a tap. The step shape and timing mirror Android's composition API
+(`VibrationEffect.Composition`). AirConsole exposes the same structure, so sequences
+written for it play here unchanged:
 
 ```js
 // A held-control rumble: a low tick, 60 ms of rest, again — ~1.8 s, re-issued before it ends.
