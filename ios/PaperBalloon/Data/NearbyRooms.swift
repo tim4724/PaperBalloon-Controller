@@ -26,6 +26,9 @@ private let codeKey = "c"
 private let relayedKey = "pbr"
 /// Instance names are display-declared; cap so one can't blow out the card.
 private let maxAdvertLabelLength = 24
+/// The suffix a display puts after its device name (§8), dropped before display. A " (2)"
+/// that DNS-SD appends on a name clash is kept: it's what tells two same-named TVs apart.
+private let displaySuffix = " · Paper Balloon( \\(\\d+\\))?$"
 
 /// `pbp` — the display's platform. A fixed vocabulary, so the launcher owns the wording.
 let platformTvOS = "tvos"
@@ -61,6 +64,7 @@ func sanitizeAdvertLabel(_ raw: String) -> String {
     let clean = raw
         .trimmingCharacters(in: .whitespacesAndNewlines)
         .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        .replacingOccurrences(of: displaySuffix, with: "$1", options: .regularExpression)
     return String(clean.prefix(maxAdvertLabelLength))
 }
 
@@ -69,7 +73,7 @@ func sanitizeAdvertLabel(_ raw: String) -> String {
 /// liveness, occupancy) comes from resolving it against the relay, which is authoritative
 /// where the LAN is not. A record can therefore name a room but never propose an origin.
 struct NearbyAdvert: Equatable, Hashable {
-    /// The DNS-SD instance name: the display's own label ("Living Room").
+    /// The DNS-SD instance name minus the §8 suffix: the display's own label ("Living Room").
     let label: String
     /// TXT `c` — the room code.
     let code: String

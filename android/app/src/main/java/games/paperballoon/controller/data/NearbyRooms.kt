@@ -32,6 +32,12 @@ private const val NEARBY_SERVICE_TYPE = "_paperballoon._tcp."
 /** Instance names are display-declared; cap so one can't blow out the card. */
 private const val MAX_ADVERT_LABEL_LENGTH = 24
 
+/**
+ * The suffix a display puts after its device name (§8), dropped before display. A " (2)"
+ * that DNS-SD appends on a name clash is kept: it's what tells two same-named TVs apart.
+ */
+private val DISPLAY_SUFFIX = Regex(" · Paper Balloon( \\(\\d+\\))?$")
+
 /** TXT `c` — the room code, the advertisement's payload (§8). */
 private const val CODE_KEY = "c"
 
@@ -71,7 +77,7 @@ fun devicePlatform(url: String): String? {
  * where the LAN is not. A record can therefore name a room but never propose an origin.
  */
 data class NearbyAdvert(
-  /** The DNS-SD instance name: the display's own label ("Living Room"). */
+  /** The DNS-SD instance name minus the §8 suffix: the display's own label ("Living Room"). */
   val label: String,
   /** TXT `c` — the room code. */
   val code: String,
@@ -547,5 +553,8 @@ private fun NsdServiceInfo.toAdvert(): NearbyAdvert? {
 private fun ByteArray?.decodeUtf8(): String? =
   this?.let { runCatching { String(it, Charsets.UTF_8) }.getOrNull() }
 
-private fun sanitizeLabel(raw: String): String =
-  raw.trim().replace(Regex("\\s+"), " ").take(MAX_ADVERT_LABEL_LENGTH)
+internal fun sanitizeLabel(raw: String): String =
+  raw.trim()
+    .replace(Regex("\\s+"), " ")
+    .replace(DISPLAY_SUFFIX, "$1")
+    .take(MAX_ADVERT_LABEL_LENGTH)

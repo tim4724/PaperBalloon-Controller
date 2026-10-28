@@ -154,7 +154,12 @@ so the same code is right in a browser.
 
 A native display (tvOS, Android TV) may advertise its room over DNS-SD as
 `_paperballoon._tcp.local`, for one-tap join. The instance name is the display's label
-("Living Room"), shown verbatim.
+("Living Room"), shown verbatim. A display that names the record itself appends
+` · Paper Balloon` ("Living Room · Paper Balloon"), which the launcher strips: some
+Android TV builds refuse a registration whose instance name the device's own services
+already use, even under another service type. Shorten the label, not the suffix, to fit
+DNS-SD's 63 bytes. A display that leaves the name to the OS — tvOS must, as it can't read
+its own name — goes without. A clash rename's ` (2)` after the suffix is kept.
 
 | TXT key | Value |
 |---|---|
