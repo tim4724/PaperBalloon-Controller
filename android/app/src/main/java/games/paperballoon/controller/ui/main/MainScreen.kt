@@ -85,6 +85,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -261,7 +262,9 @@ fun MainScreen(
   // directory probe a scan or App Link takes can cost a round trip.
   var joining by remember { mutableStateOf(false) }
   var rejoin by remember { mutableStateOf<RecentRoom?>(null) }
-  var infoGame by remember { mutableStateOf<Game?>(null) }
+  // Newest last: a closing sheet lets taps through (AppSheet), so a card tapped while
+  // one slides away opens the next sheet over it.
+  var infoSheets by remember { mutableStateOf(listOf<InfoSheet>()) }
   // Rooms advertised on the LAN by native display apps (contract §8). Resolved against
   // `games` on every change, so a manifest refresh re-admits (or drops) an advert
   // without restarting discovery.
@@ -523,7 +526,7 @@ fun MainScreen(
         taps = skyTaps,
         // Still while anything covers it: the camera above all, which a weak phone needs
         // every cycle for, and a sheet's trailer.
-        moving = !showScanner && !joining && infoGame == null && !showProfile && !showCodeEntry,
+        moving = !showScanner && !joining && infoSheets.isEmpty() && !showProfile && !showCodeEntry,
       )
       // The list is drawn through a layer so the dock's edge can draw it again, blurred.
       val listLayer = rememberGraphicsLayer()
@@ -625,7 +628,7 @@ fun MainScreen(
               }
             }
           }
-          GamesSection(games, underBar, Modifier.padding(top = 20.dp), onOpen = { infoGame = it })
+          GamesSection(games, underBar, Modifier.padding(top = 20.dp), onOpen = { infoSheets += InfoSheet(it) })
           Spacer(Modifier.height(with(LocalDensity.current) { dockHeightPx.toDp() } + 28.dp))
         }
       }
@@ -731,15 +734,18 @@ fun MainScreen(
     )
   }
 
-  infoGame?.let { game ->
+  for (sheet in infoSheets) key(sheet) {
     GameInfoSheet(
-      game = game,
-      onDismiss = { infoGame = null },
-      onScan = { infoGame = null; requireName(AfterName.Scan) },
-      onEnterCode = { infoGame = null; requireName(AfterName.EnterCode) },
+      game = sheet.game,
+      onDismiss = { infoSheets -= sheet },
+      onScan = { infoSheets = emptyList(); requireName(AfterName.Scan) },
+      onEnterCode = { infoSheets = emptyList(); requireName(AfterName.EnterCode) },
     )
   }
 }
+
+// Identity, not the game: the same game reopened while its sheet closes is a new sheet.
+private class InfoSheet(val game: Game)
 
 // A join action deferred until the player has a name (see requireName).
 private sealed interface AfterName {

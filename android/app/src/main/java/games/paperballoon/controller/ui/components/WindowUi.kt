@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.view.View
 import android.view.Window
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -21,16 +22,22 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.ViewCompat
 import games.paperballoon.controller.theme.sheetGlass
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import kotlinx.coroutines.flow.dropWhile
 
 /**
  * House-style modal sheet: opens fully expanded, no drag handle (its tap ripple
@@ -42,15 +49,28 @@ fun AppSheet(
   onDismiss: () -> Unit,
   content: @Composable ColumnScope.() -> Unit,
 ) {
+  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   ModalBottomSheet(
     onDismissRequest = onDismiss,
-    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    sheetState = sheetState,
     dragHandle = null,
     // The glass is drawn by the content, which takes the insets inside it so the glass
     // reaches under the nav bar.
     containerColor = Color.Transparent,
     contentWindowInsets = { WindowInsets(0) },
   ) {
+    // The sheet's window covers the screen until its slide-away settles, swallowing taps
+    // meant for the screen beneath. Let touches through once the sheet heads for hidden
+    // (and catch them again if a drag turns back).
+    val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+    LaunchedEffect(window) {
+      snapshotFlow { sheetState.targetValue }
+        .dropWhile { it == SheetValue.Hidden } // still opening
+        .collect {
+          val flag = WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+          if (it == SheetValue.Hidden) window?.addFlags(flag) else window?.clearFlags(flag)
+        }
+    }
     // Scrolls only when the content outgrows the screen (small displays,
     // large font scale) — ModalBottomSheet clips a plain Column otherwise.
     Column(
