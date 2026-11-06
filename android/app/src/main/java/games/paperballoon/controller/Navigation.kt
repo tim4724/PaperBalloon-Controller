@@ -43,6 +43,11 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
   fun push(key: NavKey) {
     if (backStack.lastOrNull() != key) backStack.add(key)
   }
+  // Likewise a second tap on a closing screen's back button: it would pop the screen
+  // that screen uncovered, or empty the stack.
+  fun pop(key: NavKey) {
+    if (backStack.lastOrNull() == key) backStack.removeLastOrNull()
+  }
   val context = LocalContext.current
   // Config-aware resources for string lookups in callbacks (context.getString on
   // LocalContext.current is flagged by lint as not tracking config changes).
@@ -98,7 +103,9 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
 
   NavDisplay(
     backStack = backStack,
-    onBack = { backStack.removeLastOrNull() },
+    // Two system backs can land before NavDisplay recomposes and stops handling back at
+    // the root, and an empty stack crashes it.
+    onBack = { if (backStack.size > 1) backStack.removeLastOrNull() },
     // Nav3's default predictive-back spec scales the outgoing screen to 0.7 with no
     // fade, so an edge-swipe close looked different from a button/pop close (a plain
     // fade). Override it to the same crossfade so every back animates identically.
@@ -125,7 +132,7 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           onBarIcons = { mainBars = it },
         )
       }
-      entry<About> {
+      entry<About> { key ->
         AboutScreen(
           onOpenPrivacy = { push(WebDoc(LegalLinks.PRIVACY_URL)) },
           onOpenImprint = { push(WebDoc(LegalLinks.IMPRINT_URL)) },
@@ -138,11 +145,11 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
               Intent(Intent.ACTION_VIEW, LegalLinks.websiteUrl(language).toUri())
             )
           },
-          onBack = { backStack.removeLastOrNull() },
+          onBack = { pop(key) },
         )
       }
-      entry<Licenses> {
-        LicensesScreen(onBack = { backStack.removeLastOrNull() })
+      entry<Licenses> { key ->
+        LicensesScreen(onBack = { pop(key) })
       }
       entry<WebDoc> { key ->
         // Both titles are resolved here (re-localizing with the device language); the
@@ -153,7 +160,7 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           privacyTitle = stringResource(R.string.privacy_policy),
           imprintTitle = stringResource(R.string.imprint),
           onOpenDoc = { push(WebDoc(it)) },
-          onBack = { backStack.removeLastOrNull() },
+          onBack = { pop(key) },
         )
       }
       entry<GameHost> { key ->
@@ -162,12 +169,12 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           title = key.title,
           allowedHosts = key.allowedHosts,
           onBarIcons = { gameBars = it },
-          onLeave = { backStack.removeLastOrNull() },
+          onLeave = { pop(key) },
           // Back home like leave(), plus a banner in the rejoin slot — the player didn't
           // choose to leave, so silence would read as a crash. (A load failure isn't a
           // session end: the host shows a retry overlay in place, not a pop.)
           onGameEnd = { reason ->
-            backStack.removeLastOrNull()
+            pop(key)
             // A room that's gone can't be rejoined — drop the saved room now so the
             // home rejoin card clears immediately instead of lingering until the
             // liveness poll's relay record independently catches up (10s + relay lag).
