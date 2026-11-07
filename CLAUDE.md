@@ -59,9 +59,11 @@ iOS also builds the same sources a second time as an App Clip (`PB.isAppClip`; s
   It enforces locale coverage on both platforms, identical shared translations, and identical
   manifest copies. Platform-only strings must be declared in the script's `ANDROID_ONLY` /
   `IOS_ONLY` lists — an undeclared one-sided string fails the check.
-- **Join resolution**: `tests/join-resolver.json` is the shared spec both `JoinResolver`s
-  are tested against (`JoinResolverTest.kt`, `JoinResolverTests.swift`). A resolver change
-  adds or edits a case there, never a one-platform test.
+- **Shared test specs**: `tests/*.json` hold the cases both apps' unit tests run for logic
+  the two must agree on exactly — join resolution, `hapticComposition()` parsing, the name
+  sheet's page colours. A change there adds or edits a case in the spec, never a
+  one-platform test; a new spec file also needs a resource entry under `PaperBalloonTests`
+  in `ios/project.yml`.
 
 ## The CONTRACT is a compatibility boundary
 

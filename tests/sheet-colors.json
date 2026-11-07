@@ -1,0 +1,19 @@
+{
+  "about": "Shared cases for the page colours the launcher's name sheet takes (CONTRACT.md §2), run by both apps' unit tests (SheetColorsTest.kt, SheetColorsTests.swift). The input is a computed-style colour as the page's script returns it, untrusted; a case expects the opaque sRGB colour [r, g, b], or null for none (the launcher's own palette).",
+  "cases": [
+    { "input": "rgb(16, 16, 20)", "rgb": [16, 16, 20] },
+    { "input": "rgb(0, 0, 0)", "rgb": [0, 0, 0] },
+    { "input": "rgb(255, 255, 255)", "rgb": [255, 255, 255] },
+    { "input": "rgba(16, 16, 20, 0.5)", "rgb": [16, 16, 20], "note": "alpha is dropped: the sheet surface is opaque" },
+    { "input": " rgb(1, 2, 3)\n", "rgb": [1, 2, 3] },
+    { "input": "rgb(256, 0, 0)", "rgb": null },
+    { "input": "rgb(-1, 2, 3)", "rgb": null },
+    { "input": "rgb(1.5, 2, 3)", "rgb": null },
+    { "input": "rgb(1, 2)", "rgb": null },
+    { "input": "rgb(1,2,3)", "rgb": null, "note": "only the computed-style serialization" },
+    { "input": "rgb(1, 2, 3)x", "rgb": null },
+    { "input": "#101014", "rgb": null },
+    { "input": "color(display-p3 1 0 0)", "rgb": null, "note": "wide gamut deliberately fails" },
+    { "input": "", "rgb": null }
+  ]
+}

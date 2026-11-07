@@ -222,6 +222,10 @@ targets:
       - path: PaperBalloonTests
       - path: ../tests/join-resolver.json
         buildPhase: resources
+      - path: ../tests/haptic-composition.json
+        buildPhase: resources
+      - path: ../tests/sheet-colors.json
+        buildPhase: resources
     dependencies:
       - target: PaperBalloon
     settings:
