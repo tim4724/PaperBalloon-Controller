@@ -28,9 +28,12 @@ Android: minSdk 24 / target 37, applicationId and namespace both
 third-party dependencies.
 
 Tests: unit tests (`cd android && ./gradlew :app:testDebugUnitTest`; iOS `PaperBalloonTests`
-in the app scheme) and the store-screenshot UI tests, which double as each app's smoke test
-(`StoreScreenshotTest.kt`, `StoreScreenshotTests.swift`). CI runs them from
-`.github/workflows/` — `checks.yml` (l10n + Android unit) on every push.
+in the app scheme), the store-screenshot UI tests, which double as each app's smoke test
+(`StoreScreenshotTest.kt`, `StoreScreenshotTests.swift`), and the contract UI tests
+(`ContractTest.kt`, `ContractTests.swift`), which drive the deployed contract test page
+(linked under `CONTRACT.md`'s checklist for a new game) through the real bridge. Both UI
+suites load live pages, so they need network. CI runs them from `.github/workflows/` —
+`checks.yml` (l10n + Android unit) on every push.
 
 ## The two apps are functional parity ports
 

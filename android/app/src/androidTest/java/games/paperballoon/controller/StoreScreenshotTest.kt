@@ -6,11 +6,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Environment
-import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
-import android.view.View
-import android.view.ViewGroup
-import android.webkit.WebView
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -30,9 +26,6 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import games.paperballoon.controller.data.Profile
-import games.paperballoon.controller.data.ProfileStore
-import games.paperballoon.controller.data.setNearbyOptedIn
 import java.io.File
 import org.junit.After
 import org.junit.Before
@@ -66,22 +59,7 @@ class StoreScreenshotTest {
 
   private fun str(id: Int, vararg args: Any): String = appContext.getString(id, *args)
 
-  @Before
-  fun seedProfile() {
-    // First launch mints a random FunnyName — pin the name BEFORE the activity starts
-    // so assertions and store screenshots are deterministic.
-    ProfileStore.save(appContext, Profile(PLAYER_NAME))
-    // Already opted in to nearby discovery, so home shows "Searching for rooms…" rather
-    // than the one-time Local Network ask: the stored opt-in below API 37, the permission
-    // grant from 37 on (see nearbyOptedIn).
-    setNearbyOptedIn(appContext)
-    if (Build.VERSION.SDK_INT >= 37) {
-      shell("pm grant ${appContext.packageName} android.permission.ACCESS_LOCAL_NETWORK")
-    }
-    // A fresh device shows the one-time "Viewing full screen" education overlay the
-    // first time an app hides the system bars (the in-game host does) — pre-confirm it.
-    shell("settings put secure immersive_mode_confirmations confirmed")
-  }
+  @Before fun seed() = seedDevice()
 
   @After
   fun resetDeviceState() {
@@ -200,7 +178,7 @@ class StoreScreenshotTest {
       // the first check, and the cover is already gone.
       compose.waitUntil(timeoutMillis = 15_000) {
         var hosting = false
-        scenario.onActivity { hosting = it.window.decorView.hasWebView() }
+        scenario.onActivity { hosting = it.window.decorView.findWebView() != null }
         hosting
       }
       compose.waitUntil(timeoutMillis = 30_000) {
@@ -233,12 +211,6 @@ class StoreScreenshotTest {
     }
   }
 
-  /** Run a shell command with shell privileges and wait for it to finish. */
-  private fun shell(cmd: String) {
-    val pfd = instrumentation.uiAutomation.executeShellCommand(cmd)
-    ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
-  }
-
   /** Full-device capture (system bars included) via UiAutomation — sheets and dialogs
    *  live in their own windows, which a compose-root capture would miss. */
   private fun screenshot(name: String) {
@@ -268,7 +240,6 @@ class StoreScreenshotTest {
   }
 
   private companion object {
-    const val PLAYER_NAME = "Alex"
     const val ROOM_CODE = "A3KX9p"
     const val SHOT_DIR = "paperballoon-screenshots"
     // HexStacker's players chip (Game.playersRange over the manifest counts) — numerals
@@ -285,6 +256,3 @@ class StoreScreenshotTest {
       "https://tinytrack.paperballoon.games/$ROOM_CODE?scenario=lobby-host&color=0"
   }
 }
-
-private fun View.hasWebView(): Boolean =
-  this is WebView || (this is ViewGroup && (0 until childCount).any { getChildAt(it).hasWebView() })
