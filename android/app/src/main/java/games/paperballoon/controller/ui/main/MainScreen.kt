@@ -1375,7 +1375,7 @@ private fun SkyBackdrop(scrolled: () -> Float, taps: Flow<Offset>, moving: Boole
     Modifier
       .fillMaxSize()
       .onSizeChanged { widthPx = it.width }
-      .graphicsLayer { translationY = -scrolled().toFloat() },
+      .graphicsLayer { translationY = -scrolled() },
   ) {
     Canvas(Modifier.fillMaxSize()) {
       val paperAt = SKY_PAPER_DP.dp.toPx()
