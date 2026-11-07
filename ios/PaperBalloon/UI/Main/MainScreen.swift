@@ -169,9 +169,8 @@ struct MainScreen: View {
                 .animation(.spring(duration: 0.45), value: messages.gameEndBanner)
                 .animation(.spring(duration: 0.45), value: resolvedNearby.count)
             }
-            // The dock sits in a bar at the bottom edge: the list scrolls under it and
-            // blurs out into the soft scroll edge (the system's, on iOS 26), and the
-            // content is inset so the last card stays reachable.
+            // The dock sits in a bar at the bottom edge: the list scrolls under it, and
+            // the content is inset so the last card stays reachable.
             .modifier(DockBar {
                 JoinDock(
                     onScan: { requireName(.scan) },
@@ -1482,13 +1481,11 @@ private struct JoinDock: View {
 }
 
 /// The dock's bar at the bottom edge. iOS 26 has a bar with the soft scroll edge, a
-/// progressive blur the list dissolves into; before that the list dissolves into a fade
-/// of the paper instead. A modifier rather than an inline `if #available` so the SDK-17
-/// build compiles.
+/// progressive blur the list dissolves into; before that it is the system bar material
+/// with its hairline, like a toolbar. A modifier rather than an inline `if #available` so
+/// the SDK-17 build compiles.
 private struct DockBar<Bar: View>: ViewModifier {
     @ViewBuilder let bar: () -> Bar
-
-    @Environment(\.pbPalette) private var palette
 
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
@@ -1499,19 +1496,9 @@ private struct DockBar<Bar: View>: ViewModifier {
             content
                 .safeAreaInset(edge: .bottom) {
                     bar()
-                        .padding(.top, 40)
-                        .background(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: palette.background.opacity(0), location: 0),
-                                    .init(color: palette.background, location: 0.4),
-                                    .init(color: palette.background, location: 1),
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .ignoresSafeArea(edges: .bottom)
-                        )
+                        .padding(.top, 8)
+                        .background(.bar)
+                        .overlay(alignment: .top) { Divider() }
                 }
         }
     }

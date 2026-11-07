@@ -99,7 +99,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -111,10 +111,10 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.CompositingStrategy as LayerCompositingStrategy
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.IntSize
@@ -211,6 +211,7 @@ import games.paperballoon.controller.ui.components.StatusTag
 import games.paperballoon.controller.ui.components.stableScreenInsets
 import games.paperballoon.controller.ui.game.GameHaptics
 import kotlin.math.PI
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.roundToInt
@@ -528,7 +529,7 @@ fun MainScreen(
         // every cycle for, and a sheet's trailer.
         moving = !showScanner && !joining && infoSheets.isEmpty() && !showProfile && !showCodeEntry,
       )
-      // The list is drawn through a layer so the dock's edge can draw it again, blurred.
+      // The list is drawn through a layer so the dock's panel can draw it again, blurred.
       val listLayer = rememberGraphicsLayer()
       Column(
         Modifier
@@ -632,13 +633,13 @@ fun MainScreen(
           Spacer(Modifier.height(with(LocalDensity.current) { dockHeightPx.toDp() } + 28.dp))
         }
       }
-      // The list dissolves into a blur under the dock, like iOS's soft scroll edge; the
-      // list's trailing spacer keeps the last card reachable.
+      // The list frosts under a panel behind the dock; the list's trailing spacer keeps the
+      // last card reachable.
       val bottomInset = with(LocalDensity.current) { stableScreenInsets.getBottom(this).toDp() }
-      DockEdge(
+      DockPanel(
         list = listLayer,
         scrolled = { scroll.value - band.offset },
-        modifier = Modifier.align(Alignment.BottomCenter).height(bottomInset + 12.dp + 56.dp + DOCK_EDGE_ABOVE),
+        modifier = Modifier.align(Alignment.BottomCenter).height(bottomInset + 12.dp + 56.dp + DOCK_PANEL_ABOVE),
       )
       JoinDock(
         onScan = { requireName(AfterName.Scan) },
@@ -1615,76 +1616,54 @@ private fun skyHeldStill(context: Context): Boolean =
 // A balloon slipping its string swells slowly, in CONTRACT.md §12's notation.
 private const val SLIP_HAPTIC = "slow_rise,0.5,0"
 
-// The soft edge under the dock, like iOS's soft scroll edge: the list, drawn again from its
-// layer at three blur strengths that fade in over overlapping halves of the ramp, so the
-// blur grows progressively instead of one blurred copy crossfading over the sharp list (a
-// faint double image that reads as a line), under a veil of the paper (blur alone keeps
-// the posters saturated and reads as out-of-focus content, not a frosted surface). Every
-// ramp is eased, so nothing kinks where it starts or ends. The edge reaches only a little
-// above the dock and finishes softening just inside it, so the posters stay sharp until
-// they reach the buttons. Below API 31 (no render effects) the list
-// fades into the paper instead.
+// The frosted panel under the dock: the list, drawn again from its layer and blurred, under
+// a veil of the paper (blur alone keeps the posters saturated and reads as out-of-focus
+// content, not a frosted surface). The blur is full strength right to the panel's edge, so
+// there is no sharp-to-blurred crossfade to show as a double image. Below API 31 (no render
+// effects) the panel is plain paper.
 @Composable
-private fun DockEdge(list: GraphicsLayer, scrolled: () -> Float, modifier: Modifier) {
-  val blurs = List(DOCK_EDGE_BLURS.size) { rememberGraphicsLayer() }
-  val masked = List(DOCK_EDGE_BLURS.size) { rememberGraphicsLayer() }
+private fun DockPanel(list: GraphicsLayer, scrolled: () -> Float, modifier: Modifier) {
+  val blur = rememberGraphicsLayer()
   val background = MaterialTheme.colorScheme.background
   Box(
     modifier
       .fillMaxWidth()
-      .drawWithCache {
-        val ramp = DOCK_EDGE_RAMP.toPx()
-        val veil = easedRamp(background.copy(alpha = 0f), background.copy(alpha = 0.5f), 0f, ramp)
-        val fade = easedRamp(background.copy(alpha = 0f), background, 0f, ramp)
-        val masks = DOCK_EDGE_BLURS.map { (_, from, to) -> easedRamp(Color.Transparent, Color.Black, from * ramp, to * ramp) }
-        onDrawBehind {
-          scrolled() // read here so every scroll frame redraws the edge
-          if (Build.VERSION.SDK_INT >= 31) {
-            // The list layer is the whole viewport; this edge is its bottom slice.
-            val above = list.size.height - size.height
-            val slice = IntSize(size.width.toInt(), size.height.toInt())
-            DOCK_EDGE_BLURS.forEachIndexed { i, (radius, _, _) ->
-              val blur = blurs[i]
-              blur.record(slice) { translate(top = -above) { drawLayer(list) } }
-              blur.renderEffect = BlurEffect(radius.toPx(), radius.toPx(), TileMode.Clamp)
-              // The mask's DstIn must cut only this blur, so the two share an offscreen layer.
-              val layer = masked[i]
-              layer.compositingStrategy = LayerCompositingStrategy.Offscreen
-              layer.record(slice) {
-                drawLayer(blur)
-                drawRect(masks[i], blendMode = BlendMode.DstIn)
-              }
-              drawLayer(layer)
-            }
-            drawRect(veil)
-          } else {
-            drawRect(fade)
+      .drawBehind {
+        scrolled() // read here so every scroll frame redraws the panel
+        if (Build.VERSION.SDK_INT >= 31) {
+          // The list layer is the whole viewport; this panel is its bottom slice. The blur
+          // takes in the list above the panel too and is clipped back to it: blurring only
+          // the slice clamps at its top edge and smears the top row into streaks. The slice
+          // is blurred at half size and scaled back up, which the blur hides: the blur's work
+          // is what costs, not redrawing the list.
+          val radius = DOCK_PANEL_BLUR.toPx()
+          val reach = 2 * radius
+          val above = list.size.height - size.height - reach
+          val small = IntSize(
+            ceil(size.width * DOCK_PANEL_SCALE).toInt(),
+            ceil((size.height + reach) * DOCK_PANEL_SCALE).toInt(),
+          )
+          blur.record(small) {
+            scale(DOCK_PANEL_SCALE, pivot = Offset.Zero) { translate(top = -above) { drawLayer(list) } }
           }
+          val smallRadius = radius * DOCK_PANEL_SCALE
+          blur.renderEffect = BlurEffect(smallRadius, smallRadius, TileMode.Clamp)
+          clipRect {
+            translate(top = -reach) { scale(1 / DOCK_PANEL_SCALE, pivot = Offset.Zero) { drawLayer(blur) } }
+          }
+          drawRect(background.copy(alpha = 0.5f))
+        } else {
+          drawRect(background)
         }
       },
   )
 }
 
-// A vertical ramp from [from] to [to] between [startY] and [endY], eased (smoothstep) so
-// its slope is zero at both ends — a linear ramp shows a line where it stops.
-private fun easedRamp(from: Color, to: Color, startY: Float, endY: Float): Brush {
-  val steps = 12
-  val stops = Array(steps + 1) { i ->
-    val t = i / steps.toFloat()
-    t to lerp(from, to, t * t * (3 - 2 * t))
-  }
-  return Brush.verticalGradient(*stops, startY = startY, endY = endY)
-}
-
-// How far above the dock the list starts to soften, and over how far it does (so the ramp
-// ends half of it inside the dock).
-private val DOCK_EDGE_ABOVE = 12.dp
-private val DOCK_EDGE_RAMP = 24.dp
-// The progressive blur: radius, and where in the ramp (0 = its top, 1 = its end) that
-// strength fades in.
-private val DOCK_EDGE_BLURS = listOf(
-  Triple(2.dp, 0f, 0.5f), Triple(4.dp, 0.25f, 0.75f), Triple(6.dp, 0.5f, 1f),
-)
+// How far the panel reaches above the buttons.
+private val DOCK_PANEL_ABOVE = 8.dp
+// One blur, not a progressive stack: every blur pass runs on each scroll frame.
+private val DOCK_PANEL_BLUR = 8.dp
+private const val DOCK_PANEL_SCALE = 0.5f
 
 // The dock at the thumb, over the scrolling catalog: scan, and the keyboard for a typed
 // code.
