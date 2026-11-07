@@ -93,6 +93,8 @@ internal fun rememberRubberBand(): RubberBand {
 // How much of a pull the band gives at its end, and its spring back: settled in about half
 // a second, as UIScrollView's. A fling's bounce is over-damped, so it runs only a short way
 // out and takes its time coming back, settling in about 0.65 s.
+// Both springs stop at the last visible pixel: while the band runs, the list takes every
+// touch, so a longer tail looks still but swallows taps.
 private const val BAND_GIVE = 0.55f
-private val BAND_SPRING = spring<Float>(dampingRatio = 1f, stiffness = 100f)
-private val BOUNCE_SPRING = spring<Float>(dampingRatio = 1.5f, stiffness = 144f)
+private val BAND_SPRING = spring<Float>(dampingRatio = 1f, stiffness = 100f, visibilityThreshold = 1f)
+private val BOUNCE_SPRING = spring<Float>(dampingRatio = 1.5f, stiffness = 144f, visibilityThreshold = 1f)
