@@ -53,12 +53,11 @@ enum PB {
         }
     }
 
-    /// A scanned QR payload is arbitrary content — unlike a Universal Link, the OS
-    /// hasn't vouched for its host, and `legalTitle` matches only the path. So before
-    /// the doc viewer (which trusts its URL: no allow-list) may load a scanned value,
-    /// require a launcher apex over https with no embedded credentials, mirroring
-    /// the Universal Link routing. Returns the URL to open (locale variants like
-    /// /en/privacy pass through as-is), or nil when it's not a legal page.
+    /// A scanned QR payload is arbitrary content and `legalTitle` matches only the
+    /// path, so before the doc viewer (which trusts its URL: no allow-list) may load a
+    /// scanned value, require the launcher apex over https with no embedded credentials.
+    /// Returns the URL to open (locale variants like /en/privacy pass through as-is),
+    /// or nil when it's not a legal page.
     static func scannedLegalUrl(_ raw: String) -> String? {
         guard let components = URLComponents(string: raw),
               components.scheme?.lowercased() == "https",

@@ -139,7 +139,7 @@ struct RootView: View {
                     onJoin: { url, title, hosts in
                         router.push(.gameHost(GameHostParams(joinUrl: url, title: title, allowedHosts: hosts)))
                     },
-                    // A privacy/imprint App Link opens the in-app doc viewer over Main,
+                    // A privacy/imprint link opens the in-app doc viewer over Main,
                     // rather than routing the URL through the join resolver.
                     onOpenLegalDoc: { url in
                         let title = PB.legalTitle(for: URL(string: url)) ?? String(localized: "Privacy Policy")

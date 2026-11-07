@@ -232,17 +232,15 @@ struct MainScreen: View {
             pendingSheetAction = nil
             afterName = nil
             codeEntry = nil
-            // A legal-page App Link opens the in-app doc viewer; anything else is a
-            // join. The URL keeps its locale segment (/en/privacy vs /privacy), so
-            // the viewer loads the right variant. Except in the clip, a link that names
-            // no room: a clip opens for every URL under an experience's prefix, and
-            // Apple's own App Clip link names no room at all — those just show home.
-            // (The app never sees one: its Universal Links are AASA-scoped to room paths.)
             let firstSegment = URLComponents(string: link)?.path.split(separator: "/").first.map(String.init)
             if PB.legalTitle(for: URL(string: link)) != nil {
+                // Legal pages arrive only as App Clip invocations (the AASA claims room
+                // paths only). The URL keeps its locale segment (/en/privacy vs
+                // /privacy), so the viewer loads the right variant.
                 onOpenLegalDoc(link)
             } else if PB.isAppClip, !validRoomCode(firstSegment ?? "") {
-                // Home is already showing.
+                // A clip opens for every URL under an experience's prefix, including
+                // Apple's own room-less App Clip link — those just show home.
             } else {
                 resolveAndJoin(link)
             }
@@ -339,7 +337,7 @@ struct MainScreen: View {
                 case .code(let raw):
                     // The launcher's own privacy/imprint URL isn't a room — route it
                     // to the doc viewer (host-validated: the payload is untrusted)
-                    // instead of failing it, same as the Universal Link path.
+                    // instead of failing it.
                     if let legal = PB.scannedLegalUrl(raw) {
                         successTick += 1
                         onOpenLegalDoc(legal)

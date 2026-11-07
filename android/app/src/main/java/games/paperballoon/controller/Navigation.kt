@@ -123,7 +123,7 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           onJoin = { joinUrl, title, allowedHosts ->
             push(GameHost(joinUrl, title, allowedHosts))
           },
-          // A privacy/imprint App Link opens the in-app doc viewer over Main,
+          // A scanned privacy/imprint QR opens the in-app doc viewer over Main,
           // rather than routing the URL through the join resolver.
           onOpenLegalDoc = { url -> push(WebDoc(url)) },
           onOpenAbout = { push(About) },

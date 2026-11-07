@@ -120,8 +120,7 @@ import zxingcpp.BarcodeReader
  * for the caller to resolve for real — which room a canonical paperballoon.games link
  * names is the relay directory's call, not the camera's. The exception is a
  * legal-page QR (the privacy/imprint URL printed on packaging or shown by a
- * game), which opens the in-app doc viewer instead — same routing the App Link
- * path applies, since neither is a room.
+ * game), which opens the in-app doc viewer instead, since it isn't a room.
  */
 @Composable
 fun ScanScreen(

@@ -82,27 +82,15 @@
                  characters, so the marketing index and any non-6-char page fall through
                  to the browser. pathPattern can't express base58, so avoid naming a page
                  with a 6-char path — the app takes it, and a non-room code simply fails
-                 to resolve against the relay directory. -->
+                 to resolve against the relay directory. /privacy and /imprint are
+                 deliberately not claimed: it would pull the site's own footer links
+                 into the app. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="paperballoon.games" android:pathPattern="/......" />
                 <data android:scheme="https" android:host="*.paperballoon.games" android:pathPattern="/......" />
-            </intent-filter>
-
-            <!-- Launcher legal pages open in the in-app doc viewer (WebDocScreen),
-                 not the join flow — privacy + imprint, default and English. Apex only:
-                 preview subdomains don't serve these. Exact paths, so everything else on
-                 the apex still routes by the room-code filter above or the browser. -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="paperballoon.games" android:path="/privacy" />
-                <data android:scheme="https" android:host="paperballoon.games" android:path="/imprint" />
-                <data android:scheme="https" android:host="paperballoon.games" android:path="/en/privacy" />
-                <data android:scheme="https" android:host="paperballoon.games" android:path="/en/imprint" />
             </intent-filter>
         </activity>
     </application>

@@ -193,7 +193,6 @@ import games.paperballoon.controller.theme.ghost
 import games.paperballoon.controller.theme.ghostLine
 import games.paperballoon.controller.theme.isDark
 import games.paperballoon.controller.ui.preview.CardSamples
-import games.paperballoon.controller.ui.legal.LegalLinks
 import games.paperballoon.controller.R
 import games.paperballoon.controller.ui.components.ART_LUMINANCE_ROWS
 import games.paperballoon.controller.ui.components.Art
@@ -418,16 +417,10 @@ fun MainScreen(
     }
   }
 
-  // An incoming App Link: a legal-page link opens the in-app doc viewer; anything
-  // else is a join and goes through the same name gate as a scan. The URL keeps its
-  // locale segment (/en/privacy vs /privacy), so the viewer loads the right variant.
+  // An incoming App Link goes through the same name gate as a scan.
   LaunchedEffect(deepLink) {
     if (deepLink != null) {
-      if (LegalLinks.isPrivacy(deepLink) || LegalLinks.isImprint(deepLink)) {
-        onOpenLegalDoc(deepLink)
-      } else {
-        resolveAndJoin(deepLink)
-      }
+      resolveAndJoin(deepLink)
       onDeepLinkConsumed()
     }
   }
