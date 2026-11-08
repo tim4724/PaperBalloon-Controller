@@ -1,5 +1,7 @@
 package games.paperballoon.controller.ui.main
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.SurfaceTexture
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -30,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -64,6 +67,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +79,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -121,7 +127,7 @@ fun GameInfoSheet(
       } else {
         GameArt(game, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large))
       }
-      if (game.tvApps.isNotEmpty() || game.displayHost != null) PlatformTiles(game)
+      if (game.tvApps.isNotEmpty() || game.displayHost != null) PlatformChips(game)
       if (game.isPlayable) {
         PlaySteps(game)
         JoinButtons(onScan = onScan, onEnterCode = onEnterCode)
@@ -131,7 +137,7 @@ fun GameInfoSheet(
 }
 
 // Platforms with native TV apps (manifest tvApps): id -> the nearby-card device
-// label, reused. Unknown manifest ids simply have no tile (and no home-card mention).
+// label, reused. Unknown manifest ids simply have no chip (and no home-card mention).
 // Deliberately no brand logos: Apple licenses only its word marks to third parties, and Google's
 // Android TV guidance excludes the robot — the neutral TV glyph + name is the
 // compliant version of the same message on both platforms.
@@ -140,66 +146,141 @@ internal val TV_PLATFORMS = listOf(
   "androidtv" to R.string.device_android_tv,
 )
 
+// The one TV platform whose store this app links: Google Play installs onto an Android TV
+// from the phone, where an App Store link would open a web page that can't install
+// anything. iOS links appletv.
+private const val OWN_STORE_PLATFORM = "androidtv"
+
 /**
- * Where the game runs, as a row of equal device tiles: one per declared TV app
- * (dimmed, with the shared "Coming soon" copy, when not yet live) plus a tile
- * for the browser path. This row is the sheet's only mention of platforms and
- * host, so the play steps stay path-free (PlaySteps).
+ * Where the game runs, as a row of equal chips: one per declared TV app plus one for
+ * the browser path. A chip with somewhere to go is itself the button, marked by a
+ * corner glyph: this app's own store once that TV app is live (manifest tvStores), the
+ * share sheet for the game's address. A not-yet-live TV app is a dimmed chip tagged
+ * "Soon". This row is the sheet's only mention of platforms and host, so the play
+ * steps stay path-free (PlaySteps).
  */
 @Composable
-private fun PlatformTiles(game: Game) {
+private fun PlatformChips(game: Game) {
+  val context = LocalContext.current
   Row(
     Modifier.fillMaxWidth().height(IntrinsicSize.Min),
     horizontalArrangement = Arrangement.spacedBy(9.dp),
   ) {
     TV_PLATFORMS.forEach { (id, nameRes) ->
       val status = game.tvApps[id] ?: return@forEach
-      Tile(R.drawable.ic_tv, stringResource(nameRes), soon = status != "live", Modifier.weight(1f))
+      val soon = status != "live"
+      val store = game.tvStores[id]?.takeIf { id == OWN_STORE_PLATFORM && !soon }
+      if (store != null) {
+        PlatformChip(
+          R.drawable.ic_tv,
+          stringResource(nameRes),
+          Modifier.weight(1f),
+          corner = R.drawable.ic_arrow_outward,
+          onClickLabel = stringResource(R.string.get_tv_app),
+          onClick = { context.openUrl(store) },
+        )
+      } else {
+        PlatformChip(R.drawable.ic_tv, stringResource(nameRes), Modifier.weight(1f), soon = soon)
+      }
     }
-    game.displayHost?.let {
+    val url = game.controllerBaseUrl
+    val host = game.displayHost
+    if (url != null && host != null) {
       // The zero-width space before each dot is an invisible break hint: a
-      // narrow tile wraps to "hexstacker" / ".com" instead of ellipsizing.
-      Tile(R.drawable.ic_globe, it.replace(".", "\u200B."), soon = false, Modifier.weight(1f))
+      // narrow chip wraps to "hexstacker" / ".com" instead of ellipsizing.
+      PlatformChip(
+        R.drawable.ic_globe,
+        host.replace(".", "\u200B."),
+        Modifier.weight(1f),
+        corner = R.drawable.ic_share,
+        onClickLabel = stringResource(R.string.share_link, host),
+        onClick = { context.shareUrl(url) },
+      )
     }
   }
 }
 
-// A not-yet-live tile dims its icon and label to 45% — same state the poster's
-// "Coming soon" chip marks, signalled here by dimming instead of a color swap.
+/**
+ * One chip: glyph over name, top-aligned so they line up across chips when one name
+ * wraps. With [onClick] the whole chip is the button, marked by its [corner] glyph. A
+ * [soon] chip dims its glyph and name to 45% — the state the poster's "Coming soon"
+ * chip marks — and wears the "Soon" tag across its top edge, where it can't cover the
+ * glyph.
+ */
 @Composable
-private fun Tile(iconRes: Int, label: String, soon: Boolean, modifier: Modifier) {
+private fun PlatformChip(
+  iconRes: Int,
+  label: String,
+  modifier: Modifier,
+  soon: Boolean = false,
+  corner: Int? = null,
+  onClickLabel: String? = null,
+  onClick: (() -> Unit)? = null,
+) {
   val base = MaterialTheme.colorScheme.onSurface
   val content = if (soon) base.copy(alpha = 0.45f) else base
-  Column(
-    modifier
-      .fillMaxHeight()
-      .clip(MaterialTheme.shapes.large)
-      // Highest: the step that shows on the sheet's glass (AppSheet).
-      .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-      .padding(vertical = 12.dp, horizontal = 6.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-    // Top-aligned so icons and names line up across tiles even when one tile
-    // carries the extra "Coming soon" line.
-    verticalArrangement = Arrangement.spacedBy(6.dp),
-  ) {
-    Icon(painterResource(iconRes), contentDescription = null, Modifier.size(20.dp), tint = content)
-    Text(
-      label,
-      style = MaterialTheme.typography.labelMedium,
-      color = content,
-      textAlign = TextAlign.Center,
-      maxLines = 2,
-      overflow = TextOverflow.Ellipsis,
-    )
+  Box(modifier.fillMaxHeight().semantics(mergeDescendants = true) {}) {
+    Column(
+      Modifier
+        .fillMaxSize()
+        .clip(MaterialTheme.shapes.large)
+        // Highest: the step that shows on the sheet's glass (AppSheet).
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        .then(
+          if (onClick != null) {
+            Modifier.clickable(onClickLabel = onClickLabel, role = Role.Button, onClick = onClick)
+          } else {
+            Modifier
+          },
+        )
+        .padding(vertical = 12.dp, horizontal = 6.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+      Icon(painterResource(iconRes), contentDescription = null, Modifier.size(20.dp), tint = content)
+      Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = content,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
+    if (corner != null) {
+      Icon(
+        painterResource(corner),
+        contentDescription = null,
+        Modifier.align(Alignment.TopEnd).padding(8.dp).size(16.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
     if (soon) {
       Text(
-        stringResource(R.string.status_coming_soon),
+        stringResource(R.string.status_soon),
+        Modifier
+          .align(Alignment.TopEnd)
+          .offset(x = 4.dp, y = (-6).dp)
+          .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+          .padding(horizontal = 6.dp, vertical = 2.dp),
         style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
       )
     }
   }
+}
+
+// A store page: whatever handles it (Google Play for its own pages), else nothing —
+// there's no in-app fallback worth a dialog.
+private fun Context.openUrl(url: String) {
+  runCatching { startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
+}
+
+// The system share sheet with the bare address, so any target gets a working link.
+private fun Context.shareUrl(url: String) {
+  val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
+  runCatching { startActivity(Intent.createChooser(send, null)) }
 }
 
 @Composable

@@ -42,14 +42,14 @@ struct GameInfoSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
             if !game.tvApps.isEmpty || game.displayHost != nil {
-                PlatformTiles(game: game)
+                PlatformChips(game: game)
             }
 
             // The app is the controller, so a first-timer who taps the card
             // learns they need the game running on a big screen first — then can
             // act right here. Deliberately path-free ("start it", not "open the
             // app / the site") — where the game runs is the platform-chip row's
-            // job (PlatformTiles).
+            // job (PlatformChips).
             if game.isPlayable {
                 VStack(alignment: .leading, spacing: 16) {
                     StepRow(number: 1, text: AttributedString(
@@ -83,51 +83,83 @@ struct GameInfoSheet: View {
     }
 }
 
-// MARK: - PlatformTiles
+// MARK: - PlatformChips
 
 /// Platforms with native TV apps (manifest tvApps): id -> the nearby-card device label,
-/// reused. Unknown manifest ids simply have no tile (and no home-card mention).
+/// reused. Unknown manifest ids simply have no chip (and no home-card mention).
 let tvPlatforms: [(String, LocalizedStringResource)] = [
     ("appletv", "Apple TV"),
     ("androidtv", "Android TV"),
 ]
 
-/// Where the game runs, as a row of equal device tiles: one per declared TV app
-/// (dimmed, with the shared "Coming soon" copy, when not yet live) plus a tile
-/// for the browser path. This row is the sheet's only mention of platforms and
-/// host, so the play steps stay path-free.
+/// The one TV platform whose store this app links: the App Store installs an Apple TV app
+/// from the iPhone (onto the TV with Automatically Install Apps, else into its Purchased
+/// list), and App Review 2.3.10 bars pointing at another platform's store. Android links
+/// androidtv.
+private let ownStorePlatform = "appletv"
+
+/// Where the game runs, as a row of equal chips: one per declared TV app plus one for the
+/// browser path. A chip with somewhere to go is itself the button, marked by a corner
+/// glyph: this app's own store once that TV app is live (manifest tvStores), the share
+/// sheet for the game's address. A not-yet-live TV app is a dimmed chip tagged "Soon".
+/// This row is the sheet's only mention of platforms and host, so the play steps stay
+/// path-free.
 ///
 /// Deliberately no brand logos: Apple licenses only its word marks to third
 /// parties, and Google's Android TV guidance excludes the robot — the neutral
 /// TV glyph + name is the compliant version of the same message (Android
 /// matches).
-private struct PlatformTiles: View {
+private struct PlatformChips: View {
     let game: Game
 
     @Environment(\.pbPalette) private var palette
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         HStack(spacing: 9) {
             ForEach(tvPlatforms, id: \.0) { id, name in
                 if let status = game.tvApps[id] {
-                    tile(icon: "tv", label: String(localized: name), soon: status != "live")
+                    tvChip(id: id, label: String(localized: name), live: status == "live")
                 }
             }
-            if let host = game.displayHost {
+            if let url = game.controllerBaseUrl.flatMap(URL.init(string:)), let host = game.displayHost {
                 // The zero-width space before each dot is an invisible break hint:
-                // a narrow tile wraps to "hexstacker" / ".com" instead of truncating.
-                tile(icon: "globe", label: host.replacingOccurrences(of: ".", with: "\u{200B}."), soon: false)
+                // a narrow chip wraps to "hexstacker" / ".com" instead of truncating.
+                ShareLink(item: url) {
+                    chip(icon: "globe", label: host.replacingOccurrences(of: ".", with: "\u{200B}."))
+                }
+                .buttonStyle(.plain)
+                .modifier(ChipSurface(interactive: true))
+                .overlay(alignment: .topTrailing) { cornerGlyph("square.and.arrow.up") }
+                .accessibilityLabel(String(format: String(localized: "Share %@"), host))
             }
         }
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    // A not-yet-live tile dims its icon and label to 45% — same state the
-    // poster's "Coming soon" chip marks, signalled here by dimming instead of
-    // a color swap.
-    private func tile(icon: String, label: String, soon: Bool) -> some View {
-        let base = palette.onSurface
-        let content = soon ? base.opacity(0.45) : base
+    @ViewBuilder
+    private func tvChip(id: String, label: String, live: Bool) -> some View {
+        if !live {
+            chip(icon: "tv", label: label, dimmed: true)
+                .modifier(ChipSurface(interactive: false))
+                .overlay(alignment: .topTrailing) { soonTag }
+                .accessibilityElement(children: .combine)
+        } else if id == ownStorePlatform, let store = game.tvStores[id].flatMap(URL.init(string:)) {
+            Button { openURL(store) } label: { chip(icon: "tv", label: label) }
+                .buttonStyle(.plain)
+                .modifier(ChipSurface(interactive: true))
+                .overlay(alignment: .topTrailing) { cornerGlyph("arrow.up.right") }
+                .accessibilityHint(String(localized: "Get the TV app"))
+        } else {
+            chip(icon: "tv", label: label)
+                .modifier(ChipSurface(interactive: false))
+        }
+    }
+
+    // `dimmed`: icon and label at 45% — the not-yet-live state the poster's "Coming
+    // soon" chip marks.
+    private func chip(icon: String, label: String, dimmed: Bool = false) -> some View {
+        let content = dimmed ? palette.onSurface.opacity(0.45) : palette.onSurface
         return VStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 17, weight: .medium))
@@ -137,20 +169,53 @@ private struct PlatformTiles: View {
                 .foregroundStyle(content)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-            if soon {
-                Text(String(localized: "Coming soon"))
-                    .font(.caption2)
-                    .foregroundStyle(palette.onSurfaceVariant)
-                    .multilineTextAlignment(.center)
-            }
         }
-        // Top-aligned so icons and names line up across tiles even when one
-        // tile carries the extra "Coming soon" line. Highest: the step that
-        // shows on the sheet's glass (SheetBackground).
+        // Top-aligned so icons and names line up across chips when one name wraps.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(.vertical, 12)
         .padding(.horizontal, 6)
-        .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(palette.surfaceContainerHighest))
+        // The whole chip takes the tap, not just its glyph and text.
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    // Marks a chip as a button. Taps pass through to the chip under it.
+    private func cornerGlyph(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(palette.onSurfaceVariant)
+            .padding(9)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    // Across the chip's top edge: inside the chip it covered the TV glyph.
+    private var soonTag: some View {
+        Text(String(localized: "Soon"))
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(palette.onSurfaceVariant)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(palette.surfaceVariant))
+            .offset(x: 4, y: -6)
+    }
+}
+
+/// A chip's ground: Liquid Glass on iOS 26, reacting to touch only on a chip that is a
+/// button; the sheet's highest fill below iOS 26. Glass goes on the chip itself rather than
+/// through `.buttonStyle(.glass)`, whose padding wrapped the address onto two lines.
+private struct ChipSurface: ViewModifier {
+    let interactive: Bool
+
+    @Environment(\.pbPalette) private var palette
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        if #available(iOS 26.0, *) {
+            content.glassEffect(interactive ? .regular.interactive() : .regular, in: shape)
+        } else {
+            // Highest: the step that shows on the sheet's glass (SheetBackground).
+            content.background(shape.fill(palette.surfaceContainerHighest))
+        }
     }
 }
 

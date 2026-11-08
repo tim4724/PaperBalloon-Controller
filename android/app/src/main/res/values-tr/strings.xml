@@ -14,6 +14,9 @@
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">Tarayıcı</string>
     <string name="status_coming_soon">Çok yakında</string>
+    <string name="status_soon">Yakında</string>
+    <string name="share_link">%1$s adresini paylaş</string>
+    <string name="get_tv_app">TV uygulamasını indir</string>
     <string name="status_beta">Beta</string>
     <string name="trailer_unmute">Sesi aç</string>
     <string name="trailer_mute">Sesi kapat</string>

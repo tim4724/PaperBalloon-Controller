@@ -14,6 +14,9 @@
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">Browser</string>
     <string name="status_coming_soon">Bald verfügbar</string>
+    <string name="status_soon">Bald</string>
+    <string name="share_link">%1$s teilen</string>
+    <string name="get_tv_app">TV-App laden</string>
     <string name="status_beta">Beta</string>
     <string name="trailer_unmute">Ton einschalten</string>
     <string name="trailer_mute">Ton ausschalten</string>

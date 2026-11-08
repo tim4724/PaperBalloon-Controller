@@ -14,6 +14,9 @@
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">浏览器</string>
     <string name="status_coming_soon">即将推出</string>
+    <string name="status_soon">即将推出</string>
+    <string name="share_link">分享 %1$s</string>
+    <string name="get_tv_app">获取电视应用</string>
     <string name="status_beta">测试版</string>
     <string name="trailer_unmute">取消静音</string>
     <string name="trailer_mute">静音</string>

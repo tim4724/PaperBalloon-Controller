@@ -35,8 +35,13 @@ data class Game(
   // (see [probeRelays]/[probeRoom]).
   val relayProbeBase: String? = null,
   // Native TV apps: platform id -> "live" | "soon". Display-only; ids map to
-  // device tiles in the info sheet (PlatformTiles), unknown ids are ignored.
+  // device chips in the info sheet (PlatformChips), unknown ids are ignored.
   val tvApps: Map<String, String> = emptyMap(),
+  // Store page per TV platform id (https). Each app links only its own store's
+  // platform — Android the androidtv entry, iOS the appletv one (PlatformChips).
+  // A map beside tvApps rather than a reshaped tvApps, which installed builds
+  // parse as id -> status.
+  val tvStores: Map<String, String> = emptyMap(),
 ) {
   // Beta is playable like live, only labelled differently. Any other value — including
   // one a newer manifest invents — reads as coming soon.
@@ -103,6 +108,10 @@ object GamesManifest {
         // drops that entry rather than failing the parse.
         tvApps = g.optJSONObject("tvApps")?.let { o ->
           o.keys().asSequence().mapNotNull { k -> (o.opt(k) as? String)?.let { k to it } }.toMap()
+        } ?: emptyMap(),
+        // Same leniency, and https only like every other URL field.
+        tvStores = g.optJSONObject("tvStores")?.let { o ->
+          o.keys().asSequence().mapNotNull { k -> o.optHttpsUrl(k)?.let { k to it } }.toMap()
         } ?: emptyMap(),
       )
     }

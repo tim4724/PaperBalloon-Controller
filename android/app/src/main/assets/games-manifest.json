@@ -10,6 +10,9 @@
         "appletv": "live",
         "androidtv": "soon"
       },
+      "tvStores": {
+        "appletv": "https://apps.apple.com/app/hexstacker-party/id6788876779"
+      },
       "art": "/artwork/hexstacker-16x9-v2.webp",
       "icon": "/artwork/hexstacker-icon-v2.png",
       "video": "https://hexstacker.com/artwork/trailer.mp4?v=2",

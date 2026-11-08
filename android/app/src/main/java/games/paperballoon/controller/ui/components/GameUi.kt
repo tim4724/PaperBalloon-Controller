@@ -312,7 +312,7 @@ private fun StepRow(n: Int, text: AnnotatedString) {
 fun PlaySteps(game: Game) {
   Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
     // Deliberately path-free ("start it", not "open the app / the site") — where
-    // the game runs is the device-tile row's job (PlatformTiles).
+    // the game runs is the platform-chip row's job (PlatformChips).
     StepRow(1, AnnotatedString(stringResource(R.string.play_step_start, game.name)))
     StepRow(2, AnnotatedString(stringResource(R.string.play_step_scan)))
   }

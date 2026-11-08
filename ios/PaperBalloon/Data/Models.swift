@@ -91,13 +91,18 @@ struct Game: Identifiable, Hashable {
     /// (see `probeRelays`/`probeRoom`).
     let relayProbeBase: String?
     /// Native TV apps: platform id -> "live" | "soon". Display-only; ids map to
-    /// device tiles in the info sheet (PlatformTiles), unknown ids are ignored.
+    /// device chips in the info sheet (PlatformChips), unknown ids are ignored.
     let tvApps: [String: String]
+    /// Store page per TV platform id (https). Each app links only its own store's
+    /// platform — iOS the appletv entry, Android the androidtv one (PlatformChips).
+    /// A map beside tvApps rather than a reshaped tvApps, which installed builds
+    /// parse as id -> status.
+    let tvStores: [String: String]
 
     init(id: String, name: String, status: String = "soon",
          minPlayers: Int? = nil, maxPlayers: Int? = nil, video: String? = nil, accentColor: Color = PB.defaultAccent,
          art: String? = nil, icon: String? = nil, controllerBaseUrl: String? = nil, hosts: [String] = [],
-         relayProbeBase: String? = nil, tvApps: [String: String] = [:]) {
+         relayProbeBase: String? = nil, tvApps: [String: String] = [:], tvStores: [String: String] = [:]) {
         self.id = id
         self.name = name
         self.status = status
@@ -111,6 +116,7 @@ struct Game: Identifiable, Hashable {
         self.hosts = hosts
         self.relayProbeBase = relayProbeBase
         self.tvApps = tvApps
+        self.tvStores = tvStores
     }
 
     /// Beta is playable like live, only labelled differently. Any other value —
@@ -202,11 +208,13 @@ enum GamesManifest {
         // Display-only, so lenient where hosts is strict: a non-string status
         // drops that entry rather than failing the parse.
         let tvApps = ((obj["tvApps"] as? [String: Any]) ?? [:]).compactMapValues { $0 as? String }
+        // Same leniency, and https only like every other URL field.
+        let tvStores = ((obj["tvStores"] as? [String: Any]) ?? [:]).compactMapValues { httpsURL($0) }
 
         return Game(id: id, name: name, status: status,
                     minPlayers: minPlayers, maxPlayers: maxPlayers, video: video, accentColor: accentColor,
                     art: art, icon: icon, controllerBaseUrl: controllerBaseUrl, hosts: hosts,
-                    relayProbeBase: relayProbeBase, tvApps: tvApps)
+                    relayProbeBase: relayProbeBase, tvApps: tvApps, tvStores: tvStores)
     }
 
     /// A positive Int from a JSON value, or nil if absent/non-numeric/≤0.

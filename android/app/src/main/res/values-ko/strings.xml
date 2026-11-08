@@ -15,6 +15,9 @@
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">브라우저</string>
     <string name="status_coming_soon">출시 예정</string>
+    <string name="status_soon">출시 예정</string>
+    <string name="share_link">%1$s 공유</string>
+    <string name="get_tv_app">TV 앱 받기</string>
     <string name="status_beta">베타</string>
     <string name="trailer_unmute">음소거 해제</string>
     <string name="trailer_mute">음소거</string>

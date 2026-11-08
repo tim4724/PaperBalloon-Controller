@@ -14,6 +14,9 @@
     <string name="device_android_tv">Android TV</string>
     <string name="device_web">Браузер</string>
     <string name="status_coming_soon">Скоро</string>
+    <string name="status_soon">Скоро</string>
+    <string name="share_link">Поделиться %1$s</string>
+    <string name="get_tv_app">Скачать приложение для ТВ</string>
     <string name="status_beta">Бета</string>
     <string name="trailer_unmute">Включить звук</string>
     <string name="trailer_mute">Выключить звук</string>
