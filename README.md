@@ -1,46 +1,83 @@
 # Paper Balloon Controller
 
-Native **controller** apps for the Paper Balloon party-game suite. The
-TV/computer is the display; phones are the controllers: scan the room code the
-display shows and your phone becomes the gamepad.
+[Paper Balloon](https://paperballoon.games) is a set of party games played on
+one shared screen. This is the phone app that goes with them: start a game on
+the TV or in a browser, scan the room code it shows, and your phone is the
+controller.
 
-The launcher (home screen) is fully native per platform. Each game's
-controller is a **remote web page** loaded full-screen in a hardened top-level
-web view with no launcher chrome over it — games ship controller changes without
-an app update.
+**[Download on the App Store](https://apps.apple.com/us/app/paper-balloon-controller/id6825072879)**
+· Android is in closed testing, [join the beta](https://paperballoon.games/beta)
 
-[CONTRACT.md](CONTRACT.md) is the launcher⇄game contract: the player name
-and its rename sheet, leaving, the status-bar color scheme, the safe area, and the
-`_paperballoon._tcp` room advertisement that puts a one-tap join card on home with no
-scan at all: a **native** display app (tvOS / Android TV) announces its room code,
-and a controller already in a room relays it so browser-hosted rooms are findable
-too. Both apps implement it identically.
+<p align="center">
+  <img src="docs/screenshots/home.webp" width="260" alt="Home screen: the game list, nearby-room search and the Scan code button">
+  <img src="docs/screenshots/game-sheet.webp" width="260" alt="HexStacker's sheet: where to play it and how to join">
+  <img src="docs/screenshots/in-game.webp" width="260" alt="HexStacker's controller running full screen in the app">
+</p>
 
-## Layout
+## How it works
 
-- `android/` — Jetpack Compose / Material 3 app (Kotlin)
-- `ios/` — SwiftUI app (Swift, project generated with XcodeGen; see
-  [ios/README.md](ios/README.md))
-- `third_party/zxing-cpp/` — git submodule tracking upstream zxing-cpp; Android
-  compiles its QR decoder from here rather than using the published AAR (why:
-  `android/app/build.gradle.kts`)
+The two apps are native ports of each other and behave the same: Kotlin with
+Jetpack Compose on Android, Swift with SwiftUI on iOS.
 
-## Android: build & run
+The home screen is native. A game's controller is not: it is a web page served
+by the game, opened full screen in a locked-down web view. Games can change
+their controller without an app release, and the same page keeps working in a
+plain mobile browser for players who never install anything. The app exists for
+what a browser can't do: vibrate or lock the orientation on iOS, and find a
+room on the local network.
 
-Standard Gradle project — open `android/` in Android Studio, or:
+- The page and the app talk through a small JavaScript bridge,
+  `window.PaperBalloonHost`, specified in [CONTRACT.md](CONTRACT.md): the
+  player's name and a native rename sheet, leaving the game, the back button,
+  orientation, haptics and the status bar colors. Pages feature-detect every
+  part of it, which is what keeps them working in a browser.
+- The web view only loads https pages on the game's own domains. A link the
+  player taps to anywhere else opens in the browser, and everything else is
+  blocked. A join link from a QR code or the relay server is checked against
+  the manifest's hosts before anything loads.
+- Rooms nearby appear on the home screen without scanning. A native TV app
+  can advertise its room code over mDNS, and a phone already in a room
+  advertises it too, so rooms hosted in a browser show up as well.
+- The games list is a JSON manifest the website serves, so a new game reaches
+  installed apps without an update.
+- Scanning stays on the device: CameraX with zxing-cpp on Android,
+  AVFoundation on iOS. Neither app contains analytics or ad SDKs.
+- On iOS the same code also builds as an App Clip, which opens a scanned room
+  link without installing the app.
+
+Logic the two apps must agree on exactly (parsing join links, haptic patterns)
+is tested from shared JSON cases in `tests/` that both unit test suites run.
+UI tests on both platforms drive a live contract test page through the real
+bridge, and the screenshots above come out of the store screenshot UI tests in
+CI.
+
+## Repository layout
+
+- `android/`: the Android app (Kotlin, Jetpack Compose).
+- `ios/`: the iOS app and its App Clip (Swift, SwiftUI); see
+  [ios/README.md](ios/README.md). Both apps split their sources the same way:
+  data, the home screen, the game's web view and the theme.
+- `tests/`: test cases both apps run.
+- `tools/`: the localization check, the artwork encoder and the app icon
+  generator.
+- `third_party/zxing-cpp/`: upstream zxing-cpp as a git submodule. Android
+  compiles its QR decoder from it instead of using the published AAR; the
+  reason is in `android/app/build.gradle.kts`.
+
+## Building
+
+Android: open `android/` in Android Studio, or
 
 ```sh
-git submodule update --init third_party/zxing-cpp             # once per checkout (zxing-cpp is built from source)
+git submodule update --init third_party/zxing-cpp             # once per checkout
 cd android
 echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties   # once per checkout
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-QR scanning is an in-app CameraX + zxing-cpp scanner — fully on-device, no
-telemetry (CAMERA permission, with manual room-code entry as the fallback).
-
-## iOS: build & run
+iOS: the Xcode project is generated, not committed. The simulator has no
+camera, so there you join by typing the room code.
 
 ```sh
 cd ios
@@ -48,61 +85,57 @@ xcodegen generate    # brew install xcodegen, once
 open PaperBalloon.xcodeproj
 ```
 
-QR scanning uses AVFoundation (camera permission) and degrades to manual
-room-code entry in the simulator.
-
 ## Localization
 
-Both apps ship the 11 HexStacker locales (en + de, es, fr, it, ja, ko, pt, ru,
-tr, zh): Android in `res/values[-XX]/strings.xml`, iOS in
-`PaperBalloon/Resources/*.xcstrings`. Per-game display copy (e.g. player counts)
-lives in those same string resources under `game_<id>_*` keys, resolved by game
-id at load time — `games-manifest.json` itself is purely structural and holds no
-translated text.
+Both apps ship in the same 11 languages: Android in
+`res/values[-XX]/strings.xml`, iOS in `PaperBalloon/Resources/*.xcstrings`.
+Per-game text such as player counts lives in those same resources under
+`game_<id>_*` keys; `games-manifest.json` holds no translated text. After any
+string change, run
 
 ```sh
 python3 tools/check_l10n_sync.py
 ```
 
-verifies the three stay in sync: locale coverage on both platforms, identical
-translations for every text both apps share (matched via the English source),
-and byte-identical manifest copies. Platform-only strings are declared in the
-script's `ANDROID_ONLY` / `IOS_ONLY` lists — an undeclared one-sided string
-fails the check. Run it after any string change.
+It checks that both platforms cover every locale, that text both apps share is
+translated identically (matched by the English source), and that the two
+manifest copies are byte-identical. A string that exists on one platform only
+must be listed in the script's `ANDROID_ONLY` or `IOS_ONLY`, or the check
+fails.
 
 ## Where things live
 
-- `android/app/src/main/assets/games-manifest.json` — the bundled games list;
-  drives the home screen, scan/typed-code resolution, and relay probing. Cover
-  art (`art`, 16:9) and the square brand mark (`icon`, used by the nearby-room
-  card) both sit next to it in `assets/artwork/`. The iOS app bundles copies under
-  `ios/PaperBalloon/Resources/` — keep them in sync when the manifest changes.
-  The bundled copy is only the first-run seed: once per launch both apps fetch
-  `paperballoon.games/games-manifest.json` (served no-cache from the site
-  repo), persist it, and render from it — so a new game or status flip is one
-  site deploy, no app update. Art the current build didn't ship is downloaded
-  into a URL-keyed cache that is never revalidated (entries the manifest no
-  longer names are deleted after each fetch), and shipped art is matched
-  by file name — so a **changed image must get a new file name** (e.g.
-  `hexstacker-16x9-v2.webp`) in the served manifest and in both bundles; changed
-  bytes under an unchanged name go unnoticed by design. Not a `?v=` bump: the
-  query string lands inside the file name both bundle lookups use, so every app
-  would re-download art it already ships. Trailers (`video`) are never bundled,
-  so a changed trailer is just a `?v=` bump, once the new file is live. Encode
-  covers with
+The games list is `android/app/src/main/assets/games-manifest.json`. It drives
+the home screen, resolving scanned and typed codes, and the relay lookups.
+Cover art (`art`, 16:9) and the square icon the nearby-room card uses (`icon`)
+sit next to it in `assets/artwork/`. The iOS app bundles copies in
+`ios/PaperBalloon/Resources/`; change both together.
 
-  ```sh
-  tools/encode_artwork.sh <master>...    # 1280x720 q85 -> both bundles
-  ```
+The bundled manifest only seeds the first launch. On every launch both apps
+fetch `paperballoon.games/games-manifest.json` (served no-cache from the
+website repo), store it and render from it, so a new game or a status change
+is one website deploy.
 
-  which is the ceiling both apps decode to, so a larger source is download weight
-  no screen ever shows. Not a build step, and it takes masters — every run is
-  another generation of lossy re-encode.
-- `android/app/src/main/java/games/paperballoon/controller/` — `data/` (manifest
-  model, join resolution, relay probe, LAN room discovery, prefs), `ui/main/`
-  (home), `ui/game/` (WebView game host), `theme/`.
-- `ios/PaperBalloon/` — `Data/` (same responsibilities as Android `data/`),
-  `UI/Main/`, `GameHost/` (WKWebView game host), `Theme/`.
-- The launcher icon (Android `ic_launcher_*` layers and legacy mipmaps, iOS
-  `AppIcon.icon` plus the `AppIcon.appiconset` fallback) is generated from one
-  drawing: edit and run `uv run tools/app_icon.py`, then commit what it writes.
+Art the running build doesn't ship is downloaded into a cache keyed by URL and
+never revalidated; entries the manifest no longer names are deleted after each
+fetch. Bundled art is matched by file name. So a changed image needs a **new
+file name** (for example `hexstacker-16x9-v2.webp`), in the served manifest and
+in both bundles. New bytes under an old name go unnoticed, by design. A `?v=`
+query doesn't work for art: it ends up in the file name both bundle lookups
+use, so every install would download art it already has. Trailers (`video`)
+are never bundled, so a changed trailer only needs a `?v=` bump once the new
+file is live.
+
+Encode covers with
+
+```sh
+tools/encode_artwork.sh <master>...    # 1280x720, quality 85, writes both bundles
+```
+
+1280x720 is the largest size either app decodes, so anything bigger is
+download weight no screen shows. The script isn't part of the build. Give it
+masters, since every run is another lossy re-encode.
+
+The launcher icon (Android `ic_launcher_*` layers and legacy mipmaps, iOS
+`AppIcon.icon` plus the `AppIcon.appiconset` fallback) is generated from one
+drawing: edit and run `uv run tools/app_icon.py`, then commit what it writes.

@@ -1,4 +1,4 @@
-# Paper Balloon Controller — iOS
+# Paper Balloon Controller for iOS
 
 Native SwiftUI port of the Android launcher (functional parity; see
 [../CONTRACT.md](../CONTRACT.md) for the launcher⇄game contract).
@@ -16,7 +16,7 @@ iOS 17+, no third-party dependencies. QR scanning uses AVFoundation and
 degrades to manual room-code entry in the simulator (no camera).
 
 `PaperBalloon/Resources/games-manifest.json` and `Resources/artwork/` are copies
-of the Android assets (`../android/app/src/main/assets/`) — keep them in sync
+of the Android assets (`../android/app/src/main/assets/`). Keep them in sync
 when the manifest changes.
 
 ## App Clip
@@ -25,8 +25,8 @@ when the manifest changes.
 play without installing the app. It compiles the same `PaperBalloon/` sources with
 `APPCLIP` set (`PB.isAppClip`), so the invocation URL takes the Universal Link path
 through `SceneDelegate`. Shared code must stay clip-safe: a clip has no Bonjour, so
-§8 discovery and advertising are off there — see Apple's
-[App Clip limitations](https://developer.apple.com/documentation/appclip/choosing-the-right-functionality-for-your-app-clip).
+§8 discovery and advertising are off there (see Apple's
+[App Clip limitations](https://developer.apple.com/documentation/appclip/choosing-the-right-functionality-for-your-app-clip)).
 Invocation hosts are the clip's `appclips:` entitlements in `project.yml`; each must
 serve an AASA naming the clip, and which URLs open it is set by the App Clip
 experiences in App Store Connect.
