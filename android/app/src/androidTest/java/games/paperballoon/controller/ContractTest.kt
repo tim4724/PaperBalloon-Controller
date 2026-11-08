@@ -14,6 +14,9 @@ import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso
+import androidx.test.espresso.action.ViewActions
+import androidx.test.espresso.matcher.RootMatchers.isDialog
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.webkit.WebViewCompat
@@ -73,7 +76,10 @@ class ContractTest {
   @Test fun dismissedSheetResolvesNull() = inGame {
     click("#rename")
     awaitNameSheet()
-    Espresso.pressBack()
+    // Aimed at the sheet's own dialog window: its text field can be in the tree before
+    // that window has focus, and an untargeted pressBack then picks the activity's
+    // window and waits for focus it never gets.
+    Espresso.onView(isRoot()).inRoot(isDialog()).perform(ViewActions.pressBack())
     awaitLog("editName → null")
     assertTrue("left the game", hosting())
   }
