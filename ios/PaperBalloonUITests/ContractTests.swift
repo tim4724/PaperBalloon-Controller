@@ -34,8 +34,9 @@ final class ContractTests: XCTestCase {
         ]
         app.launch()
         // The page's script has run once it has filled in its mode badge, and touches reach
-        // it once the launcher's join cover has faded (on the page's first frame).
-        XCTAssertTrue(web.staticTexts["launcher shell"].waitForExistence(timeout: 30))
+        // it once the launcher's join cover has faded (on the page's first frame). The load
+        // from a CI runner has taken over 30 s.
+        XCTAssertTrue(web.staticTexts["launcher shell"].waitForExistence(timeout: 60))
         let joining = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Joining'")).firstMatch
         XCTAssertTrue(joining.waitForNonExistence(timeout: 30))
     }
@@ -74,8 +75,10 @@ final class ContractTests: XCTestCase {
     /// §3: the first exit wins, here gameEnded, so home shows its message.
     func testGameEndedBeatsALaterLeave() {
         web.buttons["gameEnded + leave"].tap()
+        // The message first: it clears itself 5 s after the game ends, which awaitHome's
+        // queries can outlast on a slow CI simulator. It only ever shows on home.
+        XCTAssertTrue(app.staticTexts["Room is full"].waitForExistence(timeout: 10))
         awaitHome()
-        XCTAssertTrue(app.staticTexts["Room is full"].waitForExistence(timeout: 5))
     }
 
     /// §5: the page covers the whole screen and env(safe-area-inset-top) is the status bar.
