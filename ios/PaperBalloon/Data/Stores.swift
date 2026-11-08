@@ -91,16 +91,21 @@ enum ProfileStore {
         refreshed = true
         guard let (data, response) = try? await URLSession.shared.data(from: Self.manifestURL),
               (response as? HTTPURLResponse)?.statusCode == 200,
-              data.count <= Self.maxBytes,
-              // Identical to the seeded copy (the common case every launch) — the
-              // current list already reflects it, so skip the re-parse, the
-              // rewrite, and the objectWillChange.
-              data != (try? Data(contentsOf: Self.cacheFile)),
-              let fresh = GamesManifest.parse(data) else {
+              data.count <= Self.maxBytes else {
             return
         }
-        try? data.write(to: Self.cacheFile, options: .atomic)
-        games = fresh
+        // Identical to the seeded copy (the common case every launch) — the
+        // current list already reflects it, so skip the re-parse, the rewrite,
+        // and the objectWillChange.
+        if data != (try? Data(contentsOf: Self.cacheFile)) {
+            guard let fresh = GamesManifest.parse(data) else { return }
+            try? data.write(to: Self.cacheFile, options: .atomic)
+            games = fresh
+        }
+        // Every launch, not only on a change: a download the old list started can
+        // land after the prune that orphaned it.
+        let current = games
+        Task.detached(priority: .utility) { pruneDownloadCaches(keeping: current) }
     }
 }
 

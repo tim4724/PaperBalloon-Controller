@@ -7,7 +7,8 @@ import java.security.MessageDigest
 /**
  * On-demand URL-keyed download caches in cacheDir, so the OS reclaims the bytes
  * under storage pressure. Entries are NEVER revalidated — a changed remote
- * file must ship under a new URL, which simply fetches a new entry here. For
+ * file must ship under a new URL, which simply fetches a new entry here, and
+ * [pruneDownloadCaches] drops the old one once the manifest stops naming it. For
  * art that means a new file name, not a ?v= bump, which breaks the bundled-art
  * lookup (README §Where things live); trailers aren't bundled, so ?v= is enough.
  *
@@ -40,10 +41,7 @@ private fun fetchCached(
 ): File? {
   val dir = File(context.cacheDir, dirName)
   dir.mkdirs()
-  val key = MessageDigest.getInstance("SHA-256")
-    .digest(url.toByteArray())
-    .joinToString("") { "%02x".format(it) }
-    .take(16)
+  val key = cacheKey(url)
   val file = File(dir, "$key.$ext")
   if (file.length() > 0) return file
   // Download to a unique temp sibling and rename, so a torn or concurrent
@@ -68,3 +66,24 @@ private fun fetchCached(
     tmp.delete()
   }
 }
+
+/**
+ * Deletes every cached download [games] no longer names — a re-artworked game's old
+ * cover, a trailer's pre-?v= file — which nothing would ever read again. Blocking —
+ * call on IO. In-flight downloads are .part files, so they're never touched.
+ */
+fun pruneDownloadCaches(context: Context, games: List<Game>) {
+  val urls = games.flatMap { listOfNotNull(it.art, it.icon) }.mapNotNull(::remoteArtUrl) +
+    games.mapNotNull { it.video }
+  val keep = urls.map(::cacheKey).toSet()
+  for ((dirName, ext) in listOf("artwork" to "img", "trailers" to "mp4")) {
+    File(context.cacheDir, dirName).listFiles()?.forEach { file ->
+      if (file.extension == ext && file.nameWithoutExtension !in keep) file.delete()
+    }
+  }
+}
+
+private fun cacheKey(url: String): String = MessageDigest.getInstance("SHA-256")
+  .digest(url.toByteArray())
+  .joinToString("") { "%02x".format(it) }
+  .take(16)

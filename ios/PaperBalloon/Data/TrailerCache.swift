@@ -3,7 +3,8 @@ import Foundation
 
 /// On-demand URL-keyed download caches in Caches/, so the OS reclaims the bytes
 /// under storage pressure. Entries are NEVER revalidated — a changed remote
-/// file must ship under a new URL, which simply fetches a new entry here. For
+/// file must ship under a new URL, which simply fetches a new entry here, and
+/// `pruneDownloadCaches` drops the old one once the manifest stops naming it. For
 /// art that means a new file name, not a ?v= bump, which breaks the bundled-art
 /// lookup (README §Where things live); trailers aren't bundled, so ?v= is enough.
 ///
@@ -27,14 +28,39 @@ enum ArtworkCache {
     }
 }
 
+/// Deletes every cached download `games` no longer names — a re-artworked game's
+/// old cover, a trailer's pre-?v= file — which nothing would ever read again.
+/// In-flight downloads live in the system temp dir until moved here, so they're
+/// never touched.
+func pruneDownloadCaches(keeping games: [Game]) {
+    let urls = games.flatMap { [$0.art, $0.icon].compactMap { $0 }.compactMap(remoteArtURL) }
+        + games.compactMap { $0.video.flatMap(URL.init(string:)) }
+    let keep = Set(urls.map(cacheKey))
+    let fm = FileManager.default
+    for (dirName, ext) in [("artwork", "img"), ("trailers", "mp4")] {
+        let files = (try? fm.contentsOfDirectory(at: cacheDir(dirName), includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == ext
+            && !keep.contains(file.deletingPathExtension().lastPathComponent) {
+            try? fm.removeItem(at: file)
+        }
+    }
+}
+
+private func cacheDir(_ name: String) -> URL {
+    FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent(name, isDirectory: true)
+}
+
+private func cacheKey(_ url: URL) -> String {
+    let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
+    return String(digest.map { String(format: "%02x", $0) }.joined().prefix(16))
+}
+
 private func fetchCached(_ url: URL, dirName: String, ext: String,
                          delegate: URLSessionTaskDelegate? = nil) async -> URL? {
     let fm = FileManager.default
-    let dir = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent(dirName, isDirectory: true)
-    let digest = SHA256.hash(data: Data(url.absoluteString.utf8))
-    let key = digest.map { String(format: "%02x", $0) }.joined().prefix(16)
-    let dest = dir.appendingPathComponent("\(key).\(ext)")
+    let dir = cacheDir(dirName)
+    let dest = dir.appendingPathComponent("\(cacheKey(url)).\(ext)")
     if fm.fileExists(atPath: dest.path) { return dest }
     guard let (tmp, response) = try? await URLSession.shared.download(from: url, delegate: delegate),
           (response as? HTTPURLResponse)?.statusCode == 200

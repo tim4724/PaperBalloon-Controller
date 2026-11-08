@@ -47,10 +47,14 @@ object ManifestStore {
     val text = withContext(Dispatchers.IO) { fetchText() } ?: return
     // Identical to the seeded copy (the common case every launch) — the current
     // list already reflects it, so skip the re-parse and the prefs rewrite.
-    if (text == prefs(context).getString(KEY_JSON, null)) return
-    val games = GamesManifest.parse(text) ?: return
-    prefs(context).edit { putString(KEY_JSON, text) }
-    flow.value = games
+    if (text != prefs(context).getString(KEY_JSON, null)) {
+      val games = GamesManifest.parse(text) ?: return
+      prefs(context).edit { putString(KEY_JSON, text) }
+      flow.value = games
+    }
+    // Every launch, not only on a change: a download the old list started can land
+    // after the prune that orphaned it.
+    withContext(Dispatchers.IO) { pruneDownloadCaches(context, flow.value) }
   }
 
   private fun fetchText(): String? = httpGet(MANIFEST_URL) { input, _ ->

@@ -141,8 +141,8 @@ private object ArtCache {
    * The bundled asset when one ships under artwork/<file> (matched by file name —
    * the bundled and served manifests root the same art differently), else the
    * ArtworkCache copy downloaded from the manifest URL. Both lookups key on the
-   * URL/name, never on content, so a changed image must ship under a new file name
-   * or ?v= — see ArtworkCache.
+   * URL/name, never on content, so a changed image must ship under a new file
+   * name — see ArtworkCache.
    */
   private fun decode(context: Context, art: String): Art? {
     val assetPath = "artwork/" + art.substringAfterLast('/')

@@ -145,7 +145,7 @@ struct JoiningCover: View {
 /// the bundled copy when one ships (assets are flattened into the bundle root, so
 /// lookup uses lastPathComponent only), else the ArtworkCache copy downloaded from
 /// the manifest URL. Both lookups key on the URL/name, never on content, so a
-/// changed image must ship under a new file name or ?v= — see ArtworkCache.
+/// changed image must ship under a new file name — see ArtworkCache.
 enum ArtCache {
     private static let lock = NSLock()
     private static var images: [String: UIImage] = [:]
