@@ -9,9 +9,8 @@ controller.
 · Android is in closed testing, [join the beta](https://paperballoon.games/beta)
 
 <p align="center">
-  <img src="docs/screenshots/home.webp" width="260" alt="Home screen: the game list, nearby-room search and the Scan code button">
-  <img src="docs/screenshots/game-sheet.webp" width="260" alt="HexStacker's sheet: where to play it and how to join">
-  <img src="docs/screenshots/in-game.webp" width="260" alt="HexStacker's controller running full screen in the app">
+  <img src="docs/screenshots/home-android.webp" height="600" alt="Android home screen: a HexStacker room on the living room TV, ready to join with one tap, above the game list">
+  <img src="docs/screenshots/home-ios.webp" height="600" alt="The same home screen on iOS">
 </p>
 
 ## How it works
@@ -48,8 +47,7 @@ room on the local network.
 Logic the two apps must agree on exactly (parsing join links, haptic patterns)
 is tested from shared JSON cases in `tests/` that both unit test suites run.
 UI tests on both platforms drive a live contract test page through the real
-bridge, and the screenshots above come out of the store screenshot UI tests in
-CI.
+bridge, and the store screenshots come out of UI tests in CI.
 
 ## Repository layout
 
