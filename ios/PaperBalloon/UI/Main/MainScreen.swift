@@ -1478,18 +1478,23 @@ private struct JoinDock: View {
     }
 }
 
-/// The dock's bar at the bottom edge. iOS 26 has a bar with the soft scroll edge, a
-/// progressive blur the list dissolves into; before that it is the system bar material
-/// with its hairline, like a toolbar. A modifier rather than an inline `if #available` so
-/// the SDK-17 build compiles.
+/// The dock's bar at the bottom edge. iOS 27 has a bar with the soft scroll edge, a
+/// progressive blur the list dissolves into. iOS 26 (seen on 26.5, Xcode 27 build) draws
+/// no blur under this bar, soft or automatic, only a grey veil, so there the bar brings its
+/// own (`DockFrost`). Before 26 it is the system bar material with its hairline, like a
+/// toolbar. A modifier rather than an inline `if #available` so the SDK-17 build compiles.
 private struct DockBar<Bar: View>: ViewModifier {
     @ViewBuilder let bar: () -> Bar
 
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
+        if #available(iOS 27.0, *) {
             content
                 .scrollEdgeEffectStyle(.soft, for: .bottom)
                 .safeAreaBar(edge: .bottom) { bar() }
+        } else if #available(iOS 26.0, *) {
+            content
+                .scrollEdgeEffectHidden(true, for: .bottom)
+                .safeAreaBar(edge: .bottom) { bar().background { DockFrost() } }
         } else {
             content
                 .safeAreaInset(edge: .bottom) {
@@ -1499,6 +1504,23 @@ private struct DockBar<Bar: View>: ViewModifier {
                         .overlay(alignment: .top) { Divider() }
                 }
         }
+    }
+}
+
+/// iOS 26's stand-in for the soft scroll edge: the list blurred under a half veil of the
+/// page, the recipe of Android's `DockPanel` (blur alone reads as out-of-focus posters, not
+/// frost), but faded in over the top half rather than hard-edged.
+private struct DockFrost: View {
+    @Environment(\.pbPalette) private var palette
+
+    var body: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .overlay(palette.background.opacity(0.5))
+            .mask(LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .center))
+            // The fade starts a little above the buttons, so they sit in frost, not on its edge.
+            .padding(.top, -16)
+            .ignoresSafeArea(edges: .bottom)
     }
 }
 
