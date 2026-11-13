@@ -172,7 +172,7 @@ struct MainScreen: View {
             // The dock sits in a bar at the bottom edge: the list scrolls under it, and
             // the content is inset so the last card stays reachable.
             .modifier(DockBar {
-                JoinDock(
+                JoinButtons(
                     onScan: { requireName(.scan) },
                     onEnterCode: { requireName(.enterCode) }
                 )
@@ -1453,30 +1453,7 @@ private struct Puff: Shape {
     }
 }
 
-// MARK: - JoinDock (floating over the poster list)
-
-/// The dock at the thumb: scan, and the keyboard for a typed code. Glass where the OS
-/// has it.
-private struct JoinDock: View {
-    let onScan: () -> Void
-    let onEnterCode: () -> Void
-
-    @Environment(\.pbPalette) private var palette
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ScanButton(action: onScan)
-            Button(action: onEnterCode) {
-                Image(systemName: "keyboard")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(palette.onSurface)
-                    .frame(width: 30, height: 30)
-            }
-            .modifier(GhostCircleButton())
-            .accessibilityLabel("Enter code manually")
-        }
-    }
-}
+// MARK: - Dock bar (floating over the poster list)
 
 /// The dock's bar at the bottom edge. iOS 27 has a bar with the soft scroll edge, a
 /// progressive blur the list dissolves into. iOS 26 (seen on 26.5, Xcode 27 build) draws
@@ -1521,28 +1498,6 @@ private struct DockFrost: View {
             // The fade starts a little above the buttons, so they sit in frost, not on its edge.
             .padding(.top, -16)
             .ignoresSafeArea(edges: .bottom)
-    }
-}
-
-/// A round glass button on iOS 26; the ghost button (the card fill with a 1.5pt line)
-/// before. 56pt around the 30pt glyph, like the scan pill beside it. A modifier rather
-/// than an inline `if #available` so the SDK-17 build compiles.
-private struct GhostCircleButton: ViewModifier {
-    @Environment(\.pbPalette) private var palette
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-        } else {
-            content
-                .buttonStyle(.plain)
-                .padding(13)
-                .background(palette.ghost, in: Circle())
-                .overlay(Circle().strokeBorder(palette.ghostLine, lineWidth: 1.5))
-        }
     }
 }
 

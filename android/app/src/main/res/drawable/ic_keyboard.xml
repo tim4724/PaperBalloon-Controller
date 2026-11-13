@@ -1,5 +1,5 @@
-<!-- Material "keyboard". The home dock's enter-code button: a room code is typed, so the
-     glyph is the keyboard; iOS uses the SF Symbol "keyboard". -->
+<!-- Material "keyboard". The join row's enter-code button (home dock and game sheet): a
+     room code is typed, so the glyph is the keyboard; iOS uses the SF Symbol "keyboard". -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"

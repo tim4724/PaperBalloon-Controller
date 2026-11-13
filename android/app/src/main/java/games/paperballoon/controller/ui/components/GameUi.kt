@@ -3,6 +3,7 @@ package games.paperballoon.controller.ui.components
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,9 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +59,8 @@ import games.paperballoon.controller.data.remoteArtUrl
 import games.paperballoon.controller.theme.ActionSunset
 import games.paperballoon.controller.theme.betaTag
 import games.paperballoon.controller.theme.frosted
+import games.paperballoon.controller.theme.ghost
+import games.paperballoon.controller.theme.ghostLine
 import games.paperballoon.controller.theme.onBetaTag
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -318,16 +322,38 @@ fun PlaySteps(game: Game) {
   }
 }
 
-/** The two join actions, stacked — a playable game's info sheet. */
+/**
+ * The two join actions in one row: scan, and the keyboard for a typed code. The home dock
+ * and a playable game's info sheet, so joining looks the same wherever it's offered.
+ */
 @Composable
-fun JoinButtons(onScan: () -> Unit, onEnterCode: () -> Unit) {
-  ScanButton(onScan, Modifier.fillMaxWidth())
-  FilledTonalButton(onClick = onEnterCode, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-    Text(stringResource(R.string.enter_code_manually), style = MaterialTheme.typography.titleMedium)
+fun JoinButtons(onScan: () -> Unit, onEnterCode: () -> Unit, modifier: Modifier = Modifier) {
+  Row(
+    modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    ScanButton(onScan, Modifier.weight(1f))
+    // The ghost button: the card fill with a 1.5dp line, as a circle.
+    OutlinedIconButton(
+      onClick = onEnterCode,
+      modifier = Modifier.size(56.dp),
+      colors = IconButtonDefaults.outlinedIconButtonColors(
+        containerColor = MaterialTheme.colorScheme.ghost,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+      ),
+      border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.ghostLine),
+    ) {
+      Icon(
+        painterResource(R.drawable.ic_keyboard),
+        contentDescription = stringResource(R.string.enter_code_manually),
+        Modifier.size(24.dp),
+      )
+    }
   }
 }
 
-/** The one primary action: scan. Shared by the home dock and the info sheet. */
+/** The one primary action: scan. The lead of JoinButtons. */
 @Composable
 fun ScanButton(onScan: () -> Unit, modifier: Modifier = Modifier) {
   SunsetButton(onScan, modifier.height(56.dp)) {

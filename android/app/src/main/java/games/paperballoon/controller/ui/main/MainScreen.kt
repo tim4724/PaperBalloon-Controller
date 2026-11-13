@@ -70,7 +70,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -202,7 +201,7 @@ import games.paperballoon.controller.ui.components.GameIcon
 import games.paperballoon.controller.ui.components.rememberArt
 import games.paperballoon.controller.ui.components.deviceName
 import games.paperballoon.controller.ui.components.findActivity
-import games.paperballoon.controller.ui.components.ScanButton
+import games.paperballoon.controller.ui.components.JoinButtons
 import games.paperballoon.controller.ui.components.SunsetButton
 import games.paperballoon.controller.ui.components.JoiningCover
 import games.paperballoon.controller.ui.components.PlayerChip
@@ -634,7 +633,7 @@ fun MainScreen(
         scrolled = { scroll.value - band.offset },
         modifier = Modifier.align(Alignment.BottomCenter).height(bottomInset + 12.dp + 56.dp + DOCK_PANEL_ABOVE),
       )
-      JoinDock(
+      JoinButtons(
         onScan = { requireName(AfterName.Scan) },
         onEnterCode = { requireName(AfterName.EnterCode) },
         modifier = Modifier
@@ -1021,10 +1020,9 @@ private enum class NearbyStatus {
 // ask the system, or open Settings once that's the one place that can still answer. Only
 // the verb changes between the two. The info line wears the toggle's own system icon —
 // the mark the system dialog and the Settings row show — in the muted-status layout, so
-// every state of the slot is one icon-plus-line; the button stays bare-verb tonal like
-// the info sheet's "Enter code manually", at the same height. Tonal, not the sunset: this
-// is one-time setup that vanishes for good once granted, and it must not outshout the
-// scan CTA you use every session.
+// every state of the slot is one icon-plus-line; the button stays bare-verb tonal (56dp,
+// like the scan pill). Tonal, not the sunset: this is one-time setup that vanishes for
+// good once granted, and it must not outshout the scan CTA you use every session.
 //
 // Once granted, searching, not-found and the off-Wi-Fi hint collapse to a muted line — an
 // idle home screen shouldn't carry a box announcing that a TV simply isn't switched on.
@@ -1657,39 +1655,6 @@ private val DOCK_PANEL_ABOVE = 8.dp
 // One blur, not a progressive stack: every blur pass runs on each scroll frame.
 private val DOCK_PANEL_BLUR = 8.dp
 private const val DOCK_PANEL_SCALE = 0.5f
-
-// The dock at the thumb, over the scrolling catalog: scan, and the keyboard for a typed
-// code.
-@Composable
-private fun JoinDock(
-  onScan: () -> Unit,
-  onEnterCode: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  Row(
-    modifier.fillMaxWidth(),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
-  ) {
-    ScanButton(onScan, Modifier.weight(1f))
-    // The ghost button: the card fill with a 1.5dp line, as a circle.
-    OutlinedIconButton(
-      onClick = onEnterCode,
-      modifier = Modifier.size(56.dp),
-      colors = IconButtonDefaults.outlinedIconButtonColors(
-        containerColor = MaterialTheme.colorScheme.ghost,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-      ),
-      border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.ghostLine),
-    ) {
-      Icon(
-        painterResource(R.drawable.ic_keyboard),
-        contentDescription = stringResource(R.string.enter_code_manually),
-        Modifier.size(24.dp),
-      )
-    }
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Previews

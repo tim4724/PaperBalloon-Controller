@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -122,10 +123,10 @@ class StoreScreenshotTest {
     waitForText(str(R.string.play_step_scan))
     // The numeric players chip, rendered from the manifest counts (HexStacker is 1–8).
     compose.onAllNodesWithText(PLAYERS_RANGE).onFirst().assertExists()
-    // The sheet carries both join buttons as text; behind it, the home dock's Scan code
-    // does too, but its manual entry is an icon.
+    // The sheet carries the same join row as the home dock behind it: Scan code as text,
+    // the manual entry as a keyboard icon — two of each.
     compose.onAllNodesWithText(str(R.string.scan_code)).assertCountEquals(2)
-    compose.onAllNodesWithText(str(R.string.enter_code_manually)).assertCountEquals(1)
+    compose.onAllNodesWithContentDescription(str(R.string.enter_code_manually)).assertCountEquals(2)
     // Give the muted gameplay trailer time to download (first locale only — it's
     // cached after) and render real frames; cover art shows if it isn't ready.
     Thread.sleep(4_000)

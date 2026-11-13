@@ -378,24 +378,54 @@ struct StepRow: View {
 
 // MARK: - JoinButtons
 
-/// The two join actions, stacked — a playable game's info sheet.
+/// The two join actions in one row: scan, and the keyboard for a typed code. The home dock
+/// and a playable game's info sheet, so joining looks the same wherever it's offered.
 struct JoinButtons: View {
     let onScan: () -> Void
     let onEnterCode: () -> Void
 
+    @Environment(\.pbPalette) private var palette
+
     var body: some View {
-        VStack(spacing: 10) {
+        HStack(spacing: 12) {
             ScanButton(action: onScan)
-            SecondaryButton(action: onEnterCode) {
-                Text("Enter code manually")
+            Button(action: onEnterCode) {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(palette.onSurface)
+                    .frame(width: 30, height: 30)
             }
+            .modifier(GhostCircleButton())
+            .accessibilityLabel("Enter code manually")
+        }
+    }
+}
+
+/// A round glass button on iOS 26; the ghost button (the card fill with a 1.5pt line)
+/// before. 56pt around the 30pt glyph, like the scan pill beside it. A modifier rather
+/// than an inline `if #available` so the SDK-17 build compiles.
+private struct GhostCircleButton: ViewModifier {
+    @Environment(\.pbPalette) private var palette
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
+        } else {
+            content
+                .buttonStyle(.plain)
+                .padding(13)
+                .background(palette.ghost, in: Circle())
+                .overlay(Circle().strokeBorder(palette.ghostLine, lineWidth: 1.5))
         }
     }
 }
 
 // MARK: - ScanButton
 
-/// The one primary action: scan. Shared by the home dock and the info sheet. The sunset
+/// The one primary action: scan. The lead of JoinButtons. The sunset
 /// fills a screen's one primary button and nothing else; a 56pt pill, like Android's.
 struct ScanButton: View {
     let action: () -> Void
