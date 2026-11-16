@@ -6,7 +6,7 @@ D = os.path.dirname(os.path.abspath(__file__)) + '/'
 SUB = 'Your phone is the controller'
 for link, title, f in [('https://hexstacker.com', 'HexStacker', 'hexstacker-appclip-3000x2000.png'),
                        ('https://tinytrack.paperballoon.games', 'Tiny Track', 'tinytrack-appclip-3000x2000.jpg'),
-                       ('https://paperballoon.games', 'Paper Balloon', 'paperballoon-appclip-3000x2000.jpg')]:
+                       ('https://paperballoon.games', 'Paper Balloon', 'paperballoon-appclip-gamenight-3000x2000.jpg')]:
     try:
         try: iid = upload('appClipAdvancedExperienceImages', D + f)['id']
         except AssertionError as ex:  # identical bytes were uploaded before
