@@ -300,6 +300,32 @@ delay is a lead-in).
   §11.
 - Feature-detect it on its own: a launcher may have `haptic` without this.
 
+## 13. Browser → launcher: offering the app
+
+A page that offers the app shows it only in a browser (`!window.PaperBalloonHost`) and keeps
+joining in the browser the main path. The two platforms differ:
+
+- **Google Play** carries the room through the install. Put the page's join URL, the one its
+  QR encodes, in the `referrer`:
+
+  ```js
+  'https://play.google.com/store/apps/details?id=games.paperballoon.controller&referrer='
+    + encodeURIComponent(joinUrl)
+  ```
+
+  The first launch after that install joins the room like a scanned link: untrusted,
+  checked against the manifest's hosts, and only within 30 minutes of the install starting.
+- **The App Store** carries nothing, so link
+  `https://apps.apple.com/app/id6825072879` and tell the player to scan the code again
+  once the app is installed. In Safari, a Smart App Banner can open the App Clip on the
+  page's own URL instead, which joins without an install:
+
+  ```html
+  <meta name="apple-itunes-app" content="app-id=6825072879, app-clip-bundle-id=games.paperballoon.controller.Clip, app-clip-display=card">
+  ```
+
+  It works only on a host the clip is registered for, which takes a launcher release.
+
 ## Platform note: tilt controls
 
 Motion and orientation events are plain web APIs; the launcher grants iOS's sensor gate
@@ -326,7 +352,7 @@ A missing `requestPermission` means no gate (Android), not a missing sensor.
 5. Close the socket on `pagehide`, reconnect on `visibilitychange` (§7).
 6. A controller-URL template on room create (§6) and an entry in `games-manifest.json`.
 7. *Optional:* Android back (§9), landscape (§10), haptics (§11–12), mDNS for native
-   displays (§8).
+   displays (§8), offering the app in a browser (§13).
 
 <https://test.paperballoon.games/PBTEST> is a reference controller exercising every
 touchpoint; its source, `controller-test.html` in the paperballoon.games site repo, changes

@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
+import games.paperballoon.controller.data.InstallReferrer
 import games.paperballoon.controller.theme.PaperBalloonTheme
 import games.paperballoon.controller.ui.components.themeLightBarIcons
 import games.paperballoon.controller.ui.game.WebViewWarmer
@@ -29,7 +30,13 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
 
     // Only on a fresh start — don't replay the launching VIEW intent across rotation.
-    if (savedInstanceState == null) pendingDeepLink = intent?.dataString
+    if (savedInstanceState == null) {
+      val link = intent?.dataString
+      pendingDeepLink = link
+      // The first launch after a Play install joins the room the player installed from,
+      // unless a link opened the app (CONTRACT.md §13).
+      InstallReferrer.check(this) { if (link == null) pendingDeepLink = it }
+    }
 
     applyEdgeToEdge()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) splashScreen.setOnExitAnimationListener(::liftOff)

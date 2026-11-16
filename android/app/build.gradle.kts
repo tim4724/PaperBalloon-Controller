@@ -229,6 +229,10 @@ dependencies {
   // WebView compat — document-start script injection for the legal viewer.
   implementation(libs.androidx.webkit)
 
+  // Play install referrer — the first launch after a game page's store link joins that
+  // room (CONTRACT.md §13). Asks the on-device Play Store; nothing leaves the device.
+  implementation(libs.android.installreferrer)
+
   // JVM unit tests (src/test), e.g. JoinResolverTest over tests/join-resolver.json
   testImplementation(libs.junit)
   testImplementation(libs.robolectric)
