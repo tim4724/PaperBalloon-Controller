@@ -6,7 +6,7 @@ the TV or in a browser, scan the room code it shows, and your phone is the
 controller.
 
 **[Download on the App Store](https://apps.apple.com/us/app/paper-balloon-controller/id6825072879)**
-· Android is in closed testing, [join the beta](https://paperballoon.games/beta)
+· **[Get it on Google Play](https://play.google.com/store/apps/details?id=games.paperballoon.controller)**
 
 <p align="center">
   <img src="docs/screenshots/home-android.webp" height="600" alt="Android home screen: a HexStacker room on the living room TV, ready to join with one tap, above the game list">
