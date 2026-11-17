@@ -10,7 +10,21 @@ import SwiftUI
         // Audio-session setup lives in GameAudioSession (GameWebView.swift), paid on
         // first game join — the call talks to the audio server (tens of ms) and
         // nothing on the launch path plays sound.
+
+        excludeWebKitFromBackup()
         return true
+    }
+
+    /// Keeps the web views' storage (localStorage, IndexedDB) out of iCloud and Finder
+    /// backups. WebKit creates Library/WebKit on first use, so it is made here, before any
+    /// web view; the flag on the folder covers everything WebKit later writes inside it.
+    private func excludeWebKitFromBackup() {
+        var dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("WebKit", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? dir.setResourceValues(values)
     }
 }
 
