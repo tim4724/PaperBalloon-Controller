@@ -302,8 +302,9 @@ delay is a lead-in).
 
 ## 13. Browser → launcher: offering the app
 
-A page that offers the app shows it only in a browser (`!window.PaperBalloonHost`) and keeps
-joining in the browser the main path. The two platforms differ:
+Players should play in the app; the browser is the fallback for those who won't install.
+So a page opened in a browser (`!window.PaperBalloonHost`) offers the app before the player
+joins, and keeps a way to play on in the browser. The two platforms differ:
 
 - **Google Play** carries the room through the install. Put the page's join URL, the one its
   QR encodes, in the `referrer`:
@@ -351,8 +352,9 @@ A missing `requestPermission` means no gate (Android), not a missing sensor.
 4. `viewport-fit=cover`, interactive UI inside `env(safe-area-inset-*)` (§5).
 5. Close the socket on `pagehide`, reconnect on `visibilitychange` (§7).
 6. A controller-URL template on room create (§6) and an entry in `games-manifest.json`.
-7. *Optional:* Android back (§9), landscape (§10), haptics (§11–12), mDNS for native
-   displays (§8), offering the app in a browser (§13).
+7. In a browser, offer the app before joining (§13).
+8. *Optional:* Android back (§9), landscape (§10), haptics (§11–12), mDNS for native
+   displays (§8).
 
 <https://test.paperballoon.games/PBTEST> is a reference controller exercising every
 touchpoint; its source, `controller-test.html` in the paperballoon.games site repo, changes
