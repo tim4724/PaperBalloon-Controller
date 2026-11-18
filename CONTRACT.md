@@ -316,16 +316,31 @@ joins, and keeps a way to play on in the browser. The two platforms differ:
 
   The first launch after that install joins the room like a scanned link: untrusted,
   checked against the manifest's hosts, and only within 30 minutes of the install starting.
-- **The App Store** carries nothing, so link
-  `https://apps.apple.com/app/id6825072879` and tell the player to scan the code again
-  once the app is installed. In Safari, a Smart App Banner can open the App Clip on the
-  page's own URL instead, which joins without an install:
 
-  ```html
-  <meta name="apple-itunes-app" content="app-id=6825072879, app-clip-bundle-id=games.paperballoon.controller.Clip, app-clip-display=card">
+  An app that is already installed gets no referrer: Play offers Open, which lands on
+  home. In a Chromium browser, wrap the Play link in an intent link instead, which opens
+  the installed app on the room and falls back to Play otherwise:
+
+  ```js
+  'intent:' + joinUrl.slice('https:'.length)   // keeps joinUrl's #fragment: Android splits at the last '#'
+    + '#Intent;scheme=https;package=games.paperballoon.controller;S.browser_fallback_url='
+    + encodeURIComponent(playUrl) + ';end'
   ```
 
-  It works only on a host the clip is registered for, which takes a launcher release.
+  The join URL has to match the app's link filters in `AndroidManifest.xml`, or the
+  intent falls back to Play even with the app installed. Firefox and in-app WebViews
+  don't reliably handle intent links; give them the Play link.
+- **The App Clip** joins without an install. Link Apple's default App Clip link with the
+  join URL in `url`:
+
+  ```js
+  'https://appclip.apple.com/id?p=games.paperballoon.controller.Clip&url='
+    + encodeURIComponent(joinUrl)
+  ```
+
+  Safari shows the clip card, and the clip joins `url` like a scanned link. The clip is
+  iPhone-only. The App Store link, `https://apps.apple.com/app/id6825072879`, carries no
+  room: the player scans the code again once the app is installed.
 
 ## Platform note: tilt controls
 

@@ -29,6 +29,15 @@ func originlessCode(_ raw: String?) -> String? {
     return components.path.split(separator: "/").map(String.init).first ?? ""
 }
 
+/// The join link an incoming link carries: the `url` inside Apple's default App Clip link,
+/// which a game page opens the clip with (CONTRACT.md §13), or nil if it has none. Every
+/// other link is its own join link.
+func incomingJoinLink(_ url: URL) -> String? {
+    guard url.host?.lowercased() == "appclip.apple.com" else { return url.absoluteString }
+    return URLComponents(url: url, resolvingAgainstBaseURL: false)?
+        .queryItems?.first(where: { $0.name == "url" })?.value
+}
+
 // MARK: - Resolver
 
 enum JoinResolver {
