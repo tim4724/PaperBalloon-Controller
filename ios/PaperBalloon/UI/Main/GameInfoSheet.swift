@@ -5,66 +5,106 @@ import AVFoundation
 
 struct GameInfoSheet: View {
     let game: Game
+    /// Home is landscape — on the open iPhone Duo held as a book, the only place it turns,
+    /// where this shows on a wide card rather than a sheet (MainScreen). Its own size
+    /// classes don't tell: a sheet there is compact wide and regular tall.
+    let landscape: Bool
     let onScan: () -> Void
     let onEnterCode: () -> Void
 
     @Environment(\.pbPalette) private var palette
 
-    init(game: Game, onScan: @escaping () -> Void, onEnterCode: @escaping () -> Void) {
+    init(game: Game, landscape: Bool, onScan: @escaping () -> Void, onEnterCode: @escaping () -> Void) {
         self.game = game
+        self.landscape = landscape
         self.onScan = onScan
         self.onEnterCode = onEnterCode
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(game.name)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(palette.onSurface)
-                Spacer()
-                if let range = game.playersRange {
-                    playersChip(range)
+        Group {
+            if landscape {
+                // The phone's stack is too tall for the screen, so the trailer goes
+                // beside one column holding the rest, half and half, on a card wider
+                // than iOS's sheet (wideSheet).
+                HStack(alignment: .top, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        header
+                        media
+                    }
+                    .frame(maxWidth: .infinity)
+                    VStack(alignment: .leading, spacing: 14) {
+                        chips
+                        play
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-            }
-
-            // A game with a trailer shows its gameplay loop, muted until the user
-            // unmutes it; one without shows its cover art instead.
-            Group {
-                if game.video != nil {
-                    GameplayLoopView(game: game)
-                } else {
-                    GameArt(game: game)
+            } else {
+                VStack(alignment: .leading, spacing: 14) {
+                    header
+                    media
+                    chips
+                    play
                 }
-            }
-            .aspectRatio(16.0 / 9.0, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-            if !game.tvApps.isEmpty || game.displayHost != nil {
-                PlatformChips(game: game)
-            }
-
-            // The app is the controller, so a first-timer who taps the card
-            // learns they need the game running on a big screen first — then can
-            // act right here. Deliberately path-free ("start it", not "open the
-            // app / the site") — where the game runs is the platform-chip row's
-            // job (PlatformChips).
-            if game.isPlayable {
-                VStack(alignment: .leading, spacing: 16) {
-                    StepRow(number: 1, text: AttributedString(
-                        String(format: String(localized: "Start %@ on your TV."), game.name)))
-                    StepRow(number: 2, text: AttributedString(
-                        String(localized: "Scan the room code it shows.")))
-                }
-                .padding(.vertical, 4)
-                JoinButtons(onScan: onScan, onEnterCode: onEnterCode)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
         .padding(.top, 24)
-        .padding(.bottom, 28)
+        // The sheet adds the home indicator's room below this already. More left the Duo's
+        // cover screen 10pt short, scrolling a sheet whose content all showed.
+        .padding(.bottom, 12)
+    }
+
+    private var header: some View {
+        HStack {
+            Text(game.name)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(palette.onSurface)
+            Spacer()
+            if let range = game.playersRange {
+                playersChip(range)
+            }
+        }
+    }
+
+    // A game with a trailer shows its gameplay loop, muted until the user
+    // unmutes it; one without shows its cover art instead.
+    private var media: some View {
+        Group {
+            if game.video != nil {
+                GameplayLoopView(game: game)
+            } else {
+                GameArt(game: game)
+            }
+        }
+        .aspectRatio(16.0 / 9.0, contentMode: .fit)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+
+    @ViewBuilder private var chips: some View {
+        if !game.tvApps.isEmpty || game.displayHost != nil {
+            PlatformChips(game: game, stacked: landscape)
+        }
+    }
+
+    // The app is the controller, so a first-timer who taps the card
+    // learns they need the game running on a big screen first — then can
+    // act right here. Deliberately path-free ("start it", not "open the
+    // app / the site") — where the game runs is the platform-chip row's
+    // job (PlatformChips).
+    @ViewBuilder private var play: some View {
+        if game.isPlayable {
+            VStack(alignment: .leading, spacing: 16) {
+                StepRow(number: 1, text: AttributedString(
+                    String(format: String(localized: "Start %@ on your TV."), game.name)))
+                StepRow(number: 2, text: AttributedString(
+                    String(localized: "Scan the room code it shows.")))
+            }
+            .padding(.vertical, 4)
+            JoinButtons(onScan: onScan, onEnterCode: onEnterCode)
+        }
     }
 
     // "1–8" + person glyph, plain like the site's card meta: the glyph stands in for
@@ -98,10 +138,11 @@ let tvPlatforms: [(String, LocalizedStringResource)] = [
 /// androidtv.
 private let ownStorePlatform = "appletv"
 
-/// Where the game runs, as a row of equal chips: one per declared TV app plus one for the
-/// browser path. A chip with somewhere to go is itself the button, marked by a corner
-/// glyph: this app's own store once that TV app is live (manifest tvStores), the share
-/// sheet for the game's address. A not-yet-live TV app is a dimmed chip tagged "Soon".
+/// Where the game runs, as a row of equal chips (or, `stacked`, a column of rows): one per
+/// declared TV app plus one for the browser path. A chip with somewhere to go is itself the
+/// button, marked by a corner glyph: this app's own store once that TV app is live
+/// (manifest tvStores), the share sheet for the game's address. A not-yet-live TV app is a
+/// dimmed chip tagged "Soon".
 /// This row is the sheet's only mention of platforms and host, so the play steps stay
 /// path-free.
 ///
@@ -111,12 +152,14 @@ private let ownStorePlatform = "appletv"
 /// matches).
 private struct PlatformChips: View {
     let game: Game
+    let stacked: Bool
 
     @Environment(\.pbPalette) private var palette
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        HStack(spacing: 9) {
+        let layout = stacked ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 9))
+        layout {
             ForEach(tvPlatforms, id: \.0) { id, name in
                 if let status = game.tvApps[id] {
                     tvChip(id: id, label: String(localized: name), live: status == "live")
@@ -130,7 +173,7 @@ private struct PlatformChips: View {
                 }
                 .buttonStyle(.plain)
                 .modifier(ChipSurface(interactive: true))
-                .overlay(alignment: .topTrailing) { cornerGlyph("square.and.arrow.up") }
+                .overlay(alignment: markCorner) { cornerGlyph("square.and.arrow.up") }
                 .accessibilityLabel(String(format: String(localized: "Share %@"), host))
             }
         }
@@ -142,13 +185,13 @@ private struct PlatformChips: View {
         if !live {
             chip(icon: "tv", label: label, dimmed: true)
                 .modifier(ChipSurface(interactive: false))
-                .overlay(alignment: .topTrailing) { soonTag }
+                .overlay(alignment: markCorner) { soonTag }
                 .accessibilityElement(children: .combine)
         } else if id == ownStorePlatform, let store = game.tvStores[id].flatMap(URL.init(string:)) {
             Button { openURL(store) } label: { chip(icon: "tv", label: label) }
                 .buttonStyle(.plain)
                 .modifier(ChipSurface(interactive: true))
-                .overlay(alignment: .topTrailing) { cornerGlyph("arrow.up.right") }
+                .overlay(alignment: markCorner) { cornerGlyph("arrow.up.right") }
                 .accessibilityHint(String(localized: "Get the TV app"))
         } else {
             chip(icon: "tv", label: label)
@@ -158,37 +201,55 @@ private struct PlatformChips: View {
 
     // `dimmed`: icon and label at 45% — the not-yet-live state the poster's "Coming
     // soon" chip marks.
+    @ViewBuilder
     private func chip(icon: String, label: String, dimmed: Bool = false) -> some View {
         let content = dimmed ? palette.onSurface.opacity(0.45) : palette.onSurface
-        return VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(content)
-            Text(label)
-                .font(.pbLabelMedium)
-                .foregroundStyle(content)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
+        let glyph = Image(systemName: icon)
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(content)
+        let name = Text(label)
+            .font(.pbLabelMedium)
+            .foregroundStyle(content)
+        Group {
+            if stacked {
+                // The end of the row is kept for the mark.
+                HStack(spacing: 10) {
+                    glyph
+                    name.lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 12)
+                .padding(.leading, 16)
+                .padding(.trailing, 44)
+            } else {
+                VStack(spacing: 6) {
+                    glyph
+                    name.multilineTextAlignment(.center).lineLimit(2)
+                }
+                // Top-aligned so icons and names line up across chips when one name wraps.
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 6)
+            }
         }
-        // Top-aligned so icons and names line up across chips when one name wraps.
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .padding(.vertical, 12)
-        .padding(.horizontal, 6)
         // The whole chip takes the tap, not just its glyph and text.
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
+
+    /// Where a chip's mark sits: its top corner, or a row's end.
+    private var markCorner: Alignment { stacked ? .trailing : .topTrailing }
 
     // Marks a chip as a button. Taps pass through to the chip under it.
     private func cornerGlyph(_ symbol: String) -> some View {
         Image(systemName: symbol)
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(palette.onSurfaceVariant)
-            .padding(9)
+            .padding(stacked ? 16 : 9)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
 
-    // Across the chip's top edge: inside the chip it covered the TV glyph.
+    // Across a chip's top edge (inside the chip it covered the TV glyph); at a row's end.
     private var soonTag: some View {
         Text(String(localized: "Soon"))
             .font(.caption2.weight(.semibold))
@@ -196,7 +257,7 @@ private struct PlatformChips: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(Capsule().fill(palette.surfaceVariant))
-            .offset(x: 4, y: -6)
+            .offset(x: stacked ? -12 : 4, y: stacked ? 0 : -6)
     }
 }
 
@@ -299,6 +360,7 @@ struct GameplayLoopView: View {
                     withTransaction(\.disablesAnimations, true) { fullscreen = false }
                 }
                 .presentationBackground(.clear)
+                .modifier(HorizontalBars())
             }
         }
         .task {

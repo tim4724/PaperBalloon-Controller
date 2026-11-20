@@ -19,6 +19,16 @@ degrades to manual room-code entry in the simulator (no camera).
 of the Android assets (`../android/app/src/main/assets/`). Keep them in sync
 when the manifest changes.
 
+## iPhone Duo
+
+The foldable (iOS 27.1+) keeps the phone design on both screens: the bars stay
+horizontal app-wide (`HorizontalBars`), and its inner screen locks no orientation, a
+game page included (`RootHostingController.locksOrientation`, CONTRACT.md §10). Held as
+a book, home goes two posters across, and the game sheet becomes a wider card of our own
+(`wideSheet`): iOS keeps a real sheet there about a portrait phone wide. Nothing can fold
+or turn the simulator from a test, so `DuoScreenshotTests` runs once per pose, set
+in DeviceHub (see its header).
+
 ## App Clip
 
 `PaperBalloonClip` (`games.paperballoon.controller.Clip`) lets a camera scan of a room link

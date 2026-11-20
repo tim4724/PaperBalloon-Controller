@@ -30,7 +30,9 @@ struct GameHostScreen: View {
     // The page has painted its first frame. The join cover lifts on that — unless the
     // page asked for landscape and the window hasn't turned yet: the turn takes a few
     // hundred ms, and lifting earlier shows the page portrait-shaped mid-turn (a
-    // landscape-only game's "turn your phone" overlay, say).
+    // landscape-only game's "turn your phone" overlay, say). Where nothing turns (the
+    // Duo's inner screen) the page shows in whatever shape it is, and asks for the turn
+    // itself (CONTRACT.md §10).
     @State private var painted = false
     @State private var wantsLandscape = false
     // Does a swipe back leave (the page's §9 back mode is "leave")? It's the mode every
@@ -187,7 +189,8 @@ struct GameHostScreen: View {
         .environment(\.pbPalette, palette)
         .tint(palette.primary)
         .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { isLandscape = $0 }
-        .onChange(of: loading && painted && (!wantsLandscape || isLandscape)) { _, ready in
+        .onChange(of: loading && painted
+                  && (!wantsLandscape || isLandscape || ChromeState.shared.host?.locksOrientation == false)) { _, ready in
             if ready { withAnimation(.easeOut(duration: 0.3)) { loading = false } }
         }
         .task(id: loading) {

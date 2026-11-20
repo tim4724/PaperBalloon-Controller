@@ -127,12 +127,55 @@ final class RootHostingController: UIHostingController<RootView> {
         ChromeState.shared.statusBarStyle ?? .default
     }
 
+    /// Whether an iPhone Duo is open, which puts the app on its inner screen; nil on any
+    /// other iPhone, and until the hinge first reports.
+    private var unfolded: Bool?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        if #available(iOS 27.1, *) {
+            view.addInteraction(UIHingeInteraction { [weak self] _, update in
+                self?.unfolded = switch update.hinge?.status {
+                case .closed: false
+                case .partiallyOpen, .fullyOpen: true
+                default: nil
+                }
+            })
+        }
+    }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        // Opening or closing a Duo moves the app to its other screen, but UIKit doesn't ask
+        // for the orientations again, so home opened on the cover would stay a pillarboxed
+        // phone after unfolding. Asked again once the move is over, by which time the hinge
+        // has reported.
+        coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+            self?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        }
+    }
+
     /// The only view controller in the window, so this narrows the Info.plist's
     /// landscape-inclusive superset down to what the current screen actually allows
-    /// (CONTRACT.md §10). Portrait everywhere except a game host whose page asked
-    /// for landscape — home must not rotate just because the plist permits it.
+    /// (CONTRACT.md §10). A game host takes what its page asked for. The launcher's own
+    /// screens are portrait — home must not rotate just because the plist permits it.
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        ChromeState.shared.orientation
+        locksOrientation ? ChromeState.shared.orientation ?? .portrait : .allButUpsideDown
+    }
+
+    /// Everywhere but the Duo's inner screen, where nothing is locked, a game page
+    /// included: the page fills it whichever way it's held and lays itself out for that
+    /// shape, or asks the player to turn. The screen is landscape-native, and iOS shows a
+    /// portrait lock there as a phone on one half, and a landscape lock held upright
+    /// unturned and cut off.
+    var locksOrientation: Bool { !(unfolded ?? isOnLargeScreen) }
+
+    /// Before the hinge first reports, the screen's short side tells: 600 pt or more is the
+    /// Duo's inner screen, wider than any phone's. Only until then — once iOS has
+    /// pillarboxed the app, the screen reports the pillarbox.
+    private var isOnLargeScreen: Bool {
+        guard let screen = view.window?.windowScene?.screen else { return false }
+        return min(screen.bounds.width, screen.bounds.height) >= 600
     }
 }
 
@@ -154,26 +197,27 @@ final class RootHostingController: UIHostingController<RootView> {
         didSet { host?.setNeedsStatusBarAppearanceUpdate() }
     }
 
-    /// What the current screen allows (CONTRACT.md §10). `.landscape` covers both
-    /// orientations rather than picking one: a controller held either way round must
-    /// land right side up, and the launcher has no idea which hand the player uses.
-    var orientation: UIInterfaceOrientationMask = .portrait {
+    /// What the game host allows (CONTRACT.md §10); nil on the launcher's own screens,
+    /// which the root VC decides. `.landscape` covers both orientations rather than
+    /// picking one: a controller held either way round must land right side up, and the
+    /// launcher has no idea which hand the player uses.
+    var orientation: UIInterfaceOrientationMask? {
         didSet {
-            guard oldValue != orientation else { return }
+            guard oldValue != orientation, let host else { return }
             // Order matters. setNeedsUpdate… makes UIKit re-read the root VC's
             // supportedInterfaceOrientations (already the new mask — this is a didSet);
             // requestGeometryUpdate then actually turns the window. Without the first
             // call the geometry request is rejected against the stale mask; without the
             // second the device only rotates if the player physically turns the phone.
-            host?.setNeedsUpdateOfSupportedInterfaceOrientations()
-            host?.view.window?.windowScene?
-                .requestGeometryUpdate(.iOS(interfaceOrientations: orientation))
+            host.setNeedsUpdateOfSupportedInterfaceOrientations()
+            host.view.window?.windowScene?
+                .requestGeometryUpdate(.iOS(interfaceOrientations: host.supportedInterfaceOrientations))
         }
     }
 
     func reset() {
         statusBarStyle = nil
-        orientation = .portrait
+        orientation = nil
     }
 
     private init() {}

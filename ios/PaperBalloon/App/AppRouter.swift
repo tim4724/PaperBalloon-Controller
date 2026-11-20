@@ -180,6 +180,7 @@ struct RootView: View {
             MessageOverlay()
         }
         .pbThemed()
+        .modifier(HorizontalBars())
         .environment(router.messages)
         // Keep-awake, status-bar style and the §10 interface orientation follow the
         // ROUTE, not view lifecycle:
@@ -192,6 +193,10 @@ struct RootView: View {
             UIApplication.shared.isIdleTimerDisabled = inGame
             if !inGame {
                 ChromeState.shared.reset()
+            } else if ChromeState.shared.orientation == nil {
+                // A page is portrait until it asks (§10), except on the Duo's inner
+                // screen, where the root locks nothing.
+                ChromeState.shared.orientation = .portrait
             }
             if PB.isAppClip {
                 offerFullApp = !inGame && oldPath.contains(where: isGame)

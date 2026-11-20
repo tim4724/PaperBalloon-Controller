@@ -224,6 +224,11 @@ page that finishes loading without asking — a reload of a landscape page holds
 if it asks again from an external `<head>` script. Asked that early, the launcher keeps
 its join cover up until the turn is done, so the page is never seen portrait-shaped.
 
+A large screen locks neither way — the iPhone Duo's inner screen, and on Android any screen
+600 dp or more across (Android 16+ ignores the request there): the page fills it in
+whatever shape the player holds it, so a landscape game shows its own "turn your phone"
+prompt there, as in a browser.
+
 A rotation keeps the page and its socket running; the game sees `resize`, the orientation
 media query, and new insets. In landscape the status bar is hidden, so the top inset
 usually drops to 0 and the side insets carry the cutout and any navigation bar.

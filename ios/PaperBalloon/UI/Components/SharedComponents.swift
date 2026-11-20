@@ -559,10 +559,99 @@ struct AppSheetContainer<Content: View>: View {
         // Placeholder until the first measurement, which lands after the slide-up
         // starts. It must be a full-size detent: iOS 26 animates a tiny one out of the
         // bottom-left corner.
-        .presentationDetents([measuredHeight > 0 ? .height(measuredHeight) : .medium])
+        .presentationDetents([measuredHeight > 0 ? .height(fittedHeight) : .custom(PlaceholderDetent.self)])
         .presentationDragIndicator(.hidden)
         .presentationCornerRadius(28)
         .modifier(SheetBackground(surfaceTint: surfaceTint))
+        // Each presentation decides its own bars.
+        .modifier(HorizontalBars())
+    }
+
+    /// The content's height, or all the height there is when the content nearly fills it:
+    /// below full height iOS 27.1 draws the status bar into the sheet's corner on the
+    /// iPhone Duo's cover screen, whatever the app asks for (`HorizontalBars`).
+    private var fittedHeight: CGFloat {
+        let full = PlaceholderDetent.fullHeight
+        return full > 0 && measuredHeight > full - Self.nearlyFull ? full : measuredHeight
+    }
+
+    /// How near the full height counts as filling it: on the Duo's cover screen a full sheet
+    /// gives the status bar its strip across the top back, and a bottom padding on top.
+    private static var nearlyFull: CGFloat { 100 }
+}
+
+/// Half the height, as `.medium`, while the content is measured — and where the sheet
+/// learns its full height, which only a custom detent is told. A static: one app sheet is
+/// up at a time, and each opens on this placeholder.
+private struct PlaceholderDetent: CustomPresentationDetent {
+    nonisolated(unsafe) static var fullHeight: CGFloat = 0
+
+    static func height(in context: Context) -> CGFloat? {
+        fullHeight = context.maxDetentValue
+        return context.maxDetentValue / 2
+    }
+}
+
+/// Keeps the status bar and the bar buttons across the top on the iPhone Duo, where iOS
+/// 27.1 otherwise moves them into a vertical bar down the side — the launcher is drawn for
+/// a phone's top bars. Every presentation decides its own bars, so each one carries this,
+/// and the bar never jumps between the side and the top as sheets open (Apple asks for a
+/// stable choice). A modifier rather than an inline `if #available` so the SDK-17 build
+/// compiles.
+struct HorizontalBars: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 27.1, *) {
+            content.toolbarVerticalBehavior(.disabled)
+        } else {
+            content
+        }
+    }
+}
+
+private struct WideSheetCard<Content: View>: View {
+    let width: CGFloat
+    let close: () -> Void
+    @ViewBuilder let content: Content
+
+    /// How far a swipe has pulled the card down.
+    @State private var pull: CGFloat = 0
+
+    @Environment(\.pbPalette) private var palette
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(perform: close)
+                .accessibilityHidden(true)
+            content
+                .frame(width: width)
+                .background { glass }
+                .offset(y: pull)
+                .gesture(DragGesture()
+                    .onChanged { pull = max($0.translation.height, 0) }
+                    .onEnded { drag in
+                        // A fling or a long pull closes it; anything less springs back.
+                        if drag.predictedEndTranslation.height > 160 {
+                            close()
+                        } else {
+                            withAnimation(.spring(duration: 0.3)) { pull = 0 }
+                        }
+                    })
+                // Floats a little above the edge, as iOS's sheets do.
+                .padding(.bottom, 8)
+                .accessibilityAction(.escape, close)
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    @ViewBuilder private var glass: some View {
+        let shape = RoundedRectangle(cornerRadius: 28, style: .continuous)
+        if #available(iOS 26.0, *) {
+            Color.clear.glassEffect(.regular.tint(palette.sheetGlass[0].opacity(0.85)), in: shape)
+        } else {
+            shape.fill(LinearGradient(colors: palette.sheetGlass, startPoint: .top, endPoint: .bottom))
+        }
     }
 }
 
@@ -589,6 +678,23 @@ private struct SheetBackground: ViewModifier {
 }
 
 extension View {
+    /// An app sheet as a card of our own, `width` wide: on the open Duo held as a book iOS
+    /// keeps a real sheet about a portrait phone wide, whatever size it is asked for. It
+    /// rises from the bottom over home like one, on the same glass, and a tap beside it,
+    /// a swipe down or the escape gesture closes it.
+    func wideSheet<Item: Identifiable, Content: View>(
+        item: Binding<Item?>,
+        width: CGFloat,
+        onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        fullScreenCover(item: item, onDismiss: onDismiss) { value in
+            WideSheetCard(width: width, close: { item.wrappedValue = nil }) { content(value) }
+                .presentationBackground(.clear)
+                .modifier(HorizontalBars())
+        }
+    }
+
     func appSheet<Item: Identifiable, Content: View>(
         item: Binding<Item?>,
         onDismiss: (() -> Void)? = nil,

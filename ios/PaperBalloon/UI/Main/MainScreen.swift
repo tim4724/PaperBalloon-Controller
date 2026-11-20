@@ -71,6 +71,8 @@ struct MainScreen: View {
     // Haptic triggers (any change fires the paired sensoryFeedback).
     @State private var successTick = 0
     @State private var errorTick = 0
+    // The window, safe areas included; see isWide.
+    @State private var window: CGSize = .zero
 
     @Environment(MessageCenter.self) private var messages
     @Environment(\.pbPalette) private var palette
@@ -80,6 +82,11 @@ struct MainScreen: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             palette.background.ignoresSafeArea()
+                .onGeometryChange(for: CGSize.self) { proxy in
+                    let insets = proxy.safeAreaInsets
+                    return CGSize(width: proxy.size.width + insets.leading + insets.trailing,
+                                  height: proxy.size.height + insets.top + insets.bottom)
+                } action: { window = $0 }
 
             ScrollView {
                 // One rhythm for the whole stack: the banner, every room card and every
@@ -87,76 +94,11 @@ struct MainScreen: View {
                 // sections, rooms you can enter and the catalog, each open under a heading
                 // with room above it.
                 VStack(spacing: 12) {
-                    // The game-end notice sits atop the content, above the rejoin card
-                    // (present only while the room is alive) — a high-contrast strip
-                    // where the player's eye already is, not a bottom overlay.
-                    if let banner = messages.gameEndBanner {
-                        GameEndBanner(message: banner) { messages.dismissGameEndBanner() }
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-
-                    // The rejoin room's own advertisement folds INTO the rejoin card, name
-                    // and all, rather than standing up a second card for the room the
-                    // player is already being offered.
-                    let home = homeRooms(Array(resolvedNearby.values), rejoin: rejoin)
-                    // Heads rooms only: the ask and the status lines speak for themselves,
-                    // and a heading over "No rooms found" would announce a section with
-                    // nothing in it.
-                    if rejoin != nil || !home.nearby.isEmpty {
-                        sectionTitle("Nearby")
-                            .transition(.opacity)
-                    }
-                    if let rejoin {
-                        RejoinCard(room: rejoin, advert: home.rejoinAdvert, primary: true) {
-                            resolveAndJoin(rejoin.joinUrl)
-                        }
-                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                    }
-
-                    // "Searching…" / "No rooms found" are claims about having looked and
-                    // come up empty — false while a room card is already on screen, rejoin
-                    // included. The ask is an offer rather than a claim, so it stays
-                    // regardless: hiding it behind a rejoin card would make discovery
-                    // invisible for the rest of the session. So does the denied button,
-                    // which is the same offer by another route.
-                    // A clip can't browse (no Bonjour), so it makes no claim either way.
-                    if !PB.isAppClip, nearbyState == .ask || nearbyState == .denied
-                        || (home.nearby.isEmpty && rejoin == nil) {
-                        NearbyStatusCard(
-                            state: nearbyState,
-                            onAsk: {
-                                LocalNetworkAsked.set()
-                                lanAsked = true
-                                nearby.start()
-                            },
-                            onOpenSettings: {
-                                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-                                UIApplication.shared.open(url)
-                            }
-                        )
-                        .transition(.opacity)
-                    }
-                    ForEach(home.nearby) { room in
-                        NearbyCard(room: room, primary: rejoin == nil && room.id == home.nearby.first?.id) {
-                            requireName(.join(room.target))
-                        }
-                            .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                    }
-
-                    VStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            sectionTitle("Games")
-                            // Path-free: on a TV the game is an app, on a laptop a website.
-                            Text("Start a game on your TV or in your browser.")
-                                .font(.pbBodyLarge)
-                                .foregroundStyle(palette.onSurfaceVariant)
-                        }
+                    VStack(spacing: 12) { rooms }
+                        .frame(maxWidth: isWide ? wideColumn : nil)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        ForEach(games) { game in
-                            GameCard(game: game) { infoGame = game }
-                        }
-                    }
-                    .padding(.top, 20)
+                    VStack(spacing: 12) { catalog(grid: isWide) }
+                        .padding(.top, 20)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 20)
@@ -176,6 +118,7 @@ struct MainScreen: View {
                     onScan: { requireName(.scan) },
                     onEnterCode: { requireName(.enterCode) }
                 )
+                .frame(maxWidth: isWide ? Self.wideDockWidth : nil)
                 .padding(.horizontal, 16)
                 // The safe area already clears the home indicator — anything more
                 // reads as a floating gap.
@@ -353,6 +296,7 @@ struct MainScreen: View {
                     break
                 }
             }
+            .modifier(HorizontalBars())
         }
         .appSheet(item: $profileRequest, onDismiss: { afterName = nil }) { request in
             ProfileSheet(
@@ -373,23 +317,129 @@ struct MainScreen: View {
                 }
             )
         }
-        .appSheet(item: $infoGame, onDismiss: {
-            // Fire the funnel only after the sheet is fully gone — presenting the
-            // scanner/code sheet mid-dismiss would be dropped by UIKit.
-            if let action = pendingSheetAction {
-                pendingSheetAction = nil
-                requireName(action)
+        // A sheet — or, held as a book, a wide card: iOS keeps a sheet about a portrait phone
+        // wide there, too narrow for the trailer beside the rest. The card stands in home's
+        // 16 pt margins, so split half and half the trailer is about a poster wide.
+        .appSheet(item: isWide ? .constant(nil) : $infoGame, onDismiss: afterInfo, content: gameInfo)
+        .wideSheet(item: isWide ? $infoGame : .constant(nil), width: window.width - 32,
+                   onDismiss: afterInfo, content: gameInfo)
+    }
+
+    private func gameInfo(_ game: Game) -> some View {
+        GameInfoSheet(
+            game: game,
+            landscape: isWide,
+            onScan: { pendingSheetAction = .scan; infoGame = nil },
+            onEnterCode: { pendingSheetAction = .enterCode; infoGame = nil }
+        )
+    }
+
+    /// Fires the funnel only after the game's sheet is fully gone — presenting the
+    /// scanner/code sheet mid-dismiss would be dropped by UIKit.
+    private func afterInfo() {
+        if let action = pendingSheetAction {
+            pendingSheetAction = nil
+            requireName(action)
+        }
+    }
+
+    // MARK: Sections
+
+    /// Rooms the player can enter now, and the search for them.
+    @ViewBuilder private var rooms: some View {
+        // The game-end notice sits atop the content, above the rejoin card
+        // (present only while the room is alive) — a high-contrast strip
+        // where the player's eye already is, not a bottom overlay.
+        if let banner = messages.gameEndBanner {
+            GameEndBanner(message: banner) { messages.dismissGameEndBanner() }
+                .transition(.move(edge: .top).combined(with: .opacity))
+        }
+
+        // The rejoin room's own advertisement folds INTO the rejoin card, name
+        // and all, rather than standing up a second card for the room the
+        // player is already being offered.
+        let home = homeRooms(Array(resolvedNearby.values), rejoin: rejoin)
+        // Heads rooms only: the ask and the status lines speak for themselves,
+        // and a heading over "No rooms found" would announce a section with
+        // nothing in it.
+        if rejoin != nil || !home.nearby.isEmpty {
+            sectionTitle("Nearby")
+                .transition(.opacity)
+        }
+        if let rejoin {
+            RejoinCard(room: rejoin, advert: home.rejoinAdvert, primary: true) {
+                resolveAndJoin(rejoin.joinUrl)
             }
-        }) { game in
-            GameInfoSheet(
-                game: game,
-                onScan: { pendingSheetAction = .scan; infoGame = nil },
-                onEnterCode: { pendingSheetAction = .enterCode; infoGame = nil }
+            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+        }
+
+        // "Searching…" / "No rooms found" are claims about having looked and
+        // come up empty — false while a room card is already on screen, rejoin
+        // included. The ask is an offer rather than a claim, so it stays
+        // regardless: hiding it behind a rejoin card would make discovery
+        // invisible for the rest of the session. So does the denied button,
+        // which is the same offer by another route.
+        // A clip can't browse (no Bonjour), so it makes no claim either way.
+        if !PB.isAppClip, nearbyState == .ask || nearbyState == .denied
+            || (home.nearby.isEmpty && rejoin == nil) {
+            NearbyStatusCard(
+                state: nearbyState,
+                onAsk: {
+                    LocalNetworkAsked.set()
+                    lanAsked = true
+                    nearby.start()
+                },
+                onOpenSettings: {
+                    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                    UIApplication.shared.open(url)
+                }
             )
+            .transition(.opacity)
+        }
+        ForEach(home.nearby) { room in
+            NearbyCard(room: room, primary: rejoin == nil && room.id == home.nearby.first?.id) {
+                requireName(.join(room.target))
+            }
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+        }
+    }
+
+    /// The catalog, two posters across in the `grid` layout.
+    @ViewBuilder private func catalog(grid: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            sectionTitle("Games")
+            // Path-free: on a TV the game is an app, on a laptop a website.
+            Text("Start a game on your TV or in your browser.")
+                .font(.pbBodyLarge)
+                .foregroundStyle(palette.onSurfaceVariant)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        let cards = ForEach(games) { game in
+            GameCard(game: game) { infoGame = game }
+        }
+        if grid {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: Self.gridGutter, alignment: .top),
+                                GridItem(.flexible(), alignment: .top)],
+                      spacing: 12) { cards }
+        } else {
+            cards
         }
     }
 
     // MARK: Derived
+
+    /// The open iPhone Duo's inner screen held as a book, the only window home gets that is
+    /// wider than tall: the catalog goes two posters across, its gutter on the fold, and the
+    /// rooms a poster wide.
+    private var isWide: Bool { window.width > window.height }
+
+    /// One poster's width in the grid: half the window less home's margins and the gutter.
+    /// Held as a book the inner screen has no side insets to take off as well.
+    private var wideColumn: CGFloat { (window.width - 32 - Self.gridGutter) / 2 }
+
+    private static let gridGutter: CGFloat = 16
+    /// About a phone's width, centred.
+    private static let wideDockWidth: CGFloat = 520
 
     private var nearbyState: NearbyStatus {
         if !lanAsked { return .ask }
