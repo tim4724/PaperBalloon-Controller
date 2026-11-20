@@ -3,11 +3,7 @@ package games.paperballoon.controller.ui.main
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -64,6 +60,7 @@ import games.paperballoon.controller.data.ROOM_CODE_LENGTH
 import games.paperballoon.controller.data.originlessCode
 import games.paperballoon.controller.data.validRoomCode
 import games.paperballoon.controller.ui.components.KeyboardSheet
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -231,14 +228,26 @@ private fun CodeBox(character: Char?, active: Boolean, failed: Boolean, modifier
 
 @Composable
 private fun Caret() {
-  val alpha by rememberInfiniteTransition(label = "caret").animateFloat(
-    initialValue = 1f,
-    targetValue = 0f,
-    animationSpec = infiniteRepeatable(tween(450), RepeatMode.Reverse),
-    label = "caretAlpha",
+  // On and off like Android's own text cursor. A fade would redraw the sheet on every
+  // frame it is up; a toggle redraws it only when it flips.
+  var on by remember { mutableStateOf(true) }
+  LaunchedEffect(Unit) {
+    while (true) {
+      delay(CARET_BLINK_MS)
+      on = !on
+    }
+  }
+  Box(
+    Modifier
+      .width(2.dp)
+      .height(26.dp)
+      .alpha(if (on) 1f else 0f)
+      .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp)),
   )
-  Box(Modifier.width(2.dp).height(26.dp).alpha(alpha).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp)))
 }
+
+// The platform cursor's half period (android.widget.Editor's BLINK).
+private const val CARET_BLINK_MS = 500L
 
 // A quick side-to-side that settles back.
 private suspend fun Animatable<Float, AnimationVector1D>.shake(widthPx: Float) {
