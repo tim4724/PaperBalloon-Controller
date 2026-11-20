@@ -171,10 +171,14 @@ its own name — goes without. A clash rename's ` (2)` after the suffix is kept.
 - Advertise at create, send a goodbye at close. Withdrawing while full is optional.
 - New TXT keys are fine; a shape old launchers must not read needs a new service type.
 - Discovery is optional: it needs the Local Network permission and fails on isolated
-  networks, so keep showing the QR and code. The Android launcher asks for that permission
-  before loading the page on a first join, since Android gates the page's LAN traffic too;
-  a deny still loads it. iOS exempts web view traffic and never asks there. Either way,
-  treat the LAN as unreliable.
+  networks, so keep showing the QR and code. Treat the LAN as unreliable.
+- Android gates the page's LAN traffic behind that same permission. Until it is answered,
+  the Android launcher holds the top frame's `setLocalDescription` calls and asks at the
+  first one; either answer lets them through. So open WebRTC from the top frame and at
+  join, not mid-round, where the system dialog would land on gameplay, and don't time out
+  its setup around that wait. WebRTC is the only LAN traffic the launcher asks for: a
+  page's `fetch` or WebSocket to a LAN address just fails until the permission is granted.
+  iOS exempts web view traffic and never asks there.
 
 ## 9. System back: `PaperBalloonHost.setBackMode(mode)` + `back()`
 

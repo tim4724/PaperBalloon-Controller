@@ -242,4 +242,6 @@ dependencies {
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.espresso.core)
+  // System permission dialogs (androidTest/LocalNetworkGateTest.kt)
+  androidTestImplementation(libs.androidx.uiautomator)
 }

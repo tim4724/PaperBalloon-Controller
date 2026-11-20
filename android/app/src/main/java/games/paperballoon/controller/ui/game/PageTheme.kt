@@ -107,6 +107,41 @@ private fun parseCssRgb(value: String): Color? {
 }
 
 /**
+ * Document-start script, injected only while the local-network dialog is still to be
+ * answered (see the gate in GameHostContent). Holds every
+ * `RTCPeerConnection.setLocalDescription` — the call that starts candidate gathering, on
+ * the offering and the answering side alike — asks the launcher for the permission on
+ * the first one, and lets them all through on OPEN_LAN_GATE_JS. Once open, calls pass
+ * straight through. Games see only a slower setLocalDescription.
+ *
+ * Top frame only: evaluateJavascript reaches no other, so an iframe's held call would
+ * never be let through.
+ */
+internal val LAN_GATE_JS = """
+  (() => {
+    const lan = window.__pbLan;
+    const pc = window.RTCPeerConnection && window.RTCPeerConnection.prototype;
+    if (window !== window.top || !lan || !pc || window.__pbLanOpen) return;
+    const setLocal = pc.setLocalDescription;
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    let asked = false;
+    window.__pbLanOpen = () => release();
+    pc.setLocalDescription = function (...args) {
+      if (lan.isOpen()) return setLocal.apply(this, args);
+      if (!asked) {
+        asked = true;
+        lan.ask();
+      }
+      return gate.then(() => setLocal.apply(this, args));
+    };
+  })();
+""".trimIndent()
+
+/** Lets LAN_GATE_JS's held calls through, evaluated once the dialog is answered. */
+internal const val OPEN_LAN_GATE_JS = "window.__pbLanOpen && window.__pbLanOpen();"
+
+/**
  * Document-start script: defines `window.PaperBalloonHost` (CONTRACT.md) over the raw
  * `__pbHost` and `__pbName` Java interfaces, for the two members a Java interface can't
  * express — a `name` property and an `editName()` that returns a Promise — and for the one

@@ -1,6 +1,5 @@
 package games.paperballoon.controller
 
-import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
@@ -10,7 +9,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
-import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso
@@ -20,10 +18,6 @@ import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.webkit.WebViewCompat
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import org.json.JSONObject
-import org.json.JSONTokener
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -33,12 +27,14 @@ import org.junit.runner.RunWith
 
 /**
  * The launcher's half of CONTRACT.md, end to end, through the contract test controller
- * (the site repo's controller-test.html, served at [PAGE]). Each test opens the page in the
- * game host and presses the page's own buttons, so every call crosses the real bridge,
- * then asserts both ends: the page's readouts and what the launcher did with its UI and
- * window. Only the page needs network, like StoreScreenshotTest's in-game step: a
- * paperballoon.games subdomain loads verbatim (JoinResolver), so no room, relay or display
- * is involved.
+ * ([CONTRACT_PAGE]). Each test opens the page in the game host and presses the page's own
+ * buttons, so every call crosses the real bridge, then asserts both ends: the page's
+ * readouts and what the launcher did with its UI and window. Only the page needs network,
+ * like StoreScreenshotTest's in-game step: a paperballoon.games subdomain loads verbatim
+ * (JoinResolver), so no room, relay or display is involved.
+ *
+ * §8's local-network wait needs the permission ungranted, so it has its own class,
+ * LocalNetworkGateTest.
  *
  * §4–5 assert whichever path the device's WebView takes ([legacyWebView]); CI's emulator
  * takes the legacy one (store-screenshots.yml).
@@ -162,37 +158,11 @@ class ContractTest {
     awaitText("#orient", "portrait")
   }
 
-  /** Opens [PAGE] the way an App Link does and runs [body] once its script is up. */
-  private fun inGame(body: Page.() -> Unit) {
-    val intent = Intent(Intent.ACTION_VIEW, PAGE.toUri(), context, MainActivity::class.java)
-    ActivityScenario.launch<MainActivity>(intent).use { scenario ->
-      Page(scenario).apply {
-        compose.waitUntil(PAGE_LOAD_TIMEOUT) { text("#mode") == "launcher shell" }
-        body()
-      }
-    }
-  }
+  private fun inGame(body: Page.() -> Unit) = compose.inContractPage { Page(it).body() }
 
   private inner class Page(private val scenario: ActivityScenario<MainActivity>) {
 
-    /** Evaluates [script] in the game host's page; its JSON result, or null when no game is open. */
-    fun js(script: String): Any? {
-      val done = CountDownLatch(1)
-      var result: String? = null
-      scenario.onActivity { activity ->
-        val webView = activity.window.decorView.findWebView()
-        if (webView == null) {
-          done.countDown()
-        } else {
-          webView.evaluateJavascript(script) {
-            result = it
-            done.countDown()
-          }
-        }
-      }
-      assertTrue("no answer from the page: $script", done.await(10, TimeUnit.SECONDS))
-      return result?.let { JSONTokener(it).nextValue() }?.takeUnless { it == JSONObject.NULL }
-    }
+    fun js(script: String): Any? = scenario.evalJs(script)
 
     fun text(selector: String) = js("document.querySelector('$selector')?.textContent ?? null") as? String
 
@@ -238,11 +208,7 @@ class ContractTest {
   }
 
   private companion object {
-    // Any build reaches the deployed page through this App Link (the site repo's README,
-    // "Reaching it from the app"): the 6-character path is what the intent filter claims.
-    const val PAGE = "https://test.paperballoon.games/PBTEST"
     const val NEW_NAME = "Sam"
     const val TIMEOUT = 15_000L
-    const val PAGE_LOAD_TIMEOUT = 30_000L
   }
 }

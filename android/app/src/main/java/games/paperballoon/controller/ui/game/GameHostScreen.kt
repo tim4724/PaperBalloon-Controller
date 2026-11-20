@@ -77,6 +77,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.withStarted
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.delay
@@ -231,21 +233,22 @@ private fun GameHostContent(
     webView?.reload()
     Unit
   }
-  // First-join local network gate: games open a direct WebRTC path to their display
-  // ("fastlane"), and Android 17 silently blocks LAN traffic without
-  // ACCESS_LOCAL_NETWORK. Asked HERE, with the page load held until the dialog is
-  // answered — a grant that lands after the page has started ICE is only picked up by
-  // the game's own retry loop, so resolving first makes the first connection
-  // deterministic. The join never blocks on the ANSWER: a deny loads the page anyway,
-  // which falls back to its relay exactly as on an AP-isolated network. Granted,
-  // locked (localNetworkPermanentlyDenied), or pre-enforcement SDKs skip straight
-  // through, so the hold happens at most on the first join or two ever.
+  // Local network gate: games open a direct WebRTC path to their display ("fastlane"),
+  // and Android 17 silently blocks LAN traffic without ACCESS_LOCAL_NETWORK. So the page
+  // loads at once and LAN_GATE_JS asks at its first setLocalDescription: in context, and
+  // only for a game that opens a fastlane. Holding that call until the answer makes the
+  // first connection deterministic; a grant landing mid-ICE is only picked up by the
+  // game's own retry. A deny lets it through too, and the game falls back to its relay
+  // as on an AP-isolated network. Granted, locked (localNetworkPermanentlyDenied) or
+  // pre-enforcement SDKs never hold, so this asks at most on the first join or two.
   var lanGateOpen by remember {
     mutableStateOf(
       localNetworkPermissionGranted(context) ||
         localNetworkPermanentlyDenied(context, context.findActivity()),
     )
   }
+  var lanAsked by remember { mutableStateOf(false) }
+  val lanBridge = remember { LanGateBridge(lanGateOpen) { lanAsked = true } }
   val localNetworkPermission = rememberLauncherForActivityResult(
     ActivityResultContracts.RequestPermission(),
   ) { granted ->
@@ -253,9 +256,18 @@ private fun GameHostContent(
     // (see clearLocalNetworkAsked).
     if (granted) clearLocalNetworkAsked(context)
     lanGateOpen = true
+    // Bridge before the JS release, so a document starting in between sees isOpen() true.
+    lanBridge.open()
+    webView?.evaluateJavascript(OPEN_LAN_GATE_JS, null)
   }
-  LaunchedEffect(Unit) {
-    if (!lanGateOpen) {
+  // Keyed on a Boolean, so every later document asking while the dialog is up joins
+  // this one request. Launched only while the app is on screen: a page can get here just
+  // as the player switches away, and a dialog started from the background may never
+  // come back with an answer, leaving the fastlane held for good.
+  val lifecycle = LocalLifecycleOwner.current.lifecycle
+  LaunchedEffect(lanAsked) {
+    if (!lanAsked || lanGateOpen) return@LaunchedEffect
+    lifecycle.withStarted {
       markLocalNetworkAsked(context)
       localNetworkPermission.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
     }
@@ -453,9 +465,6 @@ private fun GameHostContent(
     // The game surface spans the FULL physical screen; the page keeps its interactive
     // UI inside env(safe-area-inset-*).
     Box(Modifier.fillMaxSize()) {
-      // While the gate holds, the join cover below is the whole screen — the WebView
-      // (and with it loadUrl) only comes into existence once the dialog is answered.
-      if (lanGateOpen) {
       key(webViewKey) {
       AndroidView(
         modifier = Modifier
@@ -592,12 +601,18 @@ private fun GameHostContent(
             addJavascriptInterface(hostBridge, "PaperBalloonHost")
           }
           addJavascriptInterface(schemeBridge, "__pbScheme")
+          // Only while there is something to ask: a WebView made with the gate open never
+          // holds. The feature check only keeps the call legal: every WebView on an SDK
+          // that enforces the permission has document-start scripts.
+          if (!lanGateOpen && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            addJavascriptInterface(lanBridge, "__pbLan")
+            WebViewCompat.addDocumentStartJavaScript(this, LAN_GATE_JS, setOf("*"))
+          }
           loadUrl(joinUrl)
           webView = this
         }
         },
       )
-      }
       }
       // "Joining…" cover that fades away once the controller has painted.
       // (Qualified: the ColumnScope overload would otherwise shadow this one.)
@@ -816,6 +831,26 @@ private class NameBridge(
   @JavascriptInterface
   fun editName() {
     mainHandler.post { onEditName() }
+  }
+}
+
+/**
+ * Backs LAN_GATE_JS, exposed as `__pbLan` — launcher-internal, never on PaperBalloonHost.
+ * isOpen is read synchronously by the page's wrapped setLocalDescription on the JS bridge
+ * thread, hence the atomic; ask hops to main like the other bridges.
+ */
+private class LanGateBridge(initiallyOpen: Boolean, private val onAsk: () -> Unit) {
+  private val state = AtomicBoolean(initiallyOpen)
+  private val mainHandler = Handler(Looper.getMainLooper())
+
+  fun open() = state.set(true)
+
+  @JavascriptInterface
+  fun isOpen(): Boolean = state.get()
+
+  @JavascriptInterface
+  fun ask() {
+    mainHandler.post { onAsk() }
   }
 }
 
