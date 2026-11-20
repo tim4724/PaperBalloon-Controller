@@ -13,11 +13,11 @@ private const val PACKAGE = "games.paperballoon.controller"
 
 /**
  * Records the launcher's hot paths for the baseline profile: cold start to the home
- * catalog, a scroll through the posters, then the two sheets most sessions open — a
- * game's info sheet (trailer) and the room-code sheet (keyboard). That covers
- * Activity/Compose init, manifest parse, sky + catalog composition, art decode, nearby
- * discovery and the sheets, without flows that need a live room (join/game host) or
- * hardware (scanner).
+ * catalog, a scroll through the posters, then the sheets most sessions open — a game's
+ * info sheet (trailer), and the two keyboard sheets: the name sheet every player fills
+ * in first and the room-code sheet. That covers Activity/Compose init, manifest parse,
+ * sky + catalog composition, art decode, nearby discovery and the sheets, without flows
+ * that need a live room (join/game host) or hardware (scanner).
  */
 @RunWith(AndroidJUnit4::class)
 class BaselineProfileGenerator {
@@ -64,6 +64,21 @@ class BaselineProfileGenerator {
       Thread.sleep(3_000)
       device.pressBack()
       device.wait(Until.gone(scanStep), 5_000)
+
+      // Name sheet: the player chip beside About, whatever name it shows. Saving one also
+      // takes the code step below to the code sheet rather than the name gate a
+      // nameless install shows first.
+      val about = device.findObject(By.desc("About")).visibleBounds
+      device.findObjects(By.clickable(true))
+        .first { it.visibleBounds.right < about.left && it.visibleBounds.centerY() in about.top..about.bottom }
+        .click()
+      val save = By.text("Save")
+      device.wait(Until.hasObject(save), 5_000)
+      device.waitForIdle()
+      device.findObject(By.clazz("android.widget.EditText")).text = "Player"
+      device.findObject(save).click()
+      device.wait(Until.gone(save), 5_000)
+      device.waitForIdle()
 
       // Room-code sheet: the keyboard button beside Scan code. Settle first so the
       // sheet and keyboard animations are recorded; Back may only drop the IME first,
