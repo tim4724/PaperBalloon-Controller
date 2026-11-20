@@ -7,11 +7,14 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.OrientationEventListener
 import android.view.Surface
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.view.TextureView
 import android.view.WindowManager
-import android.widget.VideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -92,6 +95,7 @@ import games.paperballoon.controller.ui.components.GameArt
 import games.paperballoon.controller.ui.components.JoinButtons
 import games.paperballoon.controller.ui.components.PlaySteps
 import java.io.File
+import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -365,9 +369,9 @@ private fun PlayersChip(range: String) {
 
 // A gameplay loop, fetched to cache on demand (TrailerCache) and played from
 // disk. Cover art fills the slot immediately and stays on top until the video
-// renders its first frame — a VideoView is SurfaceView-backed, so it shows
-// through as black until then. VideoView over ExoPlayer: a local 30s loop
-// doesn't justify the Media3 dependency.
+// renders its first frame — the SurfaceView shows through as black until then.
+// A bare MediaPlayer over ExoPlayer: a local 30s loop doesn't justify the Media3
+// dependency.
 //
 // Every open starts muted; a clip with an audio track gets a mute toggle. Unmuted
 // sound still takes no audio focus, so it layers over the user's music the way
@@ -377,7 +381,7 @@ private fun PlayersChip(range: String) {
 private fun GameplayLoop(game: Game, url: String) {
   val context = LocalContext.current
   var videoRendering by remember { mutableStateOf(false) }
-  var videoView by remember { mutableStateOf<VideoView?>(null) }
+  // Null until the player has started, and again once its surface is gone.
   var player by remember { mutableStateOf<MediaPlayer?>(null) }
   var hasAudio by remember { mutableStateOf(false) }
   var muted by remember { mutableStateOf(true) }
@@ -400,36 +404,50 @@ private fun GameplayLoop(game: Game, url: String) {
       .clip(MaterialTheme.shapes.large)
       .clickable(enabled = videoRendering, onClickLabel = stringResource(R.string.trailer_fullscreen)) {
         fullscreen = true
-        videoView?.pause()
+        player?.pause()
       },
   ) {
     file?.let { trailer ->
       AndroidView(
         modifier = Modifier.fillMaxSize(),
         factory = { ctx ->
-          VideoView(ctx).also { videoView = it }.apply {
-            // Never take audio focus — stock VideoView otherwise pauses whatever the
-            // user is listening to. (No-op below API 26.)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-              setAudioFocusRequest(AudioManager.AUDIOFOCUS_NONE)
-            }
-            setVideoPath(trailer.absolutePath)
-            setOnInfoListener { _, what, _ ->
-              if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) videoRendering = true
-              true
-            }
-            // Runs again with a new MediaPlayer when VideoView reopens the file after
-            // its surface was recreated (app backgrounded), so it reapplies `muted`.
-            setOnPreparedListener { mp ->
-              player = mp
-              hasAudio = mp.trackInfo.any { it.trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO }
-              mp.isLooping = true
-              mp.applyMuted(muted)
-              mp.start()
-            }
+          SurfaceView(ctx).apply {
+            // What VideoView's setScreenOnWhilePlaying did: the loop is something to watch.
+            keepScreenOn = true
+            holder.addCallback(object : SurfaceHolder.Callback {
+              private var playing: TrailerPlayer? = null
+
+              // Again when the surface comes back after the app was backgrounded: a new
+              // player from the start, keeping the mute toggle's state.
+              override fun surfaceCreated(holder: SurfaceHolder) {
+                val startMuted = muted
+                playing = TrailerPlayer(
+                  trailer,
+                  holder.surface,
+                  setup = {
+                    setOnInfoListener { _, what, _ ->
+                      if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) videoRendering = true
+                      true
+                    }
+                    isLooping = true
+                    applyMuted(startMuted)
+                  },
+                ) { mp, audio ->
+                  player = mp
+                  hasAudio = audio
+                }
+              }
+
+              override fun surfaceDestroyed(holder: SurfaceHolder) {
+                player = null
+                playing?.release()
+                playing = null
+              }
+
+              override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+            })
           }
         },
-        onRelease = { it.stopPlayback() },
       )
     }
     AnimatedVisibility(visible = !videoRendering, exit = fadeOut()) {
@@ -458,9 +476,8 @@ private fun GameplayLoop(game: Game, url: String) {
       IconButton(
         onClick = {
           muted = !muted
-          // VideoView releases its player when the surface goes and the reopen
-          // briefly lags it; the prepared listener applies `muted` on reopen anyway.
-          runCatching { player?.applyMuted(muted) }
+          // A player that hasn't started yet takes `muted` as it starts.
+          player?.applyMuted(muted)
         },
         modifier = Modifier
           .align(Alignment.TopEnd)
@@ -479,10 +496,10 @@ private fun GameplayLoop(game: Game, url: String) {
   if (fullscreen && trailer != null) {
     TrailerFullscreen(trailer, bounds) { position ->
       fullscreen = false
-      // Picks up where the fullscreen clip was left. VideoView may be mid-reopen
-      // (surface recreated), with no player to seek yet.
-      runCatching { player?.seekToNearestKeyframe(position) }
-      videoView?.start()
+      // Picks up where the fullscreen clip was left. A player rebuilt meanwhile (surface
+      // recreated) starts over instead.
+      player?.seekToNearestKeyframe(position)
+      player?.start()
     }
   }
 }
@@ -615,27 +632,33 @@ private fun TrailerFullscreen(file: File, source: Rect, onClose: (positionMs: In
             TextureView(ctx).apply {
               surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                 private var surface: Surface? = null
+                private var playing: TrailerPlayer? = null
 
                 override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
                   val target = Surface(texture).also { surface = it }
-                  player = MediaPlayer().apply {
-                    setSurface(target)
-                    setDataSource(file.absolutePath)
-                    setOnInfoListener { _, what, _ ->
-                      if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) rendering = true
-                      false
-                    }
-                    setOnPreparedListener { it.start() }
-                    setOnCompletionListener { close(0) }
-                    prepareAsync()
-                  }
+                  playing = TrailerPlayer(
+                    file,
+                    target,
+                    setup = {
+                      setOnInfoListener { _, what, _ ->
+                        if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) rendering = true
+                        false
+                      }
+                      setOnCompletionListener { close(0) }
+                    },
+                  ) { mp, _ -> player = mp }
                 }
 
+                // The texture outlives this call (false) until the player is done with it.
                 override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-                  player?.release()
                   player = null
-                  surface?.release()
-                  return true
+                  val target = surface
+                  playing?.release {
+                    target?.release()
+                    texture.release()
+                  }
+                  playing = null
+                  return false
                 }
 
                 override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {}
@@ -658,6 +681,56 @@ private fun TrailerFullscreen(file: File, source: Rect, onClose: (positionMs: In
           Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.trailer_close), tint = Color.White)
         }
       }
+    }
+  }
+}
+
+// A MediaPlayer's setup and release are chains of blocking calls into the media server,
+// long enough on the main thread to freeze the sheet as its trailer starts and on the
+// frame it closes. So both run on this thread, one at a time. It has no Looper, so the
+// player delivers its events on the main one.
+private val trailerThread = Executors.newSingleThreadExecutor()
+private val mainHandler = Handler(Looper.getMainLooper())
+
+/**
+ * Prepares and starts [file] on [surface] on [trailerThread], then hands the playing
+ * player — and whether the clip has an audio track — to [onStarted] on the main thread.
+ * [setup] runs on [trailerThread] before the player prepares. [release], called on the
+ * main thread, returns at once: the player is torn down on [trailerThread], started or
+ * not, and [after] runs there once it is.
+ */
+private class TrailerPlayer(
+  file: File,
+  surface: Surface,
+  setup: MediaPlayer.() -> Unit,
+  onStarted: (MediaPlayer, hasAudio: Boolean) -> Unit,
+) {
+  @Volatile private var released = false
+  private var player: MediaPlayer? = null // trailerThread only
+
+  init {
+    trailerThread.execute {
+      if (released) return@execute
+      val mp = MediaPlayer().also { player = it }
+      // A clip that won't open leaves the cover art up, as a slow one does.
+      runCatching {
+        mp.setSurface(surface)
+        mp.setDataSource(file.absolutePath)
+        mp.setup()
+        mp.prepare()
+        val audio = mp.trackInfo.any { it.trackType == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO }
+        mp.start()
+        mainHandler.post { if (!released) onStarted(mp, audio) }
+      }
+    }
+  }
+
+  fun release(after: () -> Unit = {}) {
+    released = true
+    trailerThread.execute {
+      player?.release()
+      player = null
+      after()
     }
   }
 }
