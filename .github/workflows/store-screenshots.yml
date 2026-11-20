@@ -84,6 +84,9 @@ jobs:
           script: |
             # Crash/ANR dialogs take window focus and land in screenshots; suppress them.
             adb shell settings put global hide_error_dialogs 1
+            # That stops only later ones. The action's unlock key, sent as boot completes,
+            # can already have hung a launcher with no window yet: close what is up.
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
             # Streamed for the whole run: the device may be gone by the time a
             # failure is handled.
             mkdir -p ../diag
@@ -153,13 +156,27 @@ jobs:
           working-directory: android
           # The action runs each line as its own `sh -c`: no multi-line constructs.
           script: |
+            # Error dialogs and diagnostics as in the android job.
+            adb shell settings put global hide_error_dialogs 1
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            mkdir -p ../diag
+            adb logcat -v threadtime -b main,system,crash,events > ../diag/logcat.txt 2>&1 &
             ./gradlew :app:installDebug :app:installDebugAndroidTest
             adb shell pm revoke games.paperballoon.controller android.permission.ACCESS_LOCAL_NETWORK
             adb shell pm clear-permission-flags games.paperballoon.controller android.permission.ACCESS_LOCAL_NETWORK user-set user-fixed
-            adb shell am instrument -w -e class games.paperballoon.controller.LocalNetworkGateTest games.paperballoon.controller.test/androidx.test.runner.AndroidJUnitRunner | tee ../instrument.txt
+            adb shell am instrument -w -e class games.paperballoon.controller.LocalNetworkGateTest games.paperballoon.controller.test/androidx.test.runner.AndroidJUnitRunner | tee ../diag/instrument.txt
             # am instrument exits 0 on failure, and a skip also reads OK. Only the test's last answer grants the permission.
-            grep -q "^OK (1 test)" ../instrument.txt
+            adb shell dumpsys window > ../diag/window.txt 2>&1
+            grep -q "^OK (1 test)" ../diag/instrument.txt
             adb shell dumpsys package games.paperballoon.controller | grep -q "ACCESS_LOCAL_NETWORK: granted=true"
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-lan-gate-diagnostics
+          path: diag
+          if-no-files-found: ignore
 
   ios:
     name: iOS ${{ matrix.size }} (simulator)
