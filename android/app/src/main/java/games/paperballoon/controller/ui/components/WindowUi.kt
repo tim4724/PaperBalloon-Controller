@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.ViewCompat
 import games.paperballoon.controller.theme.sheetGlass
@@ -41,18 +42,21 @@ import kotlinx.coroutines.flow.dropWhile
 
 /**
  * House-style modal sheet: opens fully expanded, no drag handle (its tap ripple
- * reads as broken).
+ * reads as broken). A [maxWidth] replaces Material's 640dp cap where a sheet has a wide
+ * layout of its own.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppSheet(
   onDismiss: () -> Unit,
+  maxWidth: Dp? = null,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   ModalBottomSheet(
     onDismissRequest = onDismiss,
     sheetState = sheetState,
+    sheetMaxWidth = maxWidth ?: BottomSheetDefaults.SheetMaxWidth,
     dragHandle = null,
     // The glass is drawn by the content, which takes the insets inside it so the glass
     // reaches under the nav bar.

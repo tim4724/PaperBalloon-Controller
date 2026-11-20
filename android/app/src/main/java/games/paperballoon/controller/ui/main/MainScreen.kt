@@ -54,6 +54,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -130,6 +131,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -238,6 +240,11 @@ fun MainScreen(
   onBarIcons: (BarIcons) -> Unit = {},
 ) {
   val context = LocalContext.current
+  // Home goes two posters across when the window is wider than tall — in practice a
+  // screen 600dp or more across, where Android 16+ ignores the portrait request (a tablet,
+  // a foldable held open). iOS matches on the open iPhone Duo.
+  val configuration = LocalConfiguration.current
+  val wide = configuration.screenWidthDp > configuration.screenHeightDp
   // Config-aware resources for string lookups in callbacks (context.getString on
   // LocalContext.current is flagged by lint as not tracking config changes).
   val resources = LocalResources.current
@@ -603,6 +610,8 @@ fun MainScreen(
             },
             contentAlignment = Alignment.TopStart,
             label = "roomSlot",
+            // A poster wide beside the grid: half of it, less half the gutter.
+            modifier = if (wide) Modifier.fillMaxWidth(0.5f).padding(end = 8.dp) else Modifier,
           ) { s ->
             // A second room joining the first changes the size without a key change.
             Column(
@@ -621,7 +630,7 @@ fun MainScreen(
               }
             }
           }
-          GamesSection(games, underBar, Modifier.padding(top = 20.dp), onOpen = { infoSheets += InfoSheet(it) })
+          GamesSection(games, underBar, grid = wide, Modifier.padding(top = 20.dp), onOpen = { infoSheets += InfoSheet(it) })
           Spacer(Modifier.height(with(LocalDensity.current) { dockHeightPx.toDp() } + 28.dp))
         }
       }
@@ -638,6 +647,8 @@ fun MainScreen(
         onEnterCode = { requireName(AfterName.EnterCode) },
         modifier = Modifier
           .align(Alignment.BottomCenter)
+          // About a phone's width on a wide screen, as on iOS.
+          .then(if (wide) Modifier.widthIn(max = WIDE_DOCK_WIDTH + 32.dp) else Modifier)
           // Measured OUTSIDE the margins + nav-bar inset so the spacer clears the
           // whole dock.
           .onGloballyPositioned { dockHeightPx = it.size.height }
@@ -730,6 +741,7 @@ fun MainScreen(
   for (sheet in infoSheets) key(sheet) {
     GameInfoSheet(
       game = sheet.game,
+      wide = wide,
       onDismiss = { infoSheets -= sheet },
       onScan = { infoSheets = emptyList(); requireName(AfterName.Scan) },
       onEnterCode = { infoSheets = emptyList(); requireName(AfterName.EnterCode) },
@@ -1099,11 +1111,13 @@ private fun StatusLine(text: AnnotatedString, @DrawableRes icon: Int, showsProgr
   }
 }
 
-// The catalog: a heading, then every game — live or coming soon — as the same card.
+// The catalog: a heading, then every game — live or coming soon — as the same card, two
+// across in the [grid] layout.
 @Composable
 private fun GamesSection(
   games: List<Game>,
   underBar: SnapshotStateMap<String, Boolean>,
+  grid: Boolean,
   modifier: Modifier = Modifier,
   onOpen: (Game) -> Unit,
 ) {
@@ -1117,7 +1131,16 @@ private fun GamesSection(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
-    games.forEach { game -> GameCard(game, underBar, onOpen) }
+    if (grid) {
+      games.chunked(2).forEach { pair ->
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+          pair.forEach { game -> GameCard(game, underBar, Modifier.weight(1f), onOpen) }
+          if (pair.size == 1) Spacer(Modifier.weight(1f))
+        }
+      }
+    } else {
+      games.forEach { game -> GameCard(game, underBar, Modifier, onOpen) }
+    }
   }
 }
 
@@ -1136,7 +1159,12 @@ private const val ICON_FLIP_LUMINANCE = 0.4f
 // untouched on top, and the name under it with its tag beside it, the player count at
 // the right and where it runs below. The whole card is the tap.
 @Composable
-private fun GameCard(game: Game, underBar: SnapshotStateMap<String, Boolean>, onOpen: (Game) -> Unit) {
+private fun GameCard(
+  game: Game,
+  underBar: SnapshotStateMap<String, Boolean>,
+  modifier: Modifier,
+  onOpen: (Game) -> Unit,
+) {
   val interaction = remember { MutableInteractionSource() }
   val scale = rememberPressScale(interaction)
   val art = rememberArt(game.art)
@@ -1155,7 +1183,7 @@ private fun GameCard(game: Game, underBar: SnapshotStateMap<String, Boolean>, on
   val muted = MaterialTheme.colorScheme.onSurfaceVariant
   Card(
     onClick = { onOpen(game) },
-    modifier = Modifier
+    modifier = modifier
       .fillMaxWidth()
       .graphicsLayer { scaleX = scale; scaleY = scale }
       .background(MaterialTheme.colorScheme.glass, MaterialTheme.shapes.large),
@@ -1652,6 +1680,9 @@ private fun DockPanel(list: GraphicsLayer, scrolled: () -> Float, modifier: Modi
 
 // How far the panel reaches above the buttons.
 private val DOCK_PANEL_ABOVE = 8.dp
+
+// The dock's buttons on a wide screen, margins aside: about a phone's width.
+private val WIDE_DOCK_WIDTH = 520.dp
 // One blur, not a progressive stack: every blur pass runs on each scroll frame.
 private val DOCK_PANEL_BLUR = 8.dp
 private const val DOCK_PANEL_SCALE = 0.5f

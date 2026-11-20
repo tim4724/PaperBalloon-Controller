@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -104,33 +105,58 @@ import kotlinx.coroutines.launch
 @Composable
 fun GameInfoSheet(
   game: Game,
+  wide: Boolean,
   onDismiss: () -> Unit,
   onScan: () -> Unit,
   onEnterCode: () -> Unit,
 ) {
-  AppSheet(onDismiss = onDismiss) {
-    Column(
-      Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
-      verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-          game.name,
-          Modifier.weight(1f),
-          style = MaterialTheme.typography.headlineSmall,
-          fontWeight = FontWeight.Bold,
-        )
-        game.playersRange?.let { PlayersChip(it) }
+  val header = @Composable {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(
+        game.name,
+        Modifier.weight(1f),
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.Bold,
+      )
+      game.playersRange?.let { PlayersChip(it) }
+    }
+  }
+  val media = @Composable {
+    if (game.video != null) {
+      GameplayLoop(game, game.video)
+    } else {
+      GameArt(game, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large))
+    }
+  }
+  val play = @Composable {
+    if (game.tvApps.isNotEmpty() || game.displayHost != null) PlatformChips(game, stacked = wide)
+    if (game.isPlayable) {
+      PlaySteps(game)
+      JoinButtons(onScan = onScan, onEnterCode = onEnterCode)
+    }
+  }
+  // The sheet adds the navigation bar's room below this already (AppSheet). iOS matches.
+  val padding = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
+  // Wider than tall (a tablet, an unfolded foldable turned), the phone's stack is too tall:
+  // the trailer goes beside one column holding the rest, half and half, on a sheet in
+  // home's 16dp margins so the trailer stays about a poster wide. iOS matches.
+  val maxWidth = if (wide) LocalConfiguration.current.screenWidthDp.dp - 32.dp else null
+  AppSheet(onDismiss = onDismiss, maxWidth = maxWidth) {
+    if (wide) {
+      Row(padding, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+          header()
+          media()
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+          play()
+        }
       }
-      if (game.video != null) {
-        GameplayLoop(game, game.video)
-      } else {
-        GameArt(game, Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large))
-      }
-      if (game.tvApps.isNotEmpty() || game.displayHost != null) PlatformChips(game)
-      if (game.isPlayable) {
-        PlaySteps(game)
-        JoinButtons(onScan = onScan, onEnterCode = onEnterCode)
+    } else {
+      Column(padding, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        header()
+        media()
+        play()
       }
     }
   }
@@ -152,20 +178,17 @@ internal val TV_PLATFORMS = listOf(
 private const val OWN_STORE_PLATFORM = "androidtv"
 
 /**
- * Where the game runs, as a row of equal chips: one per declared TV app plus one for
- * the browser path. A chip with somewhere to go is itself the button, marked by a
- * corner glyph: this app's own store once that TV app is live (manifest tvStores), the
- * share sheet for the game's address. A not-yet-live TV app is a dimmed chip tagged
- * "Soon". This row is the sheet's only mention of platforms and host, so the play
+ * Where the game runs, as a row of equal chips (or, [stacked], a column of rows): one per
+ * declared TV app plus one for the browser path. A chip with somewhere to go is itself
+ * the button, marked by a corner glyph: this app's own store once that TV app is live
+ * (manifest tvStores), the share sheet for the game's address. A not-yet-live TV app is a
+ * dimmed chip tagged "Soon". This row is the sheet's only mention of platforms and host, so the play
  * steps stay path-free (PlaySteps).
  */
 @Composable
-private fun PlatformChips(game: Game) {
+private fun PlatformChips(game: Game, stacked: Boolean) {
   val context = LocalContext.current
-  Row(
-    Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-    horizontalArrangement = Arrangement.spacedBy(9.dp),
-  ) {
+  val chips = @Composable { chip: Modifier ->
     TV_PLATFORMS.forEach { (id, nameRes) ->
       val status = game.tvApps[id] ?: return@forEach
       val soon = status != "live"
@@ -174,13 +197,14 @@ private fun PlatformChips(game: Game) {
         PlatformChip(
           R.drawable.ic_tv,
           stringResource(nameRes),
-          Modifier.weight(1f),
+          chip,
+          stacked,
           corner = R.drawable.ic_arrow_outward,
           onClickLabel = stringResource(R.string.get_tv_app),
           onClick = { context.openUrl(store) },
         )
       } else {
-        PlatformChip(R.drawable.ic_tv, stringResource(nameRes), Modifier.weight(1f), soon = soon)
+        PlatformChip(R.drawable.ic_tv, stringResource(nameRes), chip, stacked, soon = soon)
       }
     }
     val url = game.controllerBaseUrl
@@ -191,27 +215,41 @@ private fun PlatformChips(game: Game) {
       PlatformChip(
         R.drawable.ic_globe,
         host.replace(".", "\u200B."),
-        Modifier.weight(1f),
+        chip,
+        stacked,
         corner = R.drawable.ic_share,
         onClickLabel = stringResource(R.string.share_link, host),
         onClick = { context.shareUrl(url) },
       )
     }
   }
+  if (stacked) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      chips(Modifier.fillMaxWidth())
+    }
+  } else {
+    Row(
+      Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+      horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+      chips(Modifier.weight(1f))
+    }
+  }
 }
 
 /**
  * One chip: glyph over name, top-aligned so they line up across chips when one name
- * wraps. With [onClick] the whole chip is the button, marked by its [corner] glyph. A
- * [soon] chip dims its glyph and name to 45% — the state the poster's "Coming soon"
- * chip marks — and wears the "Soon" tag across its top edge, where it can't cover the
- * glyph.
+ * wraps; [stacked], a row with the glyph before the name. With [onClick] the whole chip
+ * is the button, marked by its [corner] glyph. A [soon] chip dims its glyph and name to
+ * 45% — the state the poster's "Coming soon" chip marks — and wears the "Soon" tag
+ * across its top edge, where it can't cover the glyph (at a row's end when stacked).
  */
 @Composable
 private fun PlatformChip(
   iconRes: Int,
   label: String,
   modifier: Modifier,
+  stacked: Boolean,
   soon: Boolean = false,
   corner: Int? = null,
   onClickLabel: String? = null,
@@ -219,39 +257,60 @@ private fun PlatformChip(
 ) {
   val base = MaterialTheme.colorScheme.onSurface
   val content = if (soon) base.copy(alpha = 0.45f) else base
-  Box(modifier.fillMaxHeight().semantics(mergeDescendants = true) {}) {
-    Column(
-      Modifier
-        .fillMaxSize()
-        .clip(MaterialTheme.shapes.large)
-        // Highest: the step that shows on the sheet's glass (AppSheet).
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-        .then(
-          if (onClick != null) {
-            Modifier.clickable(onClickLabel = onClickLabel, role = Role.Button, onClick = onClick)
-          } else {
-            Modifier
-          },
+  val surface = Modifier
+    .clip(MaterialTheme.shapes.large)
+    // Highest: the step that shows on the sheet's glass (AppSheet).
+    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+    .then(
+      if (onClick != null) {
+        Modifier.clickable(onClickLabel = onClickLabel, role = Role.Button, onClick = onClick)
+      } else {
+        Modifier
+      },
+    )
+  val icon = @Composable {
+    Icon(painterResource(iconRes), contentDescription = null, Modifier.size(20.dp), tint = content)
+  }
+  val mark = if (stacked) Alignment.CenterEnd else Alignment.TopEnd
+  Box((if (stacked) modifier else modifier.fillMaxHeight()).semantics(mergeDescendants = true) {}) {
+    if (stacked) {
+      // The end of the row is kept for the mark.
+      Row(
+        Modifier.fillMaxWidth().then(surface).padding(start = 16.dp, end = 44.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+      ) {
+        icon()
+        Text(
+          label,
+          style = MaterialTheme.typography.labelMedium,
+          color = content,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
         )
-        .padding(vertical = 12.dp, horizontal = 6.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-      Icon(painterResource(iconRes), contentDescription = null, Modifier.size(20.dp), tint = content)
-      Text(
-        label,
-        style = MaterialTheme.typography.labelMedium,
-        color = content,
-        textAlign = TextAlign.Center,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-      )
+      }
+    } else {
+      Column(
+        Modifier.fillMaxSize().then(surface).padding(vertical = 12.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+      ) {
+        icon()
+        Text(
+          label,
+          style = MaterialTheme.typography.labelMedium,
+          color = content,
+          textAlign = TextAlign.Center,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
     }
     if (corner != null) {
       Icon(
         painterResource(corner),
         contentDescription = null,
-        Modifier.align(Alignment.TopEnd).padding(8.dp).size(16.dp),
+        Modifier.align(mark).padding(if (stacked) 16.dp else 8.dp).size(16.dp),
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
@@ -259,8 +318,8 @@ private fun PlatformChip(
       Text(
         stringResource(R.string.status_soon),
         Modifier
-          .align(Alignment.TopEnd)
-          .offset(x = 4.dp, y = (-6).dp)
+          .align(mark)
+          .offset(x = if (stacked) (-12).dp else 4.dp, y = if (stacked) 0.dp else (-6).dp)
           .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
           .padding(horizontal = 6.dp, vertical = 2.dp),
         style = MaterialTheme.typography.labelSmall,

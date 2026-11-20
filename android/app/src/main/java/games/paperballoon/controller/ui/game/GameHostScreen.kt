@@ -188,12 +188,18 @@ private fun GameHostContent(
   // The page has painted its first frame. The join cover lifts on that — unless the page
   // asked for landscape and the window hasn't turned yet: the turn takes a few hundred
   // ms, and lifting earlier shows the page portrait-shaped mid-turn (a landscape-only
-  // game's "turn your phone" overlay, say).
+  // game's "turn your phone" overlay, say). Where nothing turns the page shows in whatever
+  // shape it is, and asks for the turn itself (CONTRACT.md §10).
   var painted by remember { mutableStateOf(false) }
-  val isLandscapeUi = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-  LaunchedEffect(loading, painted, landscape, isLandscapeUi) {
-    // Split-screen ignores orientation requests, so waiting there would never end.
-    val turned = !landscape || isLandscapeUi || context.findActivity()?.isInMultiWindowMode == true
+  val configuration = LocalConfiguration.current
+  val isLandscapeUi = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+  // Android 16+ ignores an app's orientation request on a screen 600dp or more across
+  // (a tablet, an unfolded foldable), and split-screen ignores it everywhere: waiting
+  // there would never end.
+  val turns = context.findActivity()?.isInMultiWindowMode != true &&
+    (Build.VERSION.SDK_INT < 36 || configuration.smallestScreenWidthDp < 600)
+  LaunchedEffect(loading, painted, landscape, isLandscapeUi, turns) {
+    val turned = !landscape || isLandscapeUi || !turns
     if (loading && painted && turned) loading = false
   }
   val surfaceArgb = MaterialTheme.colorScheme.surface.toArgb()
