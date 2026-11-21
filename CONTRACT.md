@@ -339,17 +339,17 @@ joins, and keeps a way to play on in the browser. The two platforms differ:
   The join URL has to match the app's link filters in `AndroidManifest.xml`, or the
   intent falls back to Play even with the app installed. Firefox and in-app WebViews
   don't reliably handle intent links; give them the Play link.
-- **The App Clip** joins without an install. Link Apple's default App Clip link with the
-  join URL in `url`:
+- **The App Store** carries no room (iOS has no install referrer); the player scans the
+  code again once the app is installed. Link its page:
 
   ```js
-  'https://appclip.apple.com/id?p=games.paperballoon.controller.Clip&url='
-    + encodeURIComponent(joinUrl)
+  'https://apps.apple.com/app/id6825072879'
   ```
 
-  Safari shows the clip card, and the clip joins `url` like a scanned link. The clip is
-  iPhone-only. The App Store link, `https://apps.apple.com/app/id6825072879`, carries no
-  room: the player scans the code again once the app is installed.
+  Don't link the App Clip: a Camera scan of a room link already opens it (every game host
+  is a clip invocation host, `ios/README.md`), and Apple's default clip link is unreliable
+  outside Safari. Offer the app on iPhone only, which it is built for; iPadOS Safari
+  reports a Mac user agent, so matching `iPhone` leaves iPads out.
 
 ## Platform note: tilt controls
 

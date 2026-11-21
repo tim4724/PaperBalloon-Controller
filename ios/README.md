@@ -39,6 +39,5 @@ through `SceneDelegate`. Shared code must stay clip-safe: a clip has no Bonjour,
 [App Clip limitations](https://developer.apple.com/documentation/appclip/choosing-the-right-functionality-for-your-app-clip)).
 Invocation hosts are the clip's `appclips:` entitlements in `project.yml`; each must
 serve an AASA naming the clip, and which URLs open it is set by the App Clip
-experiences in App Store Connect. A game page's own button opens the clip through
-Apple's default App Clip link instead, with the room link inside it (CONTRACT.md §13;
-`incomingJoinLink` unwraps it).
+experiences in App Store Connect. Apple's default App Clip link (room link in `url`)
+also opens the clip, and `incomingJoinLink` unwraps it.
