@@ -131,10 +131,14 @@ final class RootHostingController: UIHostingController<RootView> {
     /// other iPhone, and until the hinge first reports.
     private var unfolded: Bool?
 
+    /// Whether the device folds (an iPhone Duo), once its hinge has reported.
+    static private(set) var hasHinge = false
+
     override func viewDidLoad() {
         super.viewDidLoad()
         if #available(iOS 27.1, *) {
             view.addInteraction(UIHingeInteraction { [weak self] _, update in
+                if update.hinge != nil { Self.hasHinge = true }
                 self?.unfolded = switch update.hinge?.status {
                 case .closed: false
                 case .partiallyOpen, .fullyOpen: true

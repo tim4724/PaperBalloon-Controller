@@ -567,12 +567,14 @@ struct AppSheetContainer<Content: View>: View {
         .modifier(HorizontalBars())
     }
 
-    /// The content's height, or all the height there is when the content nearly fills it:
-    /// below full height iOS 27.1 draws the status bar into the sheet's corner on the
-    /// iPhone Duo's cover screen, whatever the app asks for (`HorizontalBars`).
+    /// The content's height, or on the iPhone Duo all the height there is when the content
+    /// nearly fills it: below full height iOS 27.1 draws the status bar into the sheet's
+    /// corner on its cover screen, whatever the app asks for (`HorizontalBars`).
+    /// Other iPhones keep a sheet as tall as its content, with home showing above it.
     private var fittedHeight: CGFloat {
         let full = PlaceholderDetent.fullHeight
-        return full > 0 && measuredHeight > full - Self.nearlyFull ? full : measuredHeight
+        return RootHostingController.hasHinge && full > 0 && measuredHeight > full - Self.nearlyFull
+            ? full : measuredHeight
     }
 
     /// How near the full height counts as filling it: on the Duo's cover screen a full sheet
