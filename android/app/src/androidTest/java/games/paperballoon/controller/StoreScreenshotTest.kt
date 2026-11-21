@@ -1,18 +1,10 @@
 package games.paperballoon.controller
 
-import android.content.ContentValues
-import android.content.Intent
-import android.content.res.Configuration
-import android.graphics.Bitmap
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -22,12 +14,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
-import androidx.core.net.toUri
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import java.io.File
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -78,26 +68,21 @@ class StoreScreenshotTest {
     // via configChanges, but a pre-launch flip sidesteps the question entirely).
     shell("cmd uimode night " + if (dark) "yes" else "no")
     Thread.sleep(1_000)
-    // The uimode flip knocks SystemUI out of demo mode, so the clean status bar
-    // (fixed clock, full battery/signal, no notifications) is re-applied here, per
-    // pass — not in the CI script.
+    // Per pass, not in the CI script: the uimode flip knocks SystemUI out of demo mode.
     applyDemoStatusBar()
     ActivityScenario.launch(MainActivity::class.java).use { walkHomeFlow(suffix) }
     // Once: a game page draws itself the same in either theme.
     if (!dark) {
-      captureInGame(IN_GAME_URL, "06-in-game")
-      captureInGame(TINY_TRACK_URL, "07-tinytrack", landscape = true)
+      // Fonts and the touchpad canvas; Tiny Track's 3D car previews take longer.
+      compose.inGamePage(IN_GAME_URL) {
+        Thread.sleep(1_000)
+        screenshot("06-in-game")
+      }
+      compose.inGamePage(TINY_TRACK_URL, landscape = true) {
+        Thread.sleep(2_000)
+        screenshot("07-tinytrack")
+      }
     }
-  }
-
-  private fun applyDemoStatusBar() {
-    shell("settings put global sysui_demo_allowed 1")
-    shell("am broadcast -a com.android.systemui.demo -e command enter")
-    shell("am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false")
-    shell("am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 -e fully true")
-    shell("am broadcast -a com.android.systemui.demo -e command notifications -e visible false")
-    shell("am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941")
-    Thread.sleep(500)
   }
 
   private fun walkHomeFlow(suffix: String) {
@@ -166,40 +151,6 @@ class StoreScreenshotTest {
     screenshot("05-about-$suffix")
   }
 
-  /** Deep-link (the App Link path) into a controller's scenario harness and capture it
-   *  once the "Joining…" cover has faded — after the turn, for a [landscape] page, which
-   *  asks for it (CONTRACT §10) before its first paint. */
-  private fun captureInGame(url: String, name: String, landscape: Boolean = false) {
-    val intent = Intent(Intent.ACTION_VIEW, url.toUri(), appContext, MainActivity::class.java)
-    ActivityScenario.launch<MainActivity>(intent).use { scenario ->
-      // "Joining %1$s…" localized prefix, title-independent.
-      val joiningPrefix = str(R.string.joining_game, MARKER).substringBefore(MARKER)
-      // Wait for the game host (its WebView), then for the cover to be gone. Only its
-      // absence, never its appearance: a page the WebView has cached can paint before
-      // the first check, and the cover is already gone.
-      compose.waitUntil(timeoutMillis = 15_000) {
-        var hosting = false
-        scenario.onActivity { hosting = it.window.decorView.findWebView() != null }
-        hosting
-      }
-      compose.waitUntil(timeoutMillis = 30_000) {
-        compose.onAllNodes(hasText(joiningPrefix, substring = true)).fetchSemanticsNodes().isEmpty()
-      }
-      if (landscape) {
-        compose.waitUntil(timeoutMillis = 15_000) {
-          var turned = false
-          scenario.onActivity { turned = it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
-          turned
-        }
-      }
-      // The shell fades the cover on WebView's visual-state callback, so the cover
-      // being gone means the page has actually been drawn (not merely loaded).
-      // Fonts and the touchpad canvas; Tiny Track's 3D car previews take longer.
-      Thread.sleep(if (landscape) 2_000 else 1_000)
-      screenshot(name)
-    }
-  }
-
   private fun waitForText(text: String) {
     compose.waitUntil(timeoutMillis = 10_000) {
       compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
@@ -212,33 +163,7 @@ class StoreScreenshotTest {
     }
   }
 
-  /** Full-device capture (system bars included) via UiAutomation — sheets and dialogs
-   *  live in their own windows, which a compose-root capture would miss. */
-  private fun screenshot(name: String) {
-    compose.waitForIdle()
-    Thread.sleep(400) // ripples, IME slide-in, window transitions
-    val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot()) { "takeScreenshot returned null" }
-    save(bitmap, name)
-  }
-
-  private fun save(bitmap: Bitmap, name: String) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
-        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-        put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/$SHOT_DIR")
-      }
-      val resolver = appContext.contentResolver
-      val uri = requireNotNull(resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)) {
-        "MediaStore insert failed for $name"
-      }
-      resolver.openOutputStream(uri)!!.use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-    } else {
-      // Pre-Q fallback (dev devices only — CI runs API 35): app-private files.
-      val dir = File(appContext.filesDir, SHOT_DIR).apply { mkdirs() }
-      File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-    }
-  }
+  private fun screenshot(name: String) = compose.screenshot(SHOT_DIR, name)
 
   private companion object {
     const val ROOM_CODE = "A3KX9p"
@@ -246,7 +171,6 @@ class StoreScreenshotTest {
     // HexStacker's players chip (Game.playersRange over the manifest counts) — numerals
     // and an en dash, so it reads the same in every locale.
     const val PLAYERS_RANGE = "1–8"
-    const val MARKER = "@@"
 
     // The controller's own gallery/test harness (ControllerTestHarness.js, shipped in
     // the production bundle): renders the playing screen with a stubbed connection.

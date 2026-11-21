@@ -27,7 +27,7 @@ game page included (`RootHostingController.locksOrientation`, CONTRACT.md §10).
 a book, home goes two posters across, and the game sheet becomes a wider card of our own
 (`wideSheet`): iOS keeps a real sheet there about a portrait phone wide. Nothing can fold
 or turn the simulator from a test, so `DuoScreenshotTests` runs once per pose, set
-in DeviceHub (see its header).
+in DeviceHub (see its header); `tools/store_screenshots.py duo` asks for each pose it needs.
 
 ## App Clip
 

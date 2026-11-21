@@ -33,7 +33,9 @@ in the app scheme), the store-screenshot UI tests, which double as each app's sm
 (`ContractTest.kt`, `ContractTests.swift`), which drive the deployed contract test page
 (linked under `CONTRACT.md`'s checklist for a new game) through the real bridge. Both UI
 suites load live pages, so they need network. CI runs them from `.github/workflows/` —
-`checks.yml` (l10n + Android unit) on every push.
+`checks.yml` (l10n + Android unit) on every push. The stores' screenshots come from
+`uv run tools/store_screenshots.py` on a Mac, not CI: its listing tests
+(`ListingScreenshotTest.kt`, `ListingScreenshotTests.swift`) skip unless it runs them.
 
 ## The two apps are functional parity ports
 

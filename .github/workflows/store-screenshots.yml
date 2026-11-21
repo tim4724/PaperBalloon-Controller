@@ -4,16 +4,12 @@
 # Every UI test runs here, so this also runs the contract UI tests (ContractTest.kt,
 # ContractTests.swift). The emulator's WebView predates Chromium 136, so on Android they
 # check §4–5's legacy-WebView fallback, not the full path. §8's local-network wait has its
-# own API 37 job (android-lan-gate). The iOS jobs also run the scheme's unit tests
+# own API 37 job (android-lan-gate). The iOS job also runs the scheme's unit tests
 # (PaperBalloonTests); Android's run in checks.yml.
 #
-# Screenshot geometry is chosen for store requirements (phone-only by choice —
-# the app isn't a good tablet experience, so no Play tablet sets):
-#   - Android: pixel_2 = 1080×1920 (16:9) — within Play's 2:1 aspect limit.
-#   - iOS: iPhone 17 Pro Max = 1320×2868 (App Store Connect's 6.9" display size)
-#     and iPhone 14 Plus = 1284×2778 (the 6.5" slot — the only one ASC offered this
-#     app record, so it gets a native capture rather than ASC auto-scaling). The app
-#     is iPhone-only (TARGETED_DEVICE_FAMILY 1), so no iPad set is needed.
+# The captures are for review. The stores' own images come from tools/store_screenshots.py
+# on a dev machine: it needs a nearby room, both languages and the Duo's poses, none of
+# which a runner has.
 name: Store screenshots
 
 on:
@@ -68,7 +64,7 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
-          profile: pixel_2 # 1080×1920 — Play-compliant 16:9 phone screenshots
+          profile: pixel_2 # 1080×1920, the Play listing's size
           # Headroom: on the 2-core default a system window took focus mid-test
           # (Espresso's RootViewWithoutFocusException in pressBack).
           cores: 4
@@ -179,19 +175,11 @@ jobs:
           if-no-files-found: ignore
 
   ios:
-    name: iOS ${{ matrix.size }} (simulator)
+    name: iOS (simulator)
     runs-on: xcode-27
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - size: 6.9-inch
-            device: iPhone 17 Pro Max # 1320×2868
-          - size: 6.5-inch
-            device: iPhone 14 Plus # 1284×2778
     env:
-      DEVICE: ${{ matrix.device }}
+      DEVICE: iPhone 17 Pro Max
     steps:
       - uses: actions/checkout@v7
 
@@ -218,8 +206,7 @@ jobs:
 
       - name: Boot simulator with a clean status bar
         run: |
-          # Runner images only pre-create current-generation simulators — older
-          # device types (iPhone 14 Plus) must be created first.
+          # Runner images pre-create only some device types.
           if ! xcrun simctl list devices available | grep -q "$DEVICE ("; then
             xcrun simctl create "$DEVICE" "$DEVICE"
           fi
@@ -271,7 +258,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: games.paperballoon.controller-screenshots-ios-${{ matrix.size }}
+          name: games.paperballoon.controller-screenshots-ios
           path: out
           if-no-files-found: error
 
@@ -279,6 +266,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: ios-test-results-${{ matrix.size }}
+          name: ios-test-results
           path: ios/TestResults.xcresult
           if-no-files-found: ignore

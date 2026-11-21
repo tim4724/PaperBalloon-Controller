@@ -47,7 +47,8 @@ room on the local network.
 Logic the two apps must agree on exactly (parsing join links, haptic patterns)
 is tested from shared JSON cases in `tests/` that both unit test suites run.
 UI tests on both platforms drive a live contract test page through the real
-bridge, and the store screenshots come out of UI tests in CI.
+bridge. The store screenshots come out of UI tests too, run on a Mac by
+`tools/store_screenshots.py`.
 
 ## Repository layout
 
@@ -56,8 +57,8 @@ bridge, and the store screenshots come out of UI tests in CI.
   [ios/README.md](ios/README.md). Both apps split their sources the same way:
   data, the home screen, the game's web view and the theme.
 - `tests/`: test cases both apps run.
-- `tools/`: the localization check, the artwork encoder and the app icon
-  generator.
+- `tools/`: the localization check, the artwork encoder, the app icon
+  generator and the store screenshot capture.
 - `third_party/zxing-cpp/`: upstream zxing-cpp as a git submodule. Android
   compiles its QR decoder from it instead of using the published AAR; the
   reason is in `android/app/build.gradle.kts`.
