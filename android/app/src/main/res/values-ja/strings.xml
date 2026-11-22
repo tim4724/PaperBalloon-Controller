@@ -45,6 +45,7 @@
     <string name="camera_access_needed">カメラへのアクセスが必要です</string>
     <string name="camera_access_rationale">テレビのコードをスキャンするにはカメラへのアクセスを許可してください。または、ルームコードを直接入力することもできます。</string>
     <string name="allow_camera_access">カメラへのアクセスを許可</string>
+    <string name="camera_unavailable">カメラを利用できません</string>
 
     <string name="joining_game">%1$sに参加中…</string>
     <string name="leave_game">ゲームを退出</string>

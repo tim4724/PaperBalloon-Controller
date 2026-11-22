@@ -44,6 +44,7 @@
     <string name="camera_access_needed">需要相机权限</string>
     <string name="camera_access_rationale">允许使用相机来扫描电视上的二维码，或者直接输入房间代码。</string>
     <string name="allow_camera_access">允许使用相机</string>
+    <string name="camera_unavailable">相机不可用</string>
 
     <string name="joining_game">正在加入 %1$s…</string>
     <string name="leave_game">退出游戏</string>

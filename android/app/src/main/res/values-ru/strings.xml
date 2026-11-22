@@ -44,6 +44,7 @@
     <string name="camera_access_needed">Нужен доступ к камере</string>
     <string name="camera_access_rationale">Разреши доступ к камере, чтобы отсканировать код на телевизоре, или введи код комнаты вручную.</string>
     <string name="allow_camera_access">Разрешить доступ к камере</string>
+    <string name="camera_unavailable">Камера недоступна</string>
 
     <string name="joining_game">Подключение к %1$s…</string>
     <string name="leave_game">Покинуть игру</string>

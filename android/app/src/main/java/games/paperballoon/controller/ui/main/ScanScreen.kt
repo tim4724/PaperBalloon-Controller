@@ -24,6 +24,7 @@ import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.InitializationException
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.ViewPort
@@ -150,6 +151,9 @@ fun ScanScreen(
   // Coming back from Settings after a grant there — no callback fires, so re-probe.
   LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { granted = hasCameraPermission(context) }
 
+  // The camera couldn't be started: no back camera, or CameraX itself failed.
+  var cameraUnavailable by remember { mutableStateOf(false) }
+
   // One join per screen visit: the analyzer keeps delivering frames after a hit,
   // and a second onCode would double-navigate.
   var joined by remember { mutableStateOf(false) }
@@ -200,8 +204,19 @@ fun ScanScreen(
 
   Box(Modifier.fillMaxSize().background(Color.Black)) {
     if (granted) {
-      CameraPreview(onQr = ::onQr)
-      ViewfinderOverlay(Modifier.fillMaxSize())
+      if (cameraUnavailable) {
+        // No camera to aim, so no viewfinder or scan hint either. Manual entry stays
+        // below.
+        Text(
+          stringResource(R.string.camera_unavailable),
+          style = MaterialTheme.typography.bodyMedium,
+          color = Color.White,
+          modifier = Modifier.align(Alignment.Center),
+        )
+      } else {
+        CameraPreview(onQr = ::onQr, onUnavailable = { cameraUnavailable = true })
+        ViewfinderOverlay(Modifier.fillMaxSize())
+      }
     } else if (requested) {
       PermissionDeniedContent(
         onRetry = {
@@ -257,7 +272,7 @@ fun ScanScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
-        if (granted) {
+        if (granted && !cameraUnavailable) {
           Text(
             stringResource(R.string.scan_hint),
             style = MaterialTheme.typography.bodyLarge,
@@ -294,7 +309,7 @@ fun ScanScreen(
 
 // The camera side, isolated so use-case/analyzer lifecycle stays in one place.
 @Composable
-private fun CameraPreview(onQr: (List<String>) -> Unit) {
+private fun CameraPreview(onQr: (List<String>) -> Unit, onUnavailable: () -> Unit) {
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
   val previewView = remember { CameraPreviewView(context) }
@@ -313,7 +328,13 @@ private fun CameraPreview(onQr: (List<String>) -> Unit) {
     // The only suspension point, taken before anything is allocated: from here to
     // awaitCancellation() nothing suspends, so cancellation can't strand a half-built
     // pipeline short of the finally that releases it.
-    val provider = ProcessCameraProvider.awaitInstance(context)
+    val provider = try {
+      ProcessCameraProvider.awaitInstance(context)
+    } catch (e: InitializationException) {
+      Log.e("ScanScreen", "CameraX failed to start", e)
+      onUnavailable()
+      return@LaunchedEffect
+    }
     // read() is synchronous CPU work — keep it off the main thread. KEEP_ONLY_LATEST
     // backpressure drops frames while a decode is in flight, so a slow frame lowers
     // the scan rate instead of queueing work.
@@ -380,9 +401,10 @@ private fun CameraPreview(onQr: (List<String>) -> Unit) {
       applyCenterMeteringRegions(bound)
       awaitCancellation()
     } catch (e: IllegalArgumentException) {
-      // No back camera, or a combination this device can't stream. The screen stays
-      // black and manual entry — already on it — is the way out.
+      // No back camera, or a combination this device can't stream. Manual entry —
+      // already on the screen — is the way out.
       Log.e("ScanScreen", "Camera bind failed", e)
+      onUnavailable()
     } finally {
       provider.unbind(preview, analysis)
       analysis.clearAnalyzer()

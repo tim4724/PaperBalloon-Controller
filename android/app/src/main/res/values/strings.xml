@@ -49,6 +49,7 @@
     <string name="camera_access_needed">Camera access needed</string>
     <string name="camera_access_rationale">Allow camera access to scan the code on your TV, or type the room code instead.</string>
     <string name="allow_camera_access">Allow camera access</string>
+    <string name="camera_unavailable">Camera unavailable</string>
 
     <!-- Game host -->
     <string name="joining_game">Joining %1$s…</string>

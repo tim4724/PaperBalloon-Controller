@@ -45,6 +45,7 @@
     <string name="camera_access_needed">카메라 권한 필요</string>
     <string name="camera_access_rationale">TV의 코드를 스캔하려면 카메라 접근을 허용하세요. 또는 방 코드를 직접 입력할 수도 있어요.</string>
     <string name="allow_camera_access">카메라 접근 허용</string>
+    <string name="camera_unavailable">카메라를 사용할 수 없어요</string>
 
     <string name="joining_game">%1$s에 참여 중…</string>
     <string name="leave_game">게임 나가기</string>

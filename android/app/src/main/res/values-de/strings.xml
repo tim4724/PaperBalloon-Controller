@@ -44,6 +44,7 @@
     <string name="camera_access_needed">Kamerazugriff benötigt</string>
     <string name="camera_access_rationale">Erlaube den Zugriff auf die Kamera, um den Code auf deinem Fernseher zu scannen, oder gib den Raumcode ein.</string>
     <string name="allow_camera_access">Kamerazugriff erlauben</string>
+    <string name="camera_unavailable">Kamera nicht verfügbar</string>
 
     <string name="joining_game">Verbinden mit %1$s…</string>
     <string name="leave_game">Spiel verlassen</string>

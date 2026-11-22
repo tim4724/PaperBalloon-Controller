@@ -275,6 +275,9 @@ private struct CameraPreview: UIViewRepresentable {
         func start() {
             guard !configured else { return }
             configured = true
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(sessionFailed),
+                name: AVCaptureSession.runtimeErrorNotification, object: session)
             sessionQueue.async { [weak self] in
                 guard let self else { return }
                 do {
@@ -315,6 +318,16 @@ private struct CameraPreview: UIViewRepresentable {
                     DispatchQueue.main.async { self.onFailure(message) }
                 }
             }
+        }
+
+        /// The running session died, which leaves the last frame frozen on screen. Ends
+        /// the scan the way a failed setup does; opening the scanner again starts a
+        /// fresh session. An interruption (a call, the app in the background) is not
+        /// this — iOS resumes those itself.
+        @objc private func sessionFailed(_ notification: Notification) {
+            let error = notification.userInfo?[AVCaptureSessionErrorKey] as? Error
+            let message = error?.localizedDescription ?? String(localized: "Unable to use the camera")
+            DispatchQueue.main.async { self.onFailure(message) }
         }
 
         // Mirror the Android scanner's center-weighted metering: bias continuous

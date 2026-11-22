@@ -44,6 +44,7 @@
     <string name="camera_access_needed">Acesso à câmera necessário</string>
     <string name="camera_access_rationale">Permita o acesso à câmera para escanear o código na sua TV, ou digite o código da sala.</string>
     <string name="allow_camera_access">Permitir acesso à câmera</string>
+    <string name="camera_unavailable">Câmera indisponível</string>
 
     <string name="joining_game">Entrando em %1$s…</string>
     <string name="leave_game">Sair do jogo</string>
