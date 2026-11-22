@@ -258,6 +258,9 @@ private struct CameraPreview: UIViewRepresentable {
         // once it is live, and the view whose bounds define the scan region.
         private var qrOutput: AVCaptureMetadataOutput?
         private weak var previewView: PreviewView?
+        // Retained so the coordinator keeps reporting the preview's upright angle.
+        private var rotation: AVCaptureDevice.RotationCoordinator?
+        private var rotationObservation: NSKeyValueObservation?
 
         init(onCode: @escaping (String) -> Void, onFailure: @escaping (String) -> Void) {
             self.onCode = onCode
@@ -304,6 +307,7 @@ private struct CameraPreview: UIViewRepresentable {
                     // through, so the scan region is derived here (and on every layout).
                     DispatchQueue.main.async {
                         self.qrOutput = output
+                        self.followRotation(of: device)
                         self.applyScanRegionWhenReady()
                     }
                 } catch {
@@ -337,6 +341,20 @@ private struct CameraPreview: UIViewRepresentable {
             }
         }
 
+        /// Keeps the preview upright where the scanner turns: the iPhone Duo's inner
+        /// screen, which locks no orientation (`RootHostingController.locksOrientation`).
+        /// Asked of the camera rather than derived from the interface orientation,
+        /// because how a camera is mounted differs per device. Main thread only, where
+        /// the coordinator also reports.
+        private func followRotation(of device: AVCaptureDevice) {
+            guard let layer = previewView?.previewLayer else { return }
+            let rotation = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: layer)
+            self.rotation = rotation
+            rotationObservation = rotation.observe(\.videoRotationAngleForHorizonLevelPreview) { [weak self] _, _ in
+                self?.applyScanRegion()
+            }
+        }
+
         /// Confine decoding to the frame the player can actually see. `.resizeAspectFill`
         /// crops the camera frame to the screen, so without this a code sitting just
         /// outside the preview — the TV next to the one they're aiming at, a poster on
@@ -347,11 +365,16 @@ private struct CameraPreview: UIViewRepresentable {
         /// there is no layer-to-frame mapping, and a conversion that lands outside the
         /// unit square or degenerate is discarded rather than applied — a bad region
         /// scans nothing at all. Reports whether a region was actually installed.
+        ///
+        /// The preview's rotation goes in first: the region is converted through it, and
+        /// both wait on the same things. That includes a window — off screen the
+        /// coordinator reports 0°, which would turn the preview on its side.
         @discardableResult
         func applyScanRegion() -> Bool {
-            guard let output = qrOutput, let view = previewView,
-                  view.previewLayer.connection != nil,
+            guard let output = qrOutput, let view = previewView, view.window != nil,
+                  let connection = view.previewLayer.connection,
                   view.bounds.width > 0, view.bounds.height > 0 else { return false }
+            applyRotation(to: connection)
             let unit = CGRect(x: 0, y: 0, width: 1, height: 1)
             let region = view.previewLayer
                 .metadataOutputRectConverted(fromLayerRect: view.previewLayer.bounds)
@@ -359,6 +382,13 @@ private struct CameraPreview: UIViewRepresentable {
             guard !region.isNull, region.width > 0.05, region.height > 0.05 else { return false }
             output.rectOfInterest = region
             return true
+        }
+
+        private func applyRotation(to connection: AVCaptureConnection) {
+            guard let angle = rotation?.videoRotationAngleForHorizonLevelPreview,
+                  connection.videoRotationAngle != angle,
+                  connection.isVideoRotationAngleSupported(angle) else { return }
+            connection.videoRotationAngle = angle
         }
 
         /// Keeps trying until the region lands, because the fallback for one that never
