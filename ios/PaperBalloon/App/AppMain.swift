@@ -48,14 +48,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let window = UIWindow(windowScene: windowScene)
         let root = RootHostingController(rootView: RootView(router: router))
         ChromeState.shared.host = root
-        // First frames before SwiftUI paints must already be the surface color
-        // in the correct light/dark variant (no white flash in dark mode).
-        // PBPalette background (#110F17 / #FAF9F7) — keep in sync with PBTheme.swift.
-        window.backgroundColor = UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0x11 / 255.0, green: 0x0F / 255.0, blue: 0x17 / 255.0, alpha: 1)
-                : UIColor(red: 0xFB / 255.0, green: 0xF9 / 255.0, blue: 0xF4 / 255.0, alpha: 1)
-        }
+        // First frames before SwiftUI paints must already be the background in the
+        // correct light/dark variant (no white flash in dark mode): the launch screen's
+        // own colour, which is PBPalette's background.
+        window.backgroundColor = UIColor(named: "LaunchBackground")
         window.rootViewController = root
         self.window = window
         window.makeKeyAndVisible()

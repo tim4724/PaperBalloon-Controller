@@ -36,11 +36,8 @@
     <string name="join">Играть</string>
     <string name="cancel">Отмена</string>
 
-    <string name="enter_your_name">Введи имя</string>
     <string name="name">Имя</string>
-    <string name="save_and_continue">Сохранить и продолжить</string>
     <string name="save">Сохранить</string>
-    <string name="set_name">Указать имя</string>
 
     <string name="close_scanner">Закрыть сканер</string>
     <string name="scan_hint">Отсканируй QR-код на телевизоре или ноутбуке</string>

@@ -36,11 +36,8 @@
     <string name="join">Oyna</string>
     <string name="cancel">İptal</string>
 
-    <string name="enter_your_name">İsmini gir</string>
     <string name="name">İsim</string>
-    <string name="save_and_continue">Kaydet ve devam et</string>
     <string name="save">Kaydet</string>
-    <string name="set_name">İsim belirle</string>
 
     <string name="close_scanner">Tarayıcıyı kapat</string>
     <string name="scan_hint">TV\'ndeki veya bilgisayarındaki QR kodu tara</string>

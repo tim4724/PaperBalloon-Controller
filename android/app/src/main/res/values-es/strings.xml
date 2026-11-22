@@ -36,11 +36,8 @@
     <string name="join">Jugar</string>
     <string name="cancel">Cancelar</string>
 
-    <string name="enter_your_name">Escribe tu nombre</string>
     <string name="name">Nombre</string>
-    <string name="save_and_continue">Guardar y continuar</string>
     <string name="save">Guardar</string>
-    <string name="set_name">Elegir nombre</string>
 
     <string name="close_scanner">Cerrar el escáner</string>
     <string name="scan_hint">Escanea el código QR de tu TV o portátil</string>

@@ -1,6 +1,8 @@
 package games.paperballoon.controller
 
 import android.content.res.Configuration
+import android.graphics.Rect
+import android.os.Build
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -20,6 +22,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.webkit.WebViewCompat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -148,6 +151,31 @@ class ContractTest {
     assertTrue("left the game", hosting())
   }
 
+  /** §9: `off` hands the screen edges to the page — the whole of it, and again at its new
+   *  size after a turn. */
+  @Test fun backOffKeepsTheEdgesAcrossATurn() = inGame {
+    assumeTrue("gesture exclusion needs API 29", Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+    click("[data-mode=off]")
+    awaitEdgesExcluded(landscape = false)
+    click("[data-orient=landscape]")
+    awaitOrientation(Configuration.ORIENTATION_LANDSCAPE)
+    awaitEdgesExcluded(landscape = true)
+    click("[data-mode=leave]")
+    compose.waitUntil(TIMEOUT) { exclusionRects().isEmpty() }
+  }
+
+  /** The navigation allow-list: a page can't take the top frame to another site. A scripted
+   *  navigation has no player gesture behind it, so it doesn't open the browser either. */
+  @Test fun offListNavigationIsRefused() = inGame {
+    js("location.href = 'https://example.com/'")
+    // Refusal has no event to wait for: watch for as long as a load would take to start.
+    repeat(10) {
+      Thread.sleep(150)
+      assertEquals("test.paperballoon.games", js("location.host"))
+    }
+    assertTrue("left the game", hosting())
+  }
+
   /** §10: only the literal 'landscape' turns; anything else is portrait again. */
   @Test fun setOrientationTurnsAndResets() = inGame {
     click("[data-orient=landscape]")
@@ -195,6 +223,17 @@ class ContractTest {
 
     fun webViewTop() = withActivity { activity ->
       IntArray(2).also { activity.window.decorView.findWebView()!!.getLocationOnScreen(it) }[1]
+    }
+
+    fun exclusionRects() = withActivity { it.window.decorView.findWebView()!!.systemGestureExclusionRects }
+
+    /** One rect over the whole WebView, at the size it has in that orientation. */
+    fun awaitEdgesExcluded(landscape: Boolean) = compose.waitUntil(TIMEOUT) {
+      withActivity { activity ->
+        val webView = activity.window.decorView.findWebView()!!
+        (webView.width > webView.height) == landscape &&
+          webView.systemGestureExclusionRects == listOf(Rect(0, 0, webView.width, webView.height))
+      }
     }
 
     fun awaitOrientation(orientation: Int) =

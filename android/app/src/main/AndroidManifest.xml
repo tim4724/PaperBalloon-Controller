@@ -35,7 +35,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
+        android:supportsRtl="false"
         android:theme="@style/Theme.PaperBalloon">
         <!-- screenOrientation is the DEFAULT, not a lock: the launcher's own screens are
              portrait, and a game host reverts to this on leave. A controller page that

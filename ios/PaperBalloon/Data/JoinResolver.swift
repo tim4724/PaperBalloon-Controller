@@ -29,9 +29,8 @@ func originlessCode(_ raw: String?) -> String? {
     return components.path.split(separator: "/").map(String.init).first ?? ""
 }
 
-/// The join link an incoming link carries: the `url` inside Apple's default App Clip link,
-/// which a game page opens the clip with (CONTRACT.md §13), or nil if it has none. Every
-/// other link is its own join link.
+/// The join link an incoming link carries: the `url` inside Apple's default App Clip link
+/// (ios/README.md), or nil if it has none. Every other link is its own join link.
 func incomingJoinLink(_ url: URL) -> String? {
     guard url.host?.lowercased() == "appclip.apple.com" else { return url.absoluteString }
     return URLComponents(url: url, resolvingAgainstBaseURL: false)?
@@ -96,7 +95,7 @@ enum JoinResolver {
         // Plain http only for a LAN host in debug (see isPrivateHost).
         schemeOk = schemeOk || (scheme == "http" && isPrivateHost(components.host))
         #endif
-        guard schemeOk, (components.user ?? "").isEmpty else {
+        guard schemeOk, components.user == nil, components.password == nil else {
             return .failure(message: String(localized: "That code isn’t a Paper Balloon room."))
         }
         return .success(game: game, roomCode: extractRoomCode(components), joinUrl: url)

@@ -1,5 +1,6 @@
 package games.paperballoon.controller.data
 
+import games.paperballoon.controller.R
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -43,6 +44,39 @@ class JoinResolverTest {
         assertEquals(input, case.getString("game"), success.game.id)
         assertEquals(input, case.getString("room"), success.roomCode)
         assertEquals(input, input.trim(), success.joinUrl)
+      }
+    }
+  }
+
+  @Test
+  fun resolveLookups() {
+    for (case in cases.getJSONArray("resolveLookups").objects()) {
+      val lookups = case.getJSONArray("lookups").objects().map { l ->
+        when (val kind = l.getString("kind")) {
+          "found" -> RoomLookup.Found(
+            url = if (l.isNull("url")) null else l.getString("url"),
+            clients = l.optInt("clients"),
+            maxClients = l.optInt("maxClients"),
+          )
+          "notFound" -> RoomLookup.NotFound
+          "error" -> RoomLookup.Error
+          else -> throw AssertionError("unknown lookup kind $kind")
+        }
+      }
+      val outcome = resolveLookups(lookups, games)
+      if (case.has("fail")) {
+        val message = when (val fail = case.getString("fail")) {
+          "notARoom" -> R.string.error_not_paperballoon_room
+          "unmatched" -> R.string.error_code_unmatched
+          "notFound" -> R.string.error_room_not_found
+          "unreachable" -> R.string.error_server_unreachable
+          else -> throw AssertionError("unknown failure $fail")
+        }
+        assertEquals("$case", JoinOutcome.Failure(message), outcome)
+      } else {
+        val success = outcome as? JoinOutcome.Success ?: throw AssertionError("$case: expected a join, got $outcome")
+        assertEquals("$case", case.getString("game"), success.game.id)
+        assertEquals("$case", case.getString("url"), success.joinUrl)
       }
     }
   }

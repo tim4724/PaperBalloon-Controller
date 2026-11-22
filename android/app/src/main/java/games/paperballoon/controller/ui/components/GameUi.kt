@@ -70,9 +70,10 @@ import kotlinx.coroutines.withContext
 // The tappable player identity in the home header: a frosted pill over the sky, like
 // iOS's glass toolbar chip.
 @Composable
-fun PlayerChip(name: String, onClick: () -> Unit) {
+fun PlayerChip(name: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
   Surface(
     onClick = onClick,
+    modifier = modifier,
     shape = CircleShape,
     color = MaterialTheme.colorScheme.frosted,
     contentColor = MaterialTheme.colorScheme.onSurface,
@@ -89,7 +90,7 @@ fun PlayerChip(name: String, onClick: () -> Unit) {
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
       )
       Text(
-        name.ifBlank { stringResource(R.string.set_name) },
+        name,
         style = MaterialTheme.typography.bodyLarge,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

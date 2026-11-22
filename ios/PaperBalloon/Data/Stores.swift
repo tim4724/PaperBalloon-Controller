@@ -29,6 +29,8 @@ enum ProfileStore {
         if stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, defaults === UserDefaults.standard {
             stored = shared?.string(forKey: nameKey) ?? ""
         }
+        // Earlier builds capped at 16 characters, which could hold more units.
+        stored = Profile.capped(stored)
         if !stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             profile = Profile(name: stored)
         } else {

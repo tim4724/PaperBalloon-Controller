@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.callbackFlow
  */
 private const val NEARBY_SERVICE_TYPE = "_paperballoon._tcp."
 
-/** Instance names are display-declared; cap so one can't blow out the card. */
+/** Instance names are display-declared; cap (UTF-16 units) so one can't blow out the card. */
 private const val MAX_ADVERT_LABEL_LENGTH = 24
 
 /**
@@ -249,7 +249,7 @@ private const val OPTED_IN_KEY = "opted_in"
  * enforcement there is no permission to remember with — [localNetworkPermissionGranted]
  * is unconditionally true — so a stored flag stands in — the role iOS's LocalNetworkAsked plays there.
  * Without it every pre-37 device would browse and relay-advertise on the LAN from
- * launch, which §8 forbids ("the launcher asks only when the player asks for it").
+ * launch, unasked.
  */
 fun nearbyOptedIn(context: Context): Boolean =
   if (Build.VERSION.SDK_INT >= 37) {
@@ -553,8 +553,12 @@ private fun NsdServiceInfo.toAdvert(): NearbyAdvert? {
 private fun ByteArray?.decodeUtf8(): String? =
   this?.let { runCatching { String(it, Charsets.UTF_8) }.getOrNull() }
 
-internal fun sanitizeLabel(raw: String): String =
-  raw.trim()
+internal fun sanitizeLabel(raw: String): String {
+  val clean = raw.trim()
     .replace(Regex("\\s+"), " ")
-    .replace(DISPLAY_SUFFIX, "$1")
-    .take(MAX_ADVERT_LABEL_LENGTH)
+    // A lambda, not "$1": older Android prints an unmatched group as "null".
+    .replace(DISPLAY_SUFFIX) { it.groupValues[1] }
+  // On a whole code point, as iOS cuts: never half an emoji's surrogate pair.
+  val splitsPair = clean.length > MAX_ADVERT_LABEL_LENGTH && clean[MAX_ADVERT_LABEL_LENGTH - 1].isHighSurrogate()
+  return clean.take(if (splitsPair) MAX_ADVERT_LABEL_LENGTH - 1 else MAX_ADVERT_LABEL_LENGTH)
+}

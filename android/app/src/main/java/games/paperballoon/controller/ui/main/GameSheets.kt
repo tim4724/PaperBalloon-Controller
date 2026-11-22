@@ -102,9 +102,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Pure game info — name, media, players. A game with a trailer shows its gameplay
- * loop, muted until the user unmutes it; one without shows its cover art instead.
- * Joining lives on the home dock.
+ * Game info — name, media, players — over the same join buttons as the home dock. A
+ * game with a trailer shows its gameplay loop, muted until the user unmutes it; one
+ * without shows its cover art instead.
  */
 @Composable
 fun GameInfoSheet(
@@ -395,6 +395,8 @@ private fun GameplayLoop(game: Game, url: String) {
     val fetched = async(Dispatchers.IO) { TrailerCache.fetch(context, url) { progress = it } }
     delay(600)
     value = fetched.await()
+    // A failed download: back to the bare cover, not a bar stuck part-way.
+    if (value == null) progress = null
   }
   Box(
     Modifier
@@ -418,7 +420,8 @@ private fun GameplayLoop(game: Game, url: String) {
               private var playing: TrailerPlayer? = null
 
               // Again when the surface comes back after the app was backgrounded: a new
-              // player from the start, keeping the mute toggle's state.
+              // player from the start, keeping the mute toggle's state — and staying
+              // paused under a fullscreen clip.
               override fun surfaceCreated(holder: SurfaceHolder) {
                 val startMuted = muted
                 playing = TrailerPlayer(
@@ -435,6 +438,9 @@ private fun GameplayLoop(game: Game, url: String) {
                 ) { mp, audio ->
                   player = mp
                   hasAudio = audio
+                  // Either may have changed while the player was starting.
+                  mp.applyMuted(muted)
+                  if (fullscreen) mp.pause()
                 }
               }
 
@@ -476,7 +482,7 @@ private fun GameplayLoop(game: Game, url: String) {
       IconButton(
         onClick = {
           muted = !muted
-          // A player that hasn't started yet takes `muted` as it starts.
+          // A player that hasn't started yet takes `muted` once it has.
           player?.applyMuted(muted)
         },
         modifier = Modifier

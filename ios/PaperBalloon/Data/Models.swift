@@ -53,15 +53,15 @@ enum PB {
         }
     }
 
-    /// A scanned QR payload is arbitrary content and `legalTitle` matches only the
-    /// path, so before the doc viewer (which trusts its URL: no allow-list) may load a
-    /// scanned value, require the launcher apex over https with no embedded credentials.
+    /// A scanned QR payload, an incoming link and a link inside a legal page are arbitrary
+    /// content and `legalTitle` matches only the path, so before the doc viewer (which
+    /// trusts its URL: no allow-list) may load one, require the launcher apex over https with no embedded credentials.
     /// Returns the URL to open (locale variants like /en/privacy pass through as-is),
     /// or nil when it's not a legal page.
-    static func scannedLegalUrl(_ raw: String) -> String? {
+    static func legalDocUrl(_ raw: String) -> String? {
         guard let components = URLComponents(string: raw),
               components.scheme?.lowercased() == "https",
-              (components.user ?? "").isEmpty,
+              components.user == nil, components.password == nil,
               let host = components.host?.lowercased(), host == launcherHost,
               legalTitle(for: components.url) != nil else { return nil }
         return raw
@@ -331,10 +331,15 @@ extension String {
 // MARK: - Profile
 
 struct Profile: Equatable {
-    var name: String = ""
+    var name: String
 
-    /// Non-blank after trimming whitespace.
-    var isSet: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    /// CONTRACT §1's limit: 16 UTF-16 units, as Android counts and a page's `.length`
+    /// reads, cut on a whole character.
+    static func capped(_ name: String) -> String {
+        var capped = name
+        while capped.utf16.count > 16 { capped.removeLast() }
+        return capped
+    }
 }
 
 // MARK: - FunnyName

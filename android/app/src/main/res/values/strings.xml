@@ -40,11 +40,8 @@
     <string name="cancel">Cancel</string>
 
     <!-- Profile -->
-    <string name="enter_your_name">Enter your name</string>
     <string name="name">Name</string>
-    <string name="save_and_continue">Save &amp; continue</string>
     <string name="save">Save</string>
-    <string name="set_name">Set name</string>
 
     <!-- Scanner -->
     <string name="close_scanner">Close scanner</string>

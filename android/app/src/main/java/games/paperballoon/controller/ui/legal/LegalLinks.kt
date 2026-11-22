@@ -21,9 +21,8 @@ object LegalLinks {
   fun websiteUrl(language: String): String =
     if (language.equals("de", ignoreCase = true)) "$WEBSITE_URL/de/" else WEBSITE_URL
 
-  // The two legal pages cross-link to each other, so the in-app viewer can navigate
-  // from one to the other without leaving the screen. These match the loaded URL back
-  // to a document so the native app bar can show the right title as the page changes.
+  // The two legal pages cross-link to each other, and the in-app viewer opens the
+  // other as its own screen. These match a URL back to its document, for the title.
   fun isPrivacy(url: String): Boolean = matchesPath(url, "/privacy")
 
   fun isImprint(url: String): Boolean = matchesPath(url, "/imprint")
@@ -31,14 +30,15 @@ object LegalLinks {
   private fun matchesPath(url: String, path: String): Boolean =
     url.substringBefore('?').substringBefore('#').trimEnd('/').endsWith(path)
 
-  // A scanned QR payload is arbitrary content, and [isPrivacy]/[isImprint] match only
-  // the path. So before the doc viewer (which trusts its URL: no allow-list) may load a
-  // scanned value, require the launcher apex over https with no embedded credentials.
+  // A scanned QR payload, an incoming link and a link inside a legal page are arbitrary
+  // content, and [isPrivacy]/[isImprint] match only the path. So before the doc viewer
+  // (which trusts its URL: no allow-list) may load one, require the launcher apex over
+  // https with no embedded credentials.
   // Returns the URL to open (locale variants like /en/privacy pass through as-is), or
   // null when it's not a legal page.
-  fun scannedLegalUrl(raw: String): String? {
+  fun legalDocUrl(raw: String): String? {
     val uri = runCatching { raw.toUri() }.getOrNull() ?: return null
-    if (!"https".equals(uri.scheme, ignoreCase = true) || !uri.userInfo.isNullOrEmpty()) return null
+    if (!"https".equals(uri.scheme, ignoreCase = true) || uri.userInfo != null) return null
     if (!uri.host.equals(LAUNCHER_HOST, ignoreCase = true)) return null
     return raw.takeIf { isPrivacy(it) || isImprint(it) }
   }

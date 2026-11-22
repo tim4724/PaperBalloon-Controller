@@ -36,11 +36,8 @@
     <string name="join">开始游戏</string>
     <string name="cancel">取消</string>
 
-    <string name="enter_your_name">输入名字</string>
     <string name="name">名字</string>
-    <string name="save_and_continue">保存并继续</string>
     <string name="save">保存</string>
-    <string name="set_name">设置名字</string>
 
     <string name="close_scanner">关闭扫描器</string>
     <string name="scan_hint">扫描电视或电脑上的二维码</string>

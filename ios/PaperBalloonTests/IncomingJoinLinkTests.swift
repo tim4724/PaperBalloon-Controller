@@ -1,8 +1,8 @@
 import XCTest
 @testable import PaperBalloon
 
-/// CONTRACT.md §13: the default App Clip link a game page opens carries its join URL in
-/// `url`. iOS only: Android carries the room through the Play referrer instead.
+/// Apple's default App Clip link carries its join URL in `url` (ios/README.md). iOS
+/// only: Android carries the room through the Play referrer instead.
 final class IncomingJoinLinkTests: XCTestCase {
 
     private let join = "https://hexstacker.com/A3KX9p#fra-1"

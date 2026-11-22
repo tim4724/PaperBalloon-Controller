@@ -138,6 +138,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.annotation.DrawableRes
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
@@ -252,11 +255,10 @@ fun MainScreen(
   val haptics = LocalHapticFeedback.current
   val lifecycleOwner = LocalLifecycleOwner.current
   // Seeded synchronously (cached fetch, else bundled); the once-per-launch
-  // refresh below updates it live when the served manifest differs.
+  // refresh (MainNavigation) updates it live when the served manifest differs.
   val games by ManifestStore.games(context).collectAsState()
   var profile by remember { mutableStateOf(ProfileStore.load(context)) }
   var showProfile by remember { mutableStateOf(false) }
-  var afterName by remember { mutableStateOf<AfterName?>(null) }
   var showScanner by remember { mutableStateOf(false) }
   var showCodeEntry by remember { mutableStateOf(false) }
   var codeLoading by remember { mutableStateOf(false) }
@@ -369,22 +371,9 @@ fun MainScreen(
     Toast.makeText(context, resources.getString(messageRes), Toast.LENGTH_SHORT).show()
   }
 
-  fun perform(action: AfterName) {
-    when (action) {
-      AfterName.Scan -> showScanner = true
-      AfterName.EnterCode -> { codeError = null; showCodeEntry = true }
-      is AfterName.Join -> launchJoin(action.target)
-    }
-  }
-
-  // Gate any join behind a non-blank name: prompt first if missing, else act now.
-  fun requireName(action: AfterName) {
-    if (!profile.isSet) {
-      afterName = action
-      showProfile = true
-    } else {
-      perform(action)
-    }
+  fun openCodeEntry() {
+    codeError = null
+    showCodeEntry = true
   }
 
   // Scan, App Link, rejoin and nearby taps all land here. [resolveJoin] only touches the
@@ -396,15 +385,11 @@ fun MainScreen(
       val r = resolveJoin(raw, games)
       joining = false
       when (r) {
-        is JoinOutcome.Success -> requireName(AfterName.Join(r))
+        is JoinOutcome.Success -> launchJoin(r)
         is JoinOutcome.Failure -> fail(r.messageRes)
       }
     }
   }
-
-  // Pull the served manifest once per launch (ManifestStore guards re-entry, so
-  // nav pop-backs recomposing this screen don't refetch).
-  LaunchedEffect(Unit) { ManifestStore.refresh(context) }
 
   // Browse for nearby rooms only while home is STARTED and the permission is held —
   // cancelling the collection stops discovery and drops the multicast lock, so nothing
@@ -423,7 +408,7 @@ fun MainScreen(
     }
   }
 
-  // An incoming App Link goes through the same name gate as a scan.
+  // An incoming App Link joins like a scan.
   LaunchedEffect(deepLink) {
     if (deepLink != null) {
       resolveAndJoin(deepLink)
@@ -490,7 +475,11 @@ fun MainScreen(
   val lightStatus by remember(themeLight) {
     derivedStateOf { underBar.values.firstOrNull() ?: themeLight }
   }
-  val bars = BarIcons(lightStatus = lightStatus && !showScanner, lightNav = themeLight && !showScanner)
+  // The joining cover is the theme's surface, whatever poster sits under the status bar.
+  val bars = BarIcons(
+    lightStatus = (if (joining) themeLight else lightStatus) && !showScanner,
+    lightNav = themeLight && !showScanner,
+  )
   SideEffect { onBarIcons(bars) }
 
   // Games scroll the full screen; the dock floats over the list at the bottom.
@@ -626,7 +615,7 @@ fun MainScreen(
               }
               s.status?.let { NearbyStatusCard(it, onAsk, onOpenSettings) }
               s.nearby.forEachIndexed { i, room ->
-                NearbyCard(room, primary = s.rejoin == null && i == 0) { requireName(AfterName.Join(room.target)) }
+                NearbyCard(room, primary = s.rejoin == null && i == 0) { launchJoin(room.target) }
               }
             }
           }
@@ -643,8 +632,8 @@ fun MainScreen(
         modifier = Modifier.align(Alignment.BottomCenter).height(bottomInset + 12.dp + 56.dp + DOCK_PANEL_ABOVE),
       )
       JoinButtons(
-        onScan = { requireName(AfterName.Scan) },
-        onEnterCode = { requireName(AfterName.EnterCode) },
+        onScan = { showScanner = true },
+        onEnterCode = { openCodeEntry() },
         modifier = Modifier
           .align(Alignment.BottomCenter)
           // About a phone's width on a wide screen, as on iOS.
@@ -673,7 +662,7 @@ fun MainScreen(
         },
         // Close the camera too: left running behind the dialog it would keep
         // decoding and could join mid-keystroke off a QR still in frame.
-        onEnterCode = { showScanner = false; codeError = null; showCodeEntry = true },
+        onEnterCode = { showScanner = false; openCodeEntry() },
         onClose = { showScanner = false },
       )
     }
@@ -681,27 +670,19 @@ fun MainScreen(
     // loading screen from tap to page: this one names no game because resolving is what
     // discovers which one, and the host's picks up the name.
     AnimatedVisibility(visible = joining, enter = fadeIn(), exit = fadeOut(tween(300))) {
-      JoiningCover(stringResource(R.string.joining))
+      // Takes the touches: home beneath it must not open a sheet or start another join.
+      JoiningCover(stringResource(R.string.joining), Modifier.pointerInput(Unit) {})
     }
   }
 
   if (showProfile) {
-    val gating = afterName != null
     ProfileSheet(
       initial = profile,
-      title = stringResource(if (gating) R.string.enter_your_name else R.string.name),
-      cta = stringResource(if (gating) R.string.save_and_continue else R.string.save),
-      onDismiss = {
-        showProfile = false
-        afterName = null
-      },
+      onDismiss = { showProfile = false },
       onSave = { saved ->
         ProfileStore.save(context, saved)
         profile = saved
         showProfile = false
-        val a = afterName
-        afterName = null
-        if (a != null) perform(a)
       },
     )
   }
@@ -743,21 +724,14 @@ fun MainScreen(
       game = sheet.game,
       wide = wide,
       onDismiss = { infoSheets -= sheet },
-      onScan = { infoSheets = emptyList(); requireName(AfterName.Scan) },
-      onEnterCode = { infoSheets = emptyList(); requireName(AfterName.EnterCode) },
+      onScan = { infoSheets = emptyList(); showScanner = true },
+      onEnterCode = { infoSheets = emptyList(); openCodeEntry() },
     )
   }
 }
 
 // Identity, not the game: the same game reopened while its sheet closes is a new sheet.
 private class InfoSheet(val game: Game)
-
-// A join action deferred until the player has a name (see requireName).
-private sealed interface AfterName {
-  data object Scan : AfterName
-  data object EnterCode : AfterName
-  data class Join(val target: JoinOutcome.Success) : AfterName
-}
 
 // Home chrome over the sky: the frosted name chip and About at the top right, the title
 // large beneath them (iOS's large navigation title) with the fleet flying beside it.
@@ -769,7 +743,8 @@ private fun HomeTopBar(profile: Profile, onEditProfile: () -> Unit, onOpenAbout:
       horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      PlayerChip(name = profile.name, onClick = onEditProfile)
+      // Weighted, so a long name ellipsizes rather than squeezing About out of the row.
+      PlayerChip(name = profile.name, onClick = onEditProfile, modifier = Modifier.weight(1f, fill = false))
       IconButton(
         onClick = onOpenAbout,
         modifier = Modifier.size(44.dp),
@@ -843,6 +818,7 @@ private fun GameEndBanner(message: String?, onDismiss: () -> Unit) {
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier
           .fillMaxWidth()
+          .semantics { liveRegion = LiveRegionMode.Polite }
           .clickable(
             indication = null,
             interactionSource = remember { MutableInteractionSource() },
@@ -1329,8 +1305,9 @@ private fun SkyBackdrop(scrolled: () -> Float, taps: Flow<Offset>, moving: Boole
   val shootingStar = remember { Animatable(0f) }
   val shootingFrom = remember { Offset(Random.nextFloat() * 0.4f + 0.05f, Random.nextFloat() * 100f + 20f) }
   LaunchedEffect(dark, moving) {
-    if (!dark || !moving || shootingStarShown) return@LaunchedEffect
+    // First, so a flight this effect's last run was cancelled in doesn't stay drawn.
     shootingStar.snapTo(0f)
+    if (!dark || !moving || shootingStarShown) return@LaunchedEffect
     delay(Random.nextLong(SHOOTING_STAR_AFTER_MS.first, SHOOTING_STAR_AFTER_MS.last))
     shootingStarShown = true
     shootingStar.animateTo(1f, tween(SHOOTING_STAR_MS, easing = LinearEasing))

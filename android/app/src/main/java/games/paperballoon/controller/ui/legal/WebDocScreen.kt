@@ -2,6 +2,7 @@ package games.paperballoon.controller.ui.legal
 
 import android.content.Intent
 import android.view.ViewGroup
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -124,7 +125,8 @@ fun WebDocScreen(
                 // (e.g. the linked data-protection authority), the site's home link, and
                 // non-web schemes like mailto:/tel: (which a WebView can't render and
                 // would show an error page for) — is handed to the system app.
-                if (LegalLinks.isPrivacy(target) || LegalLinks.isImprint(target)) {
+                // Host-checked: the path alone would also match another site's /privacy.
+                if (LegalLinks.legalDocUrl(target) != null) {
                   // Same doc, other language (e.g. /privacy → /en/privacy): the page's
                   // lang switch is a JS location.replace that also routes here. Load it
                   // in place rather than stacking a second screen — only the cross-link
@@ -150,10 +152,17 @@ fun WebDocScreen(
                 // the page. (An HTTP 4xx/5xx arrives via onReceivedHttpError, not here.)
                 if (request.isForMainFrame) failed = true
               }
+              // A dead renderer would otherwise take the app down with it: the screen
+              // goes, and its WebView with it.
+              override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                onBack()
+                return true
+              }
             }
             loadUrl(url)
           }.also { webViewRef = it }
         },
+        onRelease = { it.destroy() },
       )
       if (loading) {
         LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))

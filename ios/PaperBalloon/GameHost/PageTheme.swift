@@ -60,8 +60,8 @@ func gameEndMessage(_ reason: String?) -> String {
 /// vibrate/pause (the Vibration API's pattern shape); empty is its cancel call.
 /// A malformed entry keeps the valid prefix rather than dropping the buzz entirely.
 /// Both the entry count and the total run time are capped: nothing a page sends may
-/// leave the phone shaking after the tap that caused it. The entry cap is Chromium's,
-/// so any pattern Android's WebView plays in full plays in full here too.
+/// leave the phone shaking after the tap that caused it. The entry cap is above
+/// Chromium's 99, so no pattern Android's WebView plays is cut short here by its length.
 func parseVibrationPattern(_ csv: String?) -> [Int] {
     guard let csv, !csv.isEmpty, csv.utf16.count <= 1024 else { return [] }
     var pattern: [Int] = []

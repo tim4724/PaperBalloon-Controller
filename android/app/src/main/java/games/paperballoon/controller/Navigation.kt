@@ -23,6 +23,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import games.paperballoon.controller.data.ManifestStore
 import games.paperballoon.controller.data.RecentRoomStore
 import games.paperballoon.controller.ui.about.AboutScreen
 import games.paperballoon.controller.ui.about.LicensesScreen
@@ -95,7 +96,11 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
     onDispose {}
   }
 
-  // An external App Link routes through MainScreen (which owns the name gate + join).
+  // Pull the served manifest once per launch. Here, above the screens: a join pushes
+  // the game host and disposes Main, and ManifestStore doesn't retry a cancelled fetch.
+  LaunchedEffect(Unit) { ManifestStore.refresh(context) }
+
+  // An external App Link routes through MainScreen (which owns the join).
   // Pop back to Main first so it's the active entry and can handle it.
   LaunchedEffect(deepLink) {
     if (deepLink != null) while (backStack.size > 1) backStack.removeLastOrNull()
@@ -141,9 +146,10 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           // the system browser rather than the in-app WebDocScreen viewer.
           onOpenWebsite = {
             val language = resources.configuration.locales[0].language
-            context.startActivity(
-              Intent(Intent.ACTION_VIEW, LegalLinks.websiteUrl(language).toUri())
-            )
+            // No browser to take it: nothing happens, rather than a crash.
+            runCatching {
+              context.startActivity(Intent(Intent.ACTION_VIEW, LegalLinks.websiteUrl(language).toUri()))
+            }
           },
           onBack = { pop(key) },
         )

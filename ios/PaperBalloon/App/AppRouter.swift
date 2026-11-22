@@ -31,7 +31,7 @@ enum Route: Hashable {
     let messages = MessageCenter()
 
     func handleIncomingURL(_ url: URL) {
-        // Deep link always lands on Main; MainScreen owns the resolve + name gate.
+        // Deep link always lands on Main; MainScreen owns the resolve + join.
         path.removeAll()
         pendingDeepLink = incomingJoinLink(url)
     }
@@ -103,6 +103,7 @@ struct ToastItem: Identifiable, Equatable {
     func showGameEndBanner(_ text: String) {
         gameEndTask?.cancel()
         gameEndBanner = text
+        AccessibilityNotification.Announcement(text).post()
         gameEndTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(5.0))
             guard !Task.isCancelled, let self else { return }
@@ -182,6 +183,9 @@ struct RootView: View {
         .pbThemed()
         .modifier(HorizontalBars())
         .environment(router.messages)
+        // Pull the served manifest once per launch. Here, above the stack: a join pushes
+        // the game host over home, and ManifestStore doesn't retry a cancelled fetch.
+        .task { await ManifestStore.shared.refresh() }
         // Keep-awake, status-bar style and the §10 interface orientation follow the
         // ROUTE, not view lifecycle:
         // onAppear/onDisappear don't fire reliably across NavigationStack

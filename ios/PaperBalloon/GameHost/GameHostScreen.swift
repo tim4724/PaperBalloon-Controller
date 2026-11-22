@@ -98,6 +98,9 @@ struct GameHostScreen: View {
                 // ChromeState — it drives the window scene, not this view's layout, and
                 // the route-driven reset there is what guarantees home is portrait again.
                 onLandscape: {
+                    // Nil once the game route is gone: a page still talking during the
+                    // pop must not turn home.
+                    guard ChromeState.shared.orientation != nil else { return }
                     wantsLandscape = $0
                     ChromeState.shared.orientation = $0 ? .landscape : .portrait
                 },

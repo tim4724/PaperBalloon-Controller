@@ -1,16 +1,19 @@
 import XCTest
 @testable import PaperBalloon
 
-/// §8 instance name → card label. Mirrors NearbyLabelTest.kt.
+/// Runs the shared cases in tests/nearby-label.json (bundled as a resource by
+/// project.yml) — the Android port runs the same file (NearbyLabelTest.kt).
 final class NearbyLabelTests: XCTestCase {
 
-    func testDropsDisplaySuffix() {
-        XCTAssertEqual(sanitizeAdvertLabel("Living Room · Paper Balloon"), "Living Room")
-        // Longer than the cap on the wire, so this also pins stripping before capping.
-        XCTAssertEqual(sanitizeAdvertLabel("Living Room · Paper Balloon (2)"), "Living Room (2)")
-        // A name without the suffix (tvOS, older displays) only gets its whitespace normalised.
-        XCTAssertEqual(sanitizeAdvertLabel("  Living   Room "), "Living Room")
-        // Only a trailing suffix is the marker.
-        XCTAssertEqual(sanitizeAdvertLabel("Paper Balloon · Paper Balloon Club"), "Paper Balloon · Paper Ba")
+    private struct Cases: Decodable {
+        struct Case: Decodable { let input: String; let label: String }
+        let cases: [Case]
+    }
+
+    func testSanitizeAdvertLabel() throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "nearby-label", withExtension: "json"))
+        for c in try JSONDecoder().decode(Cases.self, from: Data(contentsOf: url)).cases {
+            XCTAssertEqual(sanitizeAdvertLabel(c.input), c.label, c.input)
+        }
     }
 }

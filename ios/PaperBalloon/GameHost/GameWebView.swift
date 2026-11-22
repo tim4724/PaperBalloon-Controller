@@ -42,8 +42,8 @@ enum GameAudioSession {
     /// Before the info sheet's gameplay loop plays. The clip starts muted, but AVPlayer
     /// still activates the shared session, and the default `.soloAmbient` category is
     /// non-mixing — browsing the catalog would stop the player's music for a clip they
-    /// can't hear. `.ambient` mixes by definition and follows the ringer switch. This
-    /// is Android's `setAudioFocusRequest(AUDIOFOCUS_NONE)` on the trailer VideoView.
+    /// can't hear. `.ambient` mixes by definition and follows the ringer switch.
+    /// Android's trailer MediaPlayer takes no audio focus, to the same end.
     ///
     /// Awaited, so the category is in force before a player exists — which is why it
     /// latches too: every sheet open would otherwise pay the audio-server round trip
@@ -198,9 +198,9 @@ struct GameWebView: UIViewRepresentable {
             let title = webView.title
             DispatchQueue.main.async { coordinator?.titleChanged(title) }
         }
-        // Going home must drop the relay socket (Android gets this for free from the
-        // process freezer; iOS keeps sockets alive in the out-of-process network
-        // stack) — the page's own pagehide/visibilitychange handlers do the work.
+        // Going home must drop the relay socket (iOS keeps sockets alive in the
+        // out-of-process network stack) — the page's own pagehide/visibilitychange
+        // handlers do the work. Android dispatches the same pagehide.
         coordinator.observeBackgrounding(of: webView)
         coordinator.observeIncomingLinks()
         if let url = URL(string: joinUrl) {
@@ -446,11 +446,23 @@ struct GameWebView: UIViewRepresentable {
             decisionHandler(allowed ? .grant : .deny)
         }
 
+        /// A page gets no camera or microphone, as on Android, whose WebView denies by
+        /// default. Unanswered, WebKit would raise its own prompt on the scanner's
+        /// camera permission.
+        func webView(_ webView: WKWebView,
+                     requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+                     initiatedByFrame frame: WKFrameInfo,
+                     type: WKMediaCaptureType,
+                     decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+            decisionHandler(.deny)
+        }
+
         /// The page's own name (ground truth over the manifest) feeds the home rejoin
         /// card, so games not in the bundled manifest show a real name instead of the
         /// generic fallback.
         func titleChanged(_ raw: String?) {
-            guard !isTearingDown, let raw else { return }
+            // Not a server's error page ("502 Bad Gateway"), as on Android.
+            guard !isTearingDown, !parent.failed, let raw else { return }
             RecentRoomStore.putTitle(raw)
         }
 

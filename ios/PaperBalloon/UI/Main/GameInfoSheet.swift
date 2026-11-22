@@ -375,7 +375,8 @@ struct GameplayLoopView: View {
                 Task { @MainActor in progress = fraction }
             }
             try? await Task.sleep(for: .seconds(0.6))
-            guard let local = await fetched else { return }
+            // A failed download: back to the bare cover, not a bar stuck part-way.
+            guard let local = await fetched else { progress = nil; return }
             hasAudio = (try? await AVURLAsset(url: local).loadTracks(withMediaType: .audio))?.isEmpty == false
             localURL = local
         }
@@ -455,7 +456,12 @@ private struct TrailerFullscreenView: View {
             let player = AVPlayer(url: url)
             self.player = player
             await GameAudioSession.beginFullscreenTrailer()
-            player.play()
+            // Unless it was closed while the session was still queued.
+            if sessionEnded == nil { player.play() }
+        }
+        // The system pauses video in the background and leaves it paused.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            if sessionEnded == nil { player?.play() }
         }
     }
 
@@ -563,6 +569,15 @@ private struct LoopingPlayerView: UIViewRepresentable {
             playerLayer.videoGravity = .resizeAspectFill
             fadeInWhenReady()
             queuePlayer.play()
+            // The system pauses video in the background and leaves it paused.
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(resume),
+                name: UIApplication.willEnterForegroundNotification, object: nil
+            )
+        }
+
+        @objc private func resume() {
+            if !wasPaused { player?.play() }
         }
 
         /// Coming out of a pause, picks up at the keyframe nearest `resumeAt`: instant,

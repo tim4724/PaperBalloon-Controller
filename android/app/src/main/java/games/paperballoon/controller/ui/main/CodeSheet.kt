@@ -41,7 +41,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -96,17 +98,25 @@ fun CodeSheet(
     if (error == null) return@LaunchedEffect
     // A fresh start rather than hunting for the wrong character.
     code = ""
-    shake.shake(with(density) { 12.dp.toPx() })
+    // In `scope`: the next keystroke clears the error, and a shake cancelled with this
+    // effect would leave the row off-centre.
+    nudge(12.dp)
   }
 
   // Keeps the field to what a code can be: characters outside Base58 and past the sixth
   // are dropped, with a nudge. An insertion that is a whole code or a launcher link (a
-  // paste) replaces the field instead, without one.
+  // paste) replaces the field instead, without one; a pasted link that names its own
+  // controller is resolved as a scanned one would be.
   fun accept(new: String) {
     if (loading) return
     val old = code
     val inserted = if (new.startsWith(old)) new.drop(old.length) else new
-    val pasted = if (inserted.length > 1) originlessCode(inserted)?.takeIf(::validRoomCode) else null
+    val originless = if (inserted.length > 1) originlessCode(inserted) else null
+    if (inserted.length > 1 && inserted.isNotBlank() && originless == null) {
+      onSubmit(inserted.trim())
+      return
+    }
+    val pasted = originless?.takeIf(::validRoomCode)
     val next = pasted ?: new.filter { it in BASE58 }.take(ROOM_CODE_LENGTH)
     if (pasted == null && next.length < new.length) nudge(5.dp)
     if (next == old) return
@@ -170,7 +180,12 @@ fun CodeSheet(
             Text(stringResource(R.string.joining), style = style, color = color)
           }
         } else if (error != null) {
-          Text(error, style = style, color = MaterialTheme.colorScheme.error)
+          Text(
+            error,
+            style = style,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+          )
         }
       }
     }

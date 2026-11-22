@@ -173,7 +173,7 @@ fun ScanScreen(
     for (raw in raws) {
       // The launcher's own privacy/imprint URL isn't a room — route it to the doc
       // viewer (host-validated: the payload is untrusted) instead of failing it.
-      LegalLinks.scannedLegalUrl(raw)?.let {
+      LegalLinks.legalDocUrl(raw)?.let {
         joined = true
         onOpenLegalDoc(it)
         return

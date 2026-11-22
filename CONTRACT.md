@@ -25,11 +25,11 @@ or when it fails to load: a join cover and a retry cover, each with its own clos
 const name = window.PaperBalloonHost?.name ?? myBrowserName;
 ```
 
-The player's name, shared across games: a non-blank string of at most 16 characters.
-It is there before the page's first script runs and always current. On first run the
-launcher makes one up, so there is no need to ask for one. An Android WebView too old
-for document-start scripts has neither `name` nor `editName` — the fallback above covers
-it.
+The player's name, shared across games: a non-blank string of at most 16 UTF-16 code
+units (`name.length <= 16`). It is there before the page's first script runs and always
+current. On first run the launcher makes one up, so there is no need to ask for one. An
+Android WebView too old for document-start scripts has neither `name` nor `editName` —
+the fallback above covers it.
 
 ## 2. Rename: `PaperBalloonHost.editName()`
 
@@ -154,10 +154,10 @@ so the same code is right in a browser.
 
 A native display (tvOS, Android TV) may advertise its room over DNS-SD as
 `_paperballoon._tcp.local`, for one-tap join. The instance name is the display's label
-("Living Room"), shown verbatim. A display that names the record itself appends
-` · Paper Balloon` ("Living Room · Paper Balloon"), which the launcher strips: some
-Android TV builds refuse a registration whose instance name the device's own services
-already use, even under another service type. Shorten the label, not the suffix, to fit
+("Living Room"), shown with its whitespace collapsed and cut at 24 UTF-16 code units. A
+display that names the record itself appends ` · Paper Balloon` ("Living Room · Paper
+Balloon"), which the launcher strips: some Android TV builds refuse a registration whose
+instance name the device's own services already use, even under another service type. Shorten the label, not the suffix, to fit
 DNS-SD's 63 bytes. A display that leaves the name to the OS — tvOS must, as it can't read
 its own name — goes without. A clash rename's ` (2)` after the suffix is kept.
 
@@ -248,7 +248,8 @@ stay within patterns that feel alike on both:
   `vibrate(0)`.
 - **Lighter** means shorter or sparser pulses — never pauses under 50 ms.
 
-Patterns are capped at 128 entries and 5 s.
+Keep a pattern within 99 entries and 5 s in all: past that the two platforms cut it
+differently.
 
 ## 12. Game → launcher: `PaperBalloonHost.haptic(primitive, scale)`
 

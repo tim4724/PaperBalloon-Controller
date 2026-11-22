@@ -1,0 +1,17 @@
+{
+  "about": "Shared cases for turning a §8 instance name into a room card's label (sanitizeLabel / sanitizeAdvertLabel), run by both apps' unit tests (NearbyLabelTest.kt, NearbyLabelTests.swift). The name is display-declared: its whitespace is collapsed, the display suffix dropped, and the rest cut to 24 UTF-16 units on a whole code point.",
+  "cases": [
+    { "input": "Living Room · Paper Balloon", "label": "Living Room" },
+    { "input": "Living Room · Paper Balloon (2)", "label": "Living Room (2)", "note": "longer than the cap on the wire: the suffix goes before the cut, and a clash rename stays" },
+    { "input": "  Living   Room ", "label": "Living Room", "note": "no suffix (tvOS, older displays): only the whitespace is normalised" },
+    { "input": "Wohnzimmer\tTV\n", "label": "Wohnzimmer TV" },
+    { "input": "Paper Balloon · Paper Balloon Club", "label": "Paper Balloon · Paper Ba", "note": "only a trailing suffix is the marker" },
+    { "input": "", "label": "" },
+    { "input": "ABCDEFGHIJKLMNOPQRSTUVWX", "label": "ABCDEFGHIJKLMNOPQRSTUVWX", "note": "exactly the cap" },
+    { "input": "ABCDEFGHIJKLMNOPQRSTUVWXY", "label": "ABCDEFGHIJKLMNOPQRSTUVWX" },
+    { "input": "Größe XL im Wohnzimmer oben", "label": "Größe XL im Wohnzimmer o" },
+    { "input": "ABCDEFGHIJKLMNOPQRSTUV🎈", "label": "ABCDEFGHIJKLMNOPQRSTUV🎈", "note": "an emoji is two units: this one just fits" },
+    { "input": "ABCDEFGHIJKLMNOPQRSTUVW🎈", "label": "ABCDEFGHIJKLMNOPQRSTUVW", "note": "and this one doesn't: it goes whole, never as half a surrogate pair" },
+    { "input": "🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈", "label": "🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈🎈" }
+  ]
+}

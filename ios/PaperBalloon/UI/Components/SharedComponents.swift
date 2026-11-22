@@ -1,48 +1,6 @@
 import SwiftUI
 import UIKit
 
-// MARK: - PlayerChip
-
-/// In-game name chip. Mirrors home's toolbar pill (MainScreen `chipButton`) in the game
-/// accent the host's remapped palette carries. A plain button over glass rather than
-/// `.bordered`, which is shorter than 44pt and only hit-tests its visible shape.
-struct PlayerChip: View {
-    let name: String
-    let action: () -> Void
-
-    @Environment(\.pbPalette) private var palette
-
-    init(name: String, action: @escaping () -> Void) {
-        self.name = name
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: "person.crop.circle.fill")
-                    .symbolRenderingMode(.hierarchical)
-                    // The size iOS 26's toolbar gives home's glyph.
-                    .font(.title2)
-                Text(displayName)
-                    .font(.pbLabelLarge)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            .foregroundStyle(palette.primary)
-            .padding(.horizontal, 10)
-            .frame(minHeight: 44)
-            .modifier(ChromeGlass(shape: Capsule(), fallback: palette.primary.opacity(0.15)))
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var displayName: String {
-        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? String(localized: "Set name") : name
-    }
-}
-
 // MARK: - ProminentGlassButton
 
 /// A prominent action on tinted glass where the OS has it (iOS 26), matching ChromeGlass
@@ -277,13 +235,14 @@ struct GameArt: View {
             }
             .clipped()
             .accessibilityLabel(game.name)
+            // Not only while there is no image: a refreshed manifest can rename the art
+            // under a card that keeps its identity.
             .task(id: game.art) {
-                guard image == nil, let art = game.art else { return }
-                if let decoded = await ArtCache.uiImage(forArt: art) {
-                    image = decoded
-                } else {
-                    decodeFailed = true
-                }
+                decodeFailed = false
+                guard let art = game.art else { image = nil; return }
+                if let cached = ArtCache.cached(forArt: art) { image = cached; return }
+                image = await ArtCache.uiImage(forArt: art)
+                decodeFailed = image == nil
             }
     }
 

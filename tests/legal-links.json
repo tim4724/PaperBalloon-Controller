@@ -1,0 +1,27 @@
+{
+  "about": "Shared cases for which URLs the legal doc viewer may load in-app (legalDocUrl on both platforms), run by both apps' unit tests (LegalLinksTest.kt, LegalLinksTests.swift). The viewer has no allow-list of its own, and a scanned QR, an incoming link and a link inside a legal page are all arbitrary content: only the launcher's own privacy and imprint pages pass, and an accepted URL is opened exactly as given.",
+  "cases": [
+    { "input": "https://paperballoon.games/privacy", "legal": true },
+    { "input": "https://paperballoon.games/imprint", "legal": true },
+    { "input": "https://paperballoon.games/en/privacy", "legal": true, "note": "a locale variant" },
+    { "input": "https://paperballoon.games/de/imprint/", "legal": true },
+    { "input": "https://paperballoon.games/privacy?lang=de#top", "legal": true },
+    { "input": "https://PaperBalloon.Games/privacy", "legal": true },
+    { "input": "HTTPS://paperballoon.games/privacy", "legal": true },
+    { "input": "", "legal": false },
+    { "input": "paperballoon.games/privacy", "legal": false, "note": "no scheme" },
+    { "input": "http://paperballoon.games/privacy", "legal": false },
+    { "input": "https://evil.example/privacy", "legal": false, "note": "the path alone is not enough" },
+    { "input": "https://paperballoon.games.evil.example/privacy", "legal": false },
+    { "input": "https://www.paperballoon.games/privacy", "legal": false, "note": "the apex only" },
+    { "input": "https://tinytrack.paperballoon.games/privacy", "legal": false },
+    { "input": "https://user@paperballoon.games/privacy", "legal": false },
+    { "input": "https://:pw@paperballoon.games/privacy", "legal": false },
+    { "input": "https://paperballoon.games@evil.example/privacy", "legal": false },
+    { "input": "https://paperballoon.games/notprivacy", "legal": false, "note": "the last path segment, not a suffix" },
+    { "input": "https://paperballoon.games/privacy/more", "legal": false },
+    { "input": "https://paperballoon.games/PRIVACY", "legal": false },
+    { "input": "https://paperballoon.games/A3KX9p", "legal": false, "note": "a room link" },
+    { "input": "https://paperballoon.games/", "legal": false }
+  ]
+}

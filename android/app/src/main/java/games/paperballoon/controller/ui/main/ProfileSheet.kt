@@ -31,6 +31,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -46,8 +48,7 @@ private const val COMPACT_HEIGHT_BREAKPOINT = 480
 
 /**
  * Name-only identity sheet. The primary button stays disabled until a non-blank
- * name is entered — you can't persist an empty profile. [title]/[cta] let the
- * join gate reword it.
+ * name is entered — you can't persist an empty profile.
  *
  * Two layouts: stacked, and — on a screen too short to fit it above the keyboard — the
  * field and button sharing a row with the title dropped. The title is what goes because
@@ -66,8 +67,6 @@ fun ProfileSheet(
   initial: Profile,
   onDismiss: () -> Unit,
   onSave: (Profile) -> Unit,
-  title: String = stringResource(R.string.name),
-  cta: String = stringResource(R.string.save),
   // In-game: the host passes the game's theme-color to tint the sheet surface.
   surfaceTint: Color? = null,
 ) {
@@ -117,7 +116,7 @@ fun ProfileSheet(
       ),
       verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      if (!compact) Text(title, style = MaterialTheme.typography.titleLarge)
+      if (!compact) Text(stringResource(R.string.name), style = MaterialTheme.typography.titleLarge)
 
       if (compact) {
         Row(
@@ -130,11 +129,11 @@ fun ProfileSheet(
             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
           }
           NameField(name, { name = it }, save, Modifier.weight(1f).focusRequester(focus))
-          SaveButton(cta, name.text.isNotBlank(), save)
+          SaveButton(name.text.isNotBlank(), save)
         }
       } else {
         NameField(name, { name = it }, save, Modifier.fillMaxWidth().focusRequester(focus))
-        SaveButton(cta, name.text.isNotBlank(), save, Modifier.fillMaxWidth())
+        SaveButton(name.text.isNotBlank(), save, Modifier.fillMaxWidth())
       }
     }
   }
@@ -147,6 +146,7 @@ private fun NameField(
   onSave: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val label = stringResource(R.string.name)
   OutlinedTextField(
     value = name,
     onValueChange = { if (it.text.length <= 16) onName(it) },
@@ -164,13 +164,13 @@ private fun NameField(
         onName(TextFieldValue(random, TextRange(random.length)))
       }) { Text("🎲") }
     },
-    modifier = modifier,
+    // The compact layout drops the title, so the field names itself.
+    modifier = modifier.semantics { contentDescription = label },
   )
 }
 
 @Composable
 private fun SaveButton(
-  cta: String,
   enabled: Boolean,
   onSave: () -> Unit,
   modifier: Modifier = Modifier,
@@ -180,6 +180,6 @@ private fun SaveButton(
     enabled = enabled,
     modifier = modifier.height(52.dp),
   ) {
-    Text(cta)
+    Text(stringResource(R.string.save))
   }
 }

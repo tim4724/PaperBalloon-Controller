@@ -58,7 +58,8 @@ struct CodeSheet: View {
         .padding(.bottom, 28)
         .onAppear { focused = true }
         .onChange(of: entry.error) { _, error in
-            guard error != nil else { return }
+            guard let error else { return }
+            AccessibilityNotification.Announcement(error).post()
             shake(12)
             // A fresh start rather than hunting for the wrong character.
             shown = ""
@@ -106,7 +107,8 @@ struct CodeSheet: View {
 
     /// Keeps the field to what a code can be: characters outside Base58 and past the
     /// sixth are dropped, with a nudge. An insertion that is a whole code or a launcher
-    /// link (a paste) replaces the field instead, without one.
+    /// link (a paste) replaces the field instead, without one; a pasted link that names
+    /// its own controller is resolved as a scanned one would be.
     private func accept(_ new: String) {
         let old = shown
         // Not disabled while the code resolves: that would take the focus, and the
@@ -116,7 +118,14 @@ struct CodeSheet: View {
             return
         }
         let inserted = new.hasPrefix(old) ? String(new.dropFirst(old.count)) : new
-        let pasted = inserted.count > 1 ? originlessCode(inserted).flatMap { validRoomCode($0) ? $0 : nil } : nil
+        let link = inserted.trimmingCharacters(in: .whitespacesAndNewlines)
+        let originless = inserted.count > 1 ? originlessCode(inserted) : nil
+        if inserted.count > 1, !link.isEmpty, originless == nil {
+            code = old
+            onSubmit(link)
+            return
+        }
+        let pasted = originless.flatMap { validRoomCode($0) ? $0 : nil }
         let next = pasted ?? String(new.filter { PB.base58.contains($0) }.prefix(PB.roomCodeLength))
         if next != new {
             code = next

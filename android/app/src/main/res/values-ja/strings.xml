@@ -37,11 +37,8 @@
     <string name="join">プレイ</string>
     <string name="cancel">キャンセル</string>
 
-    <string name="enter_your_name">名前を入力</string>
     <string name="name">名前</string>
-    <string name="save_and_continue">保存して続ける</string>
     <string name="save">保存</string>
-    <string name="set_name">名前を設定</string>
 
     <string name="close_scanner">スキャナーを閉じる</string>
     <string name="scan_hint">テレビまたはパソコンのQRコードをスキャンしてください</string>

@@ -29,9 +29,10 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
-    // Only on a fresh start — don't replay the launching VIEW intent across rotation.
+    // Only on a fresh start — don't replay the launching VIEW intent across rotation,
+    // nor when the task is reopened from Recents, which redelivers its first intent.
     if (savedInstanceState == null) {
-      val link = intent?.dataString
+      val link = intent?.takeIf { it.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0 }?.dataString
       pendingDeepLink = link
       // The first launch after a Play install joins the room the player installed from,
       // unless a link opened the app (CONTRACT.md §13).

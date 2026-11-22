@@ -224,6 +224,10 @@ targets:
         buildPhase: resources
       - path: ../tests/haptic-composition.json
         buildPhase: resources
+      - path: ../tests/legal-links.json
+        buildPhase: resources
+      - path: ../tests/nearby-label.json
+        buildPhase: resources
       - path: ../tests/sheet-colors.json
         buildPhase: resources
     dependencies:

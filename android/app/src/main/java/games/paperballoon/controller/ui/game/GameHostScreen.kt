@@ -278,6 +278,11 @@ private fun GameHostContent(
       localNetworkPermission.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
     }
   }
+  // A held §12 rumble must not buzz on over home.
+  val haptics = remember { GameHaptics(context) }
+  DisposableEffect(Unit) {
+    onDispose { haptics.stop() }
+  }
   val hostBridge = remember {
     PaperBalloonHostBridge(
       onGameEnded = { exitOnce { currentOnGameEnd(it) } },
@@ -287,7 +292,7 @@ private fun GameHostContent(
         orientationAsked = true
         landscape = it
       },
-      haptics = GameHaptics(context),
+      haptics = haptics,
     )
   }
   val nameBridge = remember {
@@ -400,10 +405,12 @@ private fun GameHostContent(
   // included — the edges go to the system so the gesture can start at all (and
   // draws the system's own back affordance). Full-height exclusion only works
   // because the nav bar is hidden. Applied on layout and whenever back turns on or off.
+  // Reads the state, not `backOn`: the layout listener is made once, in the factory,
+  // and would keep the first composition's value.
   fun applyGestureExclusion(target: View) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
     target.systemGestureExclusionRects =
-      if (backOn) emptyList() else listOf(Rect(0, 0, target.width, target.height))
+      if (backMode != BackMode.OFF) emptyList() else listOf(Rect(0, 0, target.width, target.height))
   }
 
   LaunchedEffect(backOn, webView) {
@@ -534,6 +541,8 @@ private fun GameHostContent(
               backMode = BackMode.LEAVE
               orientationAsked = false
               pageDark = null
+              // The incoming page may already have asked: see RESEND_PAGE_MODES_JS.
+              webView?.evaluateJavascript(RESEND_PAGE_MODES_JS, null)
             },
             onLoaded = {
               painted = true
@@ -560,6 +569,7 @@ private fun GameHostContent(
                 failed = true
               }
             },
+            onOffList = leave,
             onRenderGone = {
               if (!exited.get()) {
                 webView = null
@@ -591,6 +601,9 @@ private fun GameHostContent(
 
             override fun onJsPrompt(view: WebView?, url: String?, message: String?, defaultValue: String?, result: JsPromptResult) =
               true.also { result.cancel() }
+
+            override fun onJsBeforeUnload(view: WebView?, url: String?, message: String?, result: JsResult) =
+              true.also { result.confirm() }
           }
           keepScreenOn = true
           addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ -> applyGestureExclusion(v) }
@@ -729,30 +742,47 @@ private fun webViewMajorVersion(context: Context): Int =
  * Confines the WebView to the game's own domains (subdomains included). Only https
  * navigations to an allow-listed domain stay in-app; off-list http(s) links open in
  * the system browser, and any other scheme (javascript:, file:, intent:, …) is
- * refused outright. Governs top-level/frame navigations only — subresources and the
- * game's relay WebSocket are unaffected.
+ * refused outright. Governs top-level navigations only — subresources and the game's
+ * relay WebSocket are unaffected, and so is what a page frames: WebView doesn't route
+ * an http(s) subframe navigation through here, and the bridge objects exist in every
+ * frame. A controller must not frame an origin it doesn't trust.
  */
 private class AllowListWebViewClient(
   private val allowedDomains: List<String>,
   private val onNavigationStart: () -> Unit,
   private val onLoaded: () -> Unit,
   private val onConnectionError: () -> Unit,
+  private val onOffList: () -> Unit,
   private val onRenderGone: () -> Unit,
 ) : WebViewClient() {
+  private fun allowed(url: Uri): Boolean {
+    val scheme = url.scheme?.lowercase()
+    val host = url.host
+    if (scheme == "https" && allowedDomains.any { hostInDomain(host, it) }) return true
+    // Debug only: keep http(s) navigations to a LAN dev host in-app (see [isPrivateHost]).
+    return BuildConfig.DEBUG && isPrivateHost(host) && (scheme == "http" || scheme == "https")
+  }
+
   // Main-frame only, and deliberately not fired for same-document navigations —
   // a page that pushes history mid-session keeps its back mode.
-  override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) = onNavigationStart()
+  override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+    // shouldOverrideUrlLoading never sees a POST, so a cross-origin form submit is
+    // caught here, where the top frame's document changes: out of the host for good.
+    if (url != "about:blank" && !allowed(Uri.parse(url))) {
+      view.stopLoading()
+      onOffList()
+      return
+    }
+    onNavigationStart()
+  }
 
   override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
     val url = request.url
     val scheme = url.scheme?.lowercase()
-    val host = url.host
-    if (scheme == "https" && allowedDomains.any { hostInDomain(host, it) }) return false // load in-place
-    // Debug only: keep http(s) navigations to a LAN dev host in-app (see [isPrivateHost]).
-    if (BuildConfig.DEBUG && isPrivateHost(host) && (scheme == "http" || scheme == "https")) return false
+    if (allowed(url)) return false // load in-place
     // Off-list http(s) → browser, but only a main-frame navigation the player gestured
-    // for: a page can mint subframe/scripted navigations at will, and each would
-    // otherwise yank the player out of the match into the browser.
+    // for: a page can mint scripted navigations at will, and each would otherwise yank
+    // the player out of the match into the browser.
     if ((scheme == "http" || scheme == "https") && request.isForMainFrame && request.hasGesture()) {
       openExternally(view.context, url)
     }
@@ -928,9 +958,10 @@ private class PaperBalloonHostBridge(
   // `primitive,scale,delay;…`. Empty is the contract's stop; a sequence with no valid
   // step plays nothing and, like an unknown name to haptic(), leaves the current haptic
   // alone. A held control re-issues one every second or so, so it plays on the bridge
-  // thread like haptic.
+  // thread like haptic. Not named hapticComposition: a WebView without the shim gets
+  // this object as PaperBalloonHost, and must not offer a §12 call it can't honour.
   @JavascriptInterface
-  fun hapticComposition(encoded: String?) {
+  fun hapticSteps(encoded: String?) {
     if (encoded.isNullOrEmpty()) haptics.stop() else haptics.play(GameHaptics.parseComposition(encoded))
   }
 }

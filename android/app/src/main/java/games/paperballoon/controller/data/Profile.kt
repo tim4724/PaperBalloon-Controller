@@ -8,9 +8,7 @@ import androidx.core.content.edit
  * (CONTRACT.md §1). Color is deliberately NOT part of the native identity: each game owns its own color
  * (it resolves slot-conflicts), so the launcher stays out of it.
  */
-data class Profile(val name: String = "") {
-  val isSet: Boolean get() = name.isNotBlank()
-}
+data class Profile(val name: String)
 
 /**
  * Wholesome-funny fallback identity. Every device gets a random "Adjective Noun"

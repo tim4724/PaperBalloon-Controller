@@ -190,7 +190,7 @@ struct QRScannerScreen: View {
     /// buzzes and explains itself in place; the scan goes on.
     private func handleCode(_ value: String) {
         guard !finished else { return }
-        if PB.scannedLegalUrl(value) != nil {
+        if PB.legalDocUrl(value) != nil {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             finish(.code(value))
             return

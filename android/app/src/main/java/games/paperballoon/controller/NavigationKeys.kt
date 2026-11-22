@@ -10,9 +10,9 @@ import kotlinx.serialization.Serializable
 @Serializable data object Licenses : NavKey
 
 // A plain in-app web viewer for a hosted legal document (privacy / imprint). The
-// URL is loaded read-only in a WebView; the app bar title is derived from whichever
-// document is currently shown (the two pages cross-link), so it re-localizes with
-// the device language and follows in-page navigation.
+// URL is loaded read-only in a WebView; the app bar title is derived from the document
+// (the two pages cross-link, each opening as its own screen), so it re-localizes with
+// the device language.
 @Serializable
 data class WebDoc(val url: String) : NavKey
 

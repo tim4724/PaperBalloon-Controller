@@ -148,7 +148,8 @@ private struct WebDocView: UIViewRepresentable {
                 decisionHandler(.allow)
                 return
             }
-            if PB.legalTitle(for: target) != nil {
+            // Host-checked: the path alone would also match another site's /privacy.
+            if PB.legalDocUrl(target.absoluteString) != nil {
                 // A tap on the cross-link to the other legal doc opens it as its own
                 // pushed screen, so the system Back button returns here. The initial
                 // page load (navigationType .other) just loads in place.

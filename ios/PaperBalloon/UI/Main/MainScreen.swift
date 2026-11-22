@@ -30,7 +30,7 @@ struct MainScreen: View {
     // MARK: State
 
     // Seeded synchronously (cached fetch, else bundled); the once-per-launch
-    // refresh task below updates it live when the served manifest differs.
+    // refresh (RootView) updates it live when the served manifest differs.
     @ObservedObject private var manifest = ManifestStore.shared
     private var games: [Game] { manifest.games }
     // Rooms advertised on the LAN by native display apps (contract §8). Browsed only
@@ -57,7 +57,6 @@ struct MainScreen: View {
     // dependency-tracked and can be stale (verified on-device), so the sheets
     // must receive their inputs through the item.
     @State private var profileRequest: ProfileSheetRequest? = nil
-    @State private var afterName: AfterName? = nil
     @State private var codeEntry: CodeEntry? = nil
     // A join being resolved outside the code sheet (which shows its own progress): the
     // directory probe a scan or link takes can cost a round trip, and the cover below is
@@ -67,7 +66,7 @@ struct MainScreen: View {
     @State private var rejoin: RecentRoom? = nil
     @State private var infoGame: Game? = nil
     // A scan/enter action tapped inside the info sheet, run once it dismisses.
-    @State private var pendingSheetAction: AfterName? = nil
+    @State private var pendingSheetAction: SheetAction? = nil
     // Haptic triggers (any change fires the paired sensoryFeedback).
     @State private var successTick = 0
     @State private var errorTick = 0
@@ -115,8 +114,8 @@ struct MainScreen: View {
             // the content is inset so the last card stays reachable.
             .modifier(DockBar {
                 JoinButtons(
-                    onScan: { requireName(.scan) },
-                    onEnterCode: { requireName(.enterCode) }
+                    onScan: { perform(.scan) },
+                    onEnterCode: { perform(.enterCode) }
                 )
                 .frame(maxWidth: isWide ? Self.wideDockWidth : nil)
                 .padding(.horizontal, 16)
@@ -173,14 +172,14 @@ struct MainScreen: View {
             infoGame = nil
             profileRequest = nil
             pendingSheetAction = nil
-            afterName = nil
             codeEntry = nil
             let firstSegment = URLComponents(string: link)?.path.split(separator: "/").first.map(String.init)
-            if PB.legalTitle(for: URL(string: link)) != nil {
+            if let legal = PB.legalDocUrl(link) {
                 // Legal pages arrive only as App Clip invocations (the AASA claims room
-                // paths only). The URL keeps its locale segment (/en/privacy vs
-                // /privacy), so the viewer loads the right variant.
-                onOpenLegalDoc(link)
+                // paths only). Host-checked like a scanned one: the link inside Apple's
+                // default App Clip link is anyone's to write. The URL keeps its locale
+                // segment (/en/privacy vs /privacy), so the viewer loads the right variant.
+                onOpenLegalDoc(legal)
             } else if PB.isAppClip, !validRoomCode(firstSegment ?? "") {
                 // A clip opens for every URL under an experience's prefix, including
                 // Apple's own room-less App Clip link — those just show home.
@@ -211,10 +210,17 @@ struct MainScreen: View {
             // passive, and the ask button costs nothing to leave un-hinted.
             if visible { lan.start() } else { lan.stop() }
         }
+        // A browser that failed while the app was suspended has stopped for good; a
+        // no-op while it is still running.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            if isTopVisible && lanAsked { nearby.start() }
+        }
         // Re-checked on the same cadence as the rejoin card: both promise "you can enter
-        // this", so both have to notice when the room dies or fills. Tied to the browse
-        // task's lifetime, so nothing polls while this screen isn't the visible top.
-        .task(id: nearby.adverts) {
+        // this", so both have to notice when the room dies or fills. Keyed on visibility
+        // too, so nothing polls while this screen isn't the visible top (lingering
+        // adverts would otherwise keep it probing behind the game host).
+        .task(id: isTopVisible ? nearby.adverts : nil) {
+            guard isTopVisible else { return }
             while !Task.isCancelled {
                 // One probe per ROOM, not per record: a room announced by its display
                 // and by every phone in it is still one code.
@@ -247,9 +253,6 @@ struct MainScreen: View {
             try? await Task.sleep(for: .seconds(8))
             nearbySearchSettled = true
         }
-        // Pull the served manifest once per launch (ManifestStore guards
-        // re-entry, so push/pop re-creating this screen doesn't refetch).
-        .task { await manifest.refresh() }
         .onChange(of: messages.gameEndBanner) { _, banner in
             // A just-ended game (banner appeared) may have cleared the saved room — a
             // room_not_found end drops it. Drop the card the instant the banner lands
@@ -269,7 +272,7 @@ struct MainScreen: View {
             // cover is still dismissing would be dropped by UIKit.
             if let action = pendingSheetAction {
                 pendingSheetAction = nil
-                requireName(action)
+                perform(action)
             }
         }) { request in
             // The scanner validates payloads itself (games passed in), so .code only
@@ -281,7 +284,7 @@ struct MainScreen: View {
                     // The launcher's own privacy/imprint URL isn't a room — route it
                     // to the doc viewer (host-validated: the payload is untrusted)
                     // instead of failing it.
-                    if let legal = PB.scannedLegalUrl(raw) {
+                    if let legal = PB.legalDocUrl(raw) {
                         successTick += 1
                         onOpenLegalDoc(legal)
                         return
@@ -298,24 +301,12 @@ struct MainScreen: View {
             }
             .modifier(HorizontalBars())
         }
-        .appSheet(item: $profileRequest, onDismiss: { afterName = nil }) { request in
-            ProfileSheet(
-                initial: request.profile,
-                title: String(localized: request.gated ? "Enter your name" : "Name"),
-                cta: String(localized: request.gated ? "Save & continue" : "Save"),
-                onSave: { p in
-                    ProfileStore.save(p)
-                    profile = p
-                    // Clear the pending action BEFORE dismissal so onDismiss
-                    // doesn't cancel the just-run action.
-                    let pending = afterName
-                    afterName = nil
-                    profileRequest = nil
-                    if let pending {
-                        perform(pending)
-                    }
-                }
-            )
+        .appSheet(item: $profileRequest) { request in
+            ProfileSheet(initial: request.profile) { p in
+                ProfileStore.save(p)
+                profile = p
+                profileRequest = nil
+            }
         }
         // A sheet — or, held as a book, a wide card: iOS keeps a sheet about a portrait phone
         // wide there, too narrow for the trailer beside the rest. The card stands in home's
@@ -339,7 +330,7 @@ struct MainScreen: View {
     private func afterInfo() {
         if let action = pendingSheetAction {
             pendingSheetAction = nil
-            requireName(action)
+            perform(action)
         }
     }
 
@@ -398,7 +389,7 @@ struct MainScreen: View {
         }
         ForEach(home.nearby) { room in
             NearbyCard(room: room, primary: rejoin == nil && room.id == home.nearby.first?.id) {
-                requireName(.join(room.target))
+                launchJoin(room.target)
             }
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
         }
@@ -448,11 +439,6 @@ struct MainScreen: View {
         return nearbySearchSettled ? .none : .searching
     }
 
-    private var profileDisplayName: String {
-        let trimmed = profile.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? String(localized: "Set name") : trimmed
-    }
-
     /// The heading each home section opens under.
     private func sectionTitle(_ title: LocalizedStringKey) -> some View {
         Text(title)
@@ -466,12 +452,12 @@ struct MainScreen: View {
             // A second tap can land before the sheet covers the chip; a fresh request
             // id would make SwiftUI dismiss and re-present the sheet.
             guard profileRequest == nil else { return }
-            profileRequest = ProfileSheetRequest(gated: false, profile: profile)
+            profileRequest = ProfileSheetRequest(profile: profile)
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "person.crop.circle.fill")
                     .symbolRenderingMode(.hierarchical)
-                Text(profileDisplayName)
+                Text(profile.name)
                     .font(.pbLabelLarge)
                     .lineLimit(1)
             }
@@ -503,26 +489,13 @@ struct MainScreen: View {
     }
 
     @MainActor
-    private func perform(_ action: AfterName) {
+    private func perform(_ action: SheetAction) {
         switch action {
         case .scan:
             scanRequest = ScanRequest(games: games)
         case .enterCode:
             guard codeEntry == nil else { return }  // same double-tap guard as the chip
             codeEntry = CodeEntry()
-        case .join(let target):
-            launchJoin(target)
-        }
-    }
-
-    @MainActor
-    private func requireName(_ action: AfterName) {
-        if !profile.isSet {
-            guard profileRequest == nil else { return }  // same double-tap guard as the chip
-            afterName = action
-            profileRequest = ProfileSheetRequest(gated: true, profile: profile)
-        } else {
-            perform(action)
         }
     }
 
@@ -538,7 +511,7 @@ struct MainScreen: View {
             joining = false
             switch outcome {
             case .success:
-                requireName(.join(outcome))
+                launchJoin(outcome)
             case .failure(let message):
                 errorTick += 1
                 messages.showToast(message)
@@ -637,15 +610,13 @@ private struct HomeNavigationSubtitle: ViewModifier {
     }
 }
 
-private enum AfterName {
+private enum SheetAction {
     case scan
     case enterCode
-    case join(JoinOutcome)
 }
 
 private struct ProfileSheetRequest: Identifiable {
     let id = UUID()
-    let gated: Bool
     let profile: Profile
 }
 

@@ -142,6 +142,15 @@ internal val LAN_GATE_JS = """
 internal const val OPEN_LAN_GATE_JS = "window.__pbLanOpen && window.__pbLanOpen();"
 
 /**
+ * Evaluated when WebView reports a page start, right after the launcher has reset the
+ * §9 back mode and re-armed §10. That report and the page's bridge calls travel by
+ * different threads, so a page that asks in its first script can be heard BEFORE the
+ * reset that was meant for its predecessor, and lose both. The new document says them
+ * again; one that has asked nothing says nothing.
+ */
+internal const val RESEND_PAGE_MODES_JS = "window.__pbResendModes && window.__pbResendModes();"
+
+/**
  * Document-start script: defines `window.PaperBalloonHost` (CONTRACT.md) over the raw
  * `__pbHost` and `__pbName` Java interfaces, for the two members a Java interface can't
  * express — a `name` property and an `editName()` that returns a Promise — and for the one
@@ -149,6 +158,8 @@ internal const val OPEN_LAN_GATE_JS = "window.__pbLanOpen && window.__pbLanOpen(
  * Everything else passes straight through, so the Java bridge's own argument conversions
  * still apply. Every `editName()` reaches the launcher and gets its own Promise; the
  * launcher answers them in order through `__pbNameResult(name | null)`.
+ *
+ * It also keeps what this document last asked of §9 and §10, for [RESEND_PAGE_MODES_JS].
  */
 internal val HOST_SHIM_JS = """
   (() => {
@@ -166,11 +177,17 @@ internal val HOST_SHIM_JS = """
     // become 0, as the typed bridge would.
     const hapticComposition = (steps) => {
       if (!Array.isArray(steps)) return;
-      host.hapticComposition(steps.slice(0, 32).map((s) => {
+      host.hapticSteps(steps.slice(0, 32).map((s) => {
         s = s || {};
         return String(s.primitive) + ',' + (typeof s.scale === 'number' ? s.scale : 0) +
           ',' + (typeof s.delay === 'number' ? s.delay : 0);
       }).join(';'));
+    };
+    // Boxed, so an argument of undefined still counts as asked.
+    let backMode, orientation;
+    window.__pbResendModes = () => {
+      if (backMode) host.setBackMode(backMode[0]);
+      if (orientation) host.setOrientation(orientation[0]);
     };
     window.PaperBalloonHost = {
       get name() { return names.getName(); },
@@ -182,8 +199,8 @@ internal val HOST_SHIM_JS = """
       },
       gameEnded: (reason) => host.gameEnded(reason),
       leave: () => host.leave(),
-      setBackMode: (mode) => host.setBackMode(mode),
-      setOrientation: (mode) => host.setOrientation(mode),
+      setBackMode: (mode) => { backMode = [mode]; host.setBackMode(mode); },
+      setOrientation: (mode) => { orientation = [mode]; host.setOrientation(mode); },
       haptic: (primitive, scale) => host.haptic(primitive, scale),
       hapticComposition,
     };

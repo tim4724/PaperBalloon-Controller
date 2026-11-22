@@ -5,8 +5,6 @@ import UIKit
 
 struct ProfileSheet: View {
     let initial: Profile
-    var title: String = String(localized: "Name")
-    var cta: String = String(localized: "Save")
     let onSave: (Profile) -> Void
 
     @State private var name: String
@@ -19,12 +17,8 @@ struct ProfileSheet: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dismiss) private var dismiss
 
-    init(initial: Profile, title: String = String(localized: "Name"),
-         cta: String = String(localized: "Save"),
-         onSave: @escaping (Profile) -> Void) {
+    init(initial: Profile, onSave: @escaping (Profile) -> Void) {
         self.initial = initial
-        self.title = title
-        self.cta = cta
         self.onSave = onSave
         _name = State(initialValue: initial.name)
     }
@@ -60,7 +54,7 @@ struct ProfileSheet: View {
             : AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
         VStack(alignment: .leading, spacing: 16) {
             if !compact {
-                Text(title)
+                Text(String(localized: "Name"))
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(palette.onSurface)
             }
@@ -92,6 +86,7 @@ struct ProfileSheet: View {
     private var nameField: some View {
         HStack(spacing: 8) {
             TextField("", text: $name)
+                .accessibilityLabel(String(localized: "Name"))
                 .focused($nameFocused)
                 .textInputAutocapitalization(.words)
                 // A player name is a proper noun — correcting it is always wrong. It
@@ -103,9 +98,8 @@ struct ProfileSheet: View {
                 .font(.pbBodyLarge)
                 .foregroundStyle(palette.onSurface)
                 .onChange(of: name) { _, newValue in
-                    if newValue.count > 16 {
-                        name = String(newValue.prefix(16))
-                    }
+                    let capped = Profile.capped(newValue)
+                    if capped != newValue { name = capped }
                 }
             // The glyph is the whole label, and a `.plain` button is tappable only
             // where its label draws — so a bare emoji is a ~22pt target. The frame is
@@ -130,7 +124,7 @@ struct ProfileSheet: View {
 
     private func saveButton(fullWidth: Bool) -> some View {
         Button(action: save) {
-            Text(cta)
+            Text(String(localized: "Save"))
                 .font(.pbTitleMedium)
                 .foregroundStyle(palette.onPrimary)
                 .frame(maxWidth: fullWidth ? .infinity : nil)

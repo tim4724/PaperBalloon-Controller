@@ -24,7 +24,7 @@ private let codeKey = "c"
 /// Its instance name is therefore NOT a room label (the phone may never have learned one),
 /// so the launcher must not present it as a location.
 private let relayedKey = "pbr"
-/// Instance names are display-declared; cap so one can't blow out the card.
+/// Instance names are display-declared; cap (UTF-16 units) so one can't blow out the card.
 private let maxAdvertLabelLength = 24
 /// The suffix a display puts after its device name (§8), dropped before display. A " (2)"
 /// that DNS-SD appends on a name clash is kept: it's what tells two same-named TVs apart.
@@ -65,7 +65,15 @@ func sanitizeAdvertLabel(_ raw: String) -> String {
         .trimmingCharacters(in: .whitespacesAndNewlines)
         .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         .replacingOccurrences(of: displaySuffix, with: "$1", options: .regularExpression)
-    return String(clean.prefix(maxAdvertLabelLength))
+    // UTF-16 units on a whole code point, as Android cuts, so the two show one label.
+    var label = String.UnicodeScalarView()
+    var units = 0
+    for scalar in clean.unicodeScalars {
+        units += scalar.utf16.count
+        if units > maxAdvertLabelLength { break }
+        label.append(scalar)
+    }
+    return String(label)
 }
 
 /// One `_paperballoon._tcp` advertisement (§8): a room label and the room's code, nothing

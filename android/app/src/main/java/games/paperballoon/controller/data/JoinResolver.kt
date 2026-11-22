@@ -130,7 +130,7 @@ object JoinResolver {
     // https always; plain http only for a LAN host in debug (see [isPrivateHost]).
     val schemeOk = scheme == "https" ||
       (BuildConfig.DEBUG && scheme == "http" && isPrivateHost(uri.host))
-    if (!schemeOk || !uri.userInfo.isNullOrEmpty()) {
+    if (!schemeOk || uri.userInfo != null) {
       return JoinOutcome.Failure(R.string.error_not_paperballoon_room)
     }
     return JoinOutcome.Success(game, extractRoomCode(uri), url)
