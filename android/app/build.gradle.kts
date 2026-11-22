@@ -110,7 +110,7 @@ android {
     // Compile the wrapper's Kotlin (zxingcpp.BarcodeReader) and its JNI glue out of the
     // submodule — see the zxingCppWrapperSrc comment above.
     sourceSets["main"].kotlin.srcDir("$zxingCppWrapperSrc/java")
-    // Cross-platform test cases (tests/join-resolver.json), shared with the iOS unit tests.
+    // The cross-platform test cases in tests/, shared with the iOS unit tests.
     sourceSets["test"].resources.srcDir("../../tests")
     externalNativeBuild {
         cmake {
@@ -188,8 +188,8 @@ dependencies {
   implementation(libs.androidx.activity.compose)
 
   // Baseline profile: profileinstaller compiles the checked-in profile into ART on
-  // install/first run; :baselineprofile is the generator (see that module's README
-  // header comment for how to regenerate).
+  // install/first run; :baselineprofile is the generator (its build.gradle.kts
+  // header says how to regenerate).
   implementation(libs.androidx.profileinstaller)
   baselineProfile(project(":baselineprofile"))
 
@@ -226,14 +226,14 @@ dependencies {
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
 
-  // WebView compat — document-start script injection for the legal viewer.
+  // WebView compat — document-start script injection (game host and legal viewer).
   implementation(libs.androidx.webkit)
 
   // Play install referrer — the first launch after a game page's store link joins that
   // room (CONTRACT.md §13). Asks the on-device Play Store; nothing leaves the device.
   implementation(libs.android.installreferrer)
 
-  // JVM unit tests (src/test), e.g. JoinResolverTest over tests/join-resolver.json
+  // JVM unit tests (src/test), over the shared cases in tests/
   testImplementation(libs.junit)
   testImplementation(libs.robolectric)
 

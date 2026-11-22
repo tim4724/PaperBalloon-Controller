@@ -113,6 +113,11 @@ internal fun ComposeTestRule.inGamePage(url: String, landscape: Boolean = false,
     waitUntil(timeoutMillis = 30_000) {
       onAllNodes(hasText(joiningPrefix, substring = true)).fetchSemanticsNodes().isEmpty()
     }
+    // A failed load drops the cover too, for the retry cover.
+    assertTrue(
+      "the page failed to load",
+      onAllNodes(hasText(context.getString(R.string.action_retry))).fetchSemanticsNodes().isEmpty(),
+    )
     if (landscape) {
       waitUntil(timeoutMillis = 15_000) {
         var turned = false

@@ -50,8 +50,7 @@ iOS also builds the same sources a second time as an App Clip (`PB.isAppClip`; s
 - **Manifest + artwork**: `android/app/src/main/assets/games-manifest.json` +
   `assets/artwork/` are the source of truth; `ios/PaperBalloon/Resources/` holds byte-identical
   copies. Update both when either changes. The manifest is purely structural — no translated
-  text; per-game display copy lives in string resources under `game_<id>_*` keys. The bundled
-  copy is only the first-run seed — both apps refresh from the served manifest
+  text. The bundled copy is only the first-run seed — both apps refresh from the served manifest
   (`ManifestStore`), and remote art/trailers are cached by URL and never revalidated, so a
   changed image must ship under a new file name — not a `?v=` bump (details: README §Where
   things live). Encode covers with `tools/encode_artwork.sh` (1280×720 q85, writes both
@@ -65,8 +64,8 @@ iOS also builds the same sources a second time as an App Clip (`PB.isAppClip`; s
   manifest copies. Platform-only strings must be declared in the script's `ANDROID_ONLY` /
   `IOS_ONLY` lists — an undeclared one-sided string fails the check.
 - **Shared test specs**: `tests/*.json` hold the cases both apps' unit tests run for logic
-  the two must agree on exactly — join resolution, `hapticComposition()` parsing, the name
-  sheet's page colours. A change there adds or edits a case in the spec, never a
+  the two must agree on exactly, such as join resolution and `hapticComposition()`
+  parsing. A change there adds or edits a case in the spec, never a
   one-platform test; a new spec file also needs a resource entry under `PaperBalloonTests`
   in `ios/project.yml`.
 

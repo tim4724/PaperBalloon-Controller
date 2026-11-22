@@ -156,6 +156,8 @@ final class StoreScreenshotTests: XCTestCase {
         // The shell fades the cover on its injected __firstFrame signal, so the
         // cover's absence means the page has rendered (not merely loaded).
         XCTAssertTrue(joining.waitForNonExistence(timeout: 30))
+        // A failed load drops the cover too, for the retry cover.
+        XCTAssertFalse(app.buttons["Try again"].exists, "the page failed to load")
         // ...but on a slow CI runner that frame can still be waiting for WebKit's
         // compositor, leaving a flat page background on screen.
         XCTAssertTrue(waitForPaint(timeout: 15))

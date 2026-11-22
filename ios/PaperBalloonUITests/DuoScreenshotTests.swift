@@ -80,6 +80,7 @@ final class DuoScreenshotTests: XCTestCase {
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15))
         let joining = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Joining'")).firstMatch
         XCTAssertTrue(joining.waitForNonExistence(timeout: 30))
+        XCTAssertFalse(app.buttons["Try again"].exists, "the page failed to load")
         Thread.sleep(forTimeInterval: 3)  // fonts, the touchpad canvas, Tiny Track's 3D cars
         snap(name)
     }

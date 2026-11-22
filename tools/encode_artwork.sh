@@ -55,8 +55,5 @@ done
 
 # The two bundles must stay byte-identical (see CLAUDE.md) — copying above is
 # what guarantees it, and this is what proves the whole directory still is.
-for f in "$android"/*; do
-  cmp -s "$f" "$ios/$(basename "$f")" ||
-    { echo "MISMATCH: $(basename "$f") differs between the two bundles" >&2; exit 1; }
-done
+diff -rq -x .DS_Store "$android" "$ios" >&2 || { echo "MISMATCH between the two bundles" >&2; exit 1; }
 echo "both bundles in sync"

@@ -160,6 +160,8 @@ def ios_tests(xctestrun, udid, tests, env, display=None):
             time.sleep(0.2)
     if proc.returncode:
         sys.exit(f'iOS UI tests failed, see {log}')
+    if not shots:
+        sys.exit(f'iOS UI tests captured nothing (skipped?), see {log}')
     return shots
 
 
@@ -267,8 +269,12 @@ def capture_android(locales, room_for):
                                  '-no-window', '-no-audio', '-no-boot-anim', '-no-snapshot'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        run(*adb, 'wait-for-device')
+        # Bounded: a missing AVD or an emulator that dies at start would otherwise hang silently.
+        run(*adb, 'wait-for-device', timeout=180)
+        deadline = time.monotonic() + 300
         while run(*adb, 'shell', 'getprop', 'sys.boot_completed').strip() != '1':
+            if time.monotonic() > deadline:
+                sys.exit('ci_api35 did not finish booting')
             time.sleep(2)
         run(*adb, 'shell', 'settings', 'put', 'global', 'hide_error_dialogs', '1')
         run(*adb, 'shell', 'am', 'broadcast', '-a', 'android.intent.action.CLOSE_SYSTEM_DIALOGS')

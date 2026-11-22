@@ -44,8 +44,8 @@ room on the local network.
 - On iOS the same code also builds as an App Clip, which opens a scanned room
   link without installing the app.
 
-Logic the two apps must agree on exactly (parsing join links, haptic patterns)
-is tested from shared JSON cases in `tests/` that both unit test suites run.
+Logic the two apps must agree on exactly (parsing join links, for one) is
+tested from shared JSON cases in `tests/` that both unit test suites run.
 UI tests on both platforms drive a live contract test page through the real
 bridge. The store screenshots come out of UI tests too, run on a Mac by
 `tools/store_screenshots.py`.
@@ -57,8 +57,8 @@ bridge. The store screenshots come out of UI tests too, run on a Mac by
   [ios/README.md](ios/README.md). Both apps split their sources the same way:
   data, the home screen, the game's web view and the theme.
 - `tests/`: test cases both apps run.
-- `tools/`: the localization check, the artwork encoder, the app icon
-  generator and the store screenshot capture.
+- `tools/`: scripts for localization, artwork, the app icon and the store
+  screenshots.
 - `third_party/zxing-cpp/`: upstream zxing-cpp as a git submodule. Android
   compiles its QR decoder from it instead of using the published AAR; the
   reason is in `android/app/build.gradle.kts`.
@@ -88,9 +88,7 @@ open PaperBalloon.xcodeproj
 
 Both apps ship in the same 11 languages: Android in
 `res/values[-XX]/strings.xml`, iOS in `PaperBalloon/Resources/*.xcstrings`.
-Per-game text such as player counts lives in those same resources under
-`game_<id>_*` keys; `games-manifest.json` holds no translated text. After any
-string change, run
+`games-manifest.json` holds no translated text. After any string change, run
 
 ```sh
 python3 tools/check_l10n_sync.py
