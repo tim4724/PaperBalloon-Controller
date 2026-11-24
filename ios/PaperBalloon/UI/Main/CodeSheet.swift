@@ -15,7 +15,8 @@ import SwiftUI
 /// system's own. A character pops into its box; one a code can't hold (0, O, I, l or
 /// anything else outside Base58) nudges the row instead. The sixth submits by itself,
 /// and a code the relay can't place shakes the row and empties it, with the reason
-/// under it. A pasted launcher link gives up its code. Android: CodeSheet.kt.
+/// under it. A pasted launcher link gives up its code; any other paste with a character
+/// outside Base58 is refused whole, with a nudge. Android: CodeSheet.kt.
 struct CodeSheet: View {
     let entry: CodeEntry
     let onSubmit: (String) -> Void
@@ -108,7 +109,9 @@ struct CodeSheet: View {
     /// Keeps the field to what a code can be: characters outside Base58 and past the
     /// sixth are dropped, with a nudge. An insertion that is a whole code or a launcher
     /// link (a paste) replaces the field instead, without one; a pasted link that names
-    /// its own controller is resolved as a scanned one would be.
+    /// its own controller is resolved as a scanned one would be. Any other paste with a
+    /// character outside Base58 (a launcher link without a code, a sentence) is refused
+    /// whole, with a nudge: filtered down, it would name a made-up room.
     private func accept(_ new: String) {
         let old = shown
         // Not disabled while the code resolves: that would take the focus, and the
@@ -126,6 +129,11 @@ struct CodeSheet: View {
             return
         }
         let pasted = originless.flatMap { validRoomCode($0) ? $0 : nil }
+        if pasted == nil, inserted.count > 1, link.contains(where: { !PB.base58.contains($0) }) {
+            code = old
+            shake(5)
+            return
+        }
         let next = pasted ?? String(new.filter { PB.base58.contains($0) }.prefix(PB.roomCodeLength))
         if next != new {
             code = next

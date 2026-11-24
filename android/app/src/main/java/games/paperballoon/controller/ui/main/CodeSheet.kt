@@ -72,7 +72,8 @@ import kotlinx.coroutines.launch
  * anything else outside Base58) nudges the row instead. The sixth submits by itself,
  * and a code the relay can't place ([error]) shakes the row and empties it, with the
  * reason under it.
- * A pasted launcher link gives up its code. While [loading] the field keeps its focus,
+ * A pasted launcher link gives up its code; any other paste with a character outside
+ * Base58 is refused whole, with a nudge. While [loading] the field keeps its focus,
  * and the keyboard, but takes no edits. iOS: CodeSheet.swift.
  *
  * [KeyboardSheet], like the name sheet: see there for why.
@@ -106,17 +107,24 @@ fun CodeSheet(
   // Keeps the field to what a code can be: characters outside Base58 and past the sixth
   // are dropped, with a nudge. An insertion that is a whole code or a launcher link (a
   // paste) replaces the field instead, without one; a pasted link that names its own
-  // controller is resolved as a scanned one would be.
+  // controller is resolved as a scanned one would be. Any other paste with a character
+  // outside Base58 (a launcher link without a code, a sentence) is refused whole, with a
+  // nudge: filtered down, it would name a made-up room.
   fun accept(new: String) {
     if (loading) return
     val old = code
     val inserted = if (new.startsWith(old)) new.drop(old.length) else new
+    val link = inserted.trim()
     val originless = if (inserted.length > 1) originlessCode(inserted) else null
-    if (inserted.length > 1 && inserted.isNotBlank() && originless == null) {
-      onSubmit(inserted.trim())
+    if (inserted.length > 1 && link.isNotEmpty() && originless == null) {
+      onSubmit(link)
       return
     }
     val pasted = originless?.takeIf(::validRoomCode)
+    if (pasted == null && inserted.length > 1 && link.any { it !in BASE58 }) {
+      nudge(5.dp)
+      return
+    }
     val next = pasted ?: new.filter { it in BASE58 }.take(ROOM_CODE_LENGTH)
     if (pasted == null && next.length < new.length) nudge(5.dp)
     if (next == old) return
