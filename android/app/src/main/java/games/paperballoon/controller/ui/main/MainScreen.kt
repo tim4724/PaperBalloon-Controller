@@ -670,8 +670,7 @@ fun MainScreen(
     // loading screen from tap to page: this one names no game because resolving is what
     // discovers which one, and the host's picks up the name.
     AnimatedVisibility(visible = joining, enter = fadeIn(), exit = fadeOut(tween(300))) {
-      // Takes the touches: home beneath it must not open a sheet or start another join.
-      JoiningCover(stringResource(R.string.joining), Modifier.pointerInput(Unit) {})
+      JoiningCover(stringResource(R.string.joining))
     }
   }
 

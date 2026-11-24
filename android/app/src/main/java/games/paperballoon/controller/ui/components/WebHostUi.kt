@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,7 +42,8 @@ fun WebView.denyLocalFileAccess() {
  * Opaque "couldn't reach the server / try again" cover shown over a dead WebView
  * (host unreachable) — same copy and shape in the game host and the legal doc viewer.
  * [background] differs: the surface over a live game page, the screen background as a
- * standalone state; the text color follows it.
+ * standalone state; the text color follows it. It takes the touches, so the dead page
+ * beneath can't be tapped.
  */
 @Composable
 fun ServerUnreachableRetry(
@@ -51,6 +53,7 @@ fun ServerUnreachableRetry(
 ) {
   Column(
     modifier
+      .pointerInput(Unit) {}
       .fillMaxSize()
       .background(background)
       .padding(horizontal = 32.dp),
@@ -75,12 +78,13 @@ fun ServerUnreachableRetry(
  * "Joining…" cover over a page that hasn't painted yet: home shows it while the relay
  * resolves a code, the game host while the controller loads, so one join reads as a
  * single loading screen. Only [message] differs — home hasn't discovered the game yet,
- * the host names it.
+ * the host names it. It takes the touches: home beneath it must not open a sheet or start
+ * another join, nor the page be tapped before it has painted.
  */
 @Composable
 fun JoiningCover(message: String, modifier: Modifier = Modifier) {
   Box(
-    modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
+    modifier.pointerInput(Unit) {}.fillMaxSize().background(MaterialTheme.colorScheme.surface),
     contentAlignment = Alignment.Center,
   ) {
     Column(
