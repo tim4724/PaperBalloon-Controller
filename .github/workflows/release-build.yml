@@ -12,7 +12,9 @@
 #
 # Runs on bare-semver release tags and on demand. Each signing step fails fast with
 # a named error when its secrets are missing — the Android build would otherwise
-# silently fall back to a debug-signed (store-rejected) artifact.
+# silently fall back to a debug-signed (store-rejected) artifact. The secrets live
+# in the `release` environment, which admits only main and release tags, so a
+# workflow pushed on any other branch can't read them.
 name: Release build
 
 on:
@@ -30,6 +32,7 @@ concurrency:
 jobs:
   android:
     name: Android (AAB)
+    environment: release
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -117,6 +120,7 @@ jobs:
 
   ios:
     name: iOS (IPA)
+    environment: release
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
