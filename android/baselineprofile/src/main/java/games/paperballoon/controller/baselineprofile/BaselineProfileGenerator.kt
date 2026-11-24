@@ -13,9 +13,9 @@ private const val PACKAGE = "games.paperballoon.controller"
 
 /**
  * Records the launcher's hot paths for the baseline profile: cold start to the home
- * catalog, a scroll through the posters, then the sheets most sessions open — a game's
- * info sheet (trailer), and the two keyboard sheets: the name sheet every player fills
- * in first and the room-code sheet. That covers Activity/Compose init, manifest parse,
+ * catalog, the sheets most sessions open — a game's info sheet (trailer), and the two
+ * keyboard sheets: the name sheet every player fills in first and the room-code sheet —
+ * then a scroll through the posters. That covers Activity/Compose init, manifest parse,
  * sky + catalog composition, art decode, nearby discovery and the sheets, without flows
  * that need a live room (join/game host) or hardware (scanner).
  */
@@ -48,15 +48,6 @@ class BaselineProfileGenerator {
       startActivityAndWait()
       device.wait(Until.hasObject(By.text("HexStacker")), 10_000)
 
-      // Scroll the catalog down and back — the catalog is up once the wait above
-      // returns; the swipe itself exercises art decode + draw.
-      val w = device.displayWidth
-      val h = device.displayHeight
-      device.swipe(w / 2, h * 3 / 4, w / 2, h / 4, 20)
-      device.waitForIdle()
-      device.swipe(w / 2, h / 4, w / 2, h * 3 / 4, 20)
-      device.waitForIdle()
-
       // Game info sheet, long enough for the trailer to start playing.
       val scanStep = By.text("Scan the room code it shows.")
       device.findObject(By.text("HexStacker"))?.click()
@@ -65,9 +56,7 @@ class BaselineProfileGenerator {
       device.pressBack()
       device.wait(Until.gone(scanStep), 5_000)
 
-      // Name sheet: the player chip beside About, whatever name it shows. Saving one also
-      // takes the code step below to the code sheet rather than the name gate a
-      // nameless install shows first.
+      // Name sheet: the player chip beside About, whatever name it shows.
       val about = device.findObject(By.desc("About")).visibleBounds
       device.findObjects(By.clickable(true))
         .first { it.visibleBounds.right < about.left && it.visibleBounds.centerY() in about.top..about.bottom }
@@ -93,6 +82,16 @@ class BaselineProfileGenerator {
           device.waitForIdle()
         }
       }
+
+      // Scroll the catalog down and back, which exercises art decode + draw. Last: a tap
+      // on a list still settling from a swipe only stops it, so the sheets above, which
+      // open from taps on the list, would sometimes not open.
+      val w = device.displayWidth
+      val h = device.displayHeight
+      device.swipe(w / 2, h * 3 / 4, w / 2, h / 4, 20)
+      device.waitForIdle()
+      device.swipe(w / 2, h / 4, w / 2, h * 3 / 4, 20)
+      device.waitForIdle()
     }
   }
 
