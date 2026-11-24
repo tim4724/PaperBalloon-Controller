@@ -254,6 +254,10 @@ private struct CameraPreview: UIViewRepresentable {
         let session = AVCaptureSession()
         private let sessionQueue = DispatchQueue(label: "games.paperballoon.controller.qr-session")
         private var configured = false
+        // Session-queue state: the scanner has gone (so a late error restarts nothing),
+        // and a media services reset has had its one restart.
+        private var stopped = false
+        private var restarted = false
         // Main-thread state: the running output, published from the session queue only
         // once it is live, and the view whose bounds define the scan region.
         private var qrOutput: AVCaptureMetadataOutput?
@@ -320,14 +324,23 @@ private struct CameraPreview: UIViewRepresentable {
             }
         }
 
-        /// The running session died, which leaves the last frame frozen on screen. Ends
-        /// the scan the way a failed setup does; opening the scanner again starts a
-        /// fresh session. An interruption (a call, the app in the background) is not
-        /// this — iOS resumes those itself.
+        /// The running session died, which leaves the last frame frozen on screen. A
+        /// media services reset is the one error a restart recovers from, as Apple's AVCam
+        /// does; once, so a restart that fails the same way can't loop. Anything else ends
+        /// the scan the way a failed setup does, in our words rather than AVFoundation's;
+        /// opening the scanner again starts a fresh session. An interruption (a call, the
+        /// app in the background) is not this — iOS resumes those itself.
         @objc private func sessionFailed(_ notification: Notification) {
-            let error = notification.userInfo?[AVCaptureSessionErrorKey] as? Error
-            let message = error?.localizedDescription ?? String(localized: "Unable to use the camera")
-            DispatchQueue.main.async { self.onFailure(message) }
+            let code = (notification.userInfo?[AVCaptureSessionErrorKey] as? AVError)?.code
+            sessionQueue.async { [weak self] in
+                guard let self, !self.stopped else { return }
+                if code == .mediaServicesWereReset, !self.restarted {
+                    self.restarted = true
+                    self.session.startRunning()
+                    return
+                }
+                DispatchQueue.main.async { self.onFailure(String(localized: "Unable to use the camera")) }
+            }
         }
 
         // Mirror the Android scanner's center-weighted metering: bias continuous
@@ -424,6 +437,7 @@ private struct CameraPreview: UIViewRepresentable {
         func stop() {
             sessionQueue.async { [weak self] in
                 guard let self else { return }
+                self.stopped = true
                 if self.session.isRunning {
                     self.session.stopRunning()
                 }
