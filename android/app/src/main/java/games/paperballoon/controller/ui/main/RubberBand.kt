@@ -1,7 +1,9 @@
 package games.paperballoon.controller.ui.main
 
+import androidx.compose.animation.core.AnimationConstants
+import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.SpringSpec
-import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateTo
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.runtime.Composable
@@ -11,6 +13,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.unit.Velocity
@@ -18,6 +21,7 @@ import kotlin.math.abs
 import kotlin.math.sign
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
@@ -73,13 +77,20 @@ internal class RubberBand(private val scope: CoroutineScope) : OverscrollEffect 
     // A fling that hits an end runs on into the band at the speed it arrived with, as on
     // iOS, and a stiffer band slows it: one motion, without running far. performFling
     // answers what it used; at the end the list moves BAND_GIVE of the pull's speed.
-    val left = velocity.y - performFling(velocity).y
-    if (left != 0f) springBack(left / BAND_GIVE, BOUNCE_SPRING)
+    // The bounce takes over at the fling's last frame: a new animation spends its first
+    // frame at its start, which would hold the list still for a frame as it hits the end.
+    var lastFrame = AnimationConstants.UnspecifiedTime
+    val left = coroutineScope {
+      val frames = launch { while (true) withFrameNanos { lastFrame = it } }
+      (velocity.y - performFling(velocity).y).also { frames.cancel() }
+    }
+    if (left != 0f) springBack(left / BAND_GIVE, BOUNCE_SPRING, lastFrame)
   }
 
-  private fun springBack(velocity: Float, spring: SpringSpec<Float>) {
+  private fun springBack(velocity: Float, spring: SpringSpec<Float>, from: Long = AnimationConstants.UnspecifiedTime) {
     settle = scope.launch {
-      animate(pull, 0f, velocity, spring) { value, _ -> pull = value }
+      AnimationState(pull, velocity, lastFrameTimeNanos = from)
+        .animateTo(0f, spring, sequentialAnimation = true) { pull = value }
     }
   }
 }
