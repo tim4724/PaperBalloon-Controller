@@ -1204,6 +1204,9 @@ private fun GameCard(
         game.displayHost?.let { add(R.drawable.ic_globe to it) }
       }
       if (meta.isNotEmpty()) {
+        // No weights: each place is measured at its natural width in turn, so only the
+        // last (the host) is cut, and only when the row is full. Equal weights cut a host
+        // that fit.
         Row(
           Modifier.padding(top = 6.dp),
           verticalAlignment = Alignment.CenterVertically,
@@ -1211,7 +1214,6 @@ private fun GameCard(
         ) {
           meta.forEach { (icon, label) ->
             Row(
-              Modifier.weight(1f, fill = false),
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
