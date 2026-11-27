@@ -1,14 +1,20 @@
 # Builds the two store-ready, signed release artifacts:
 #   - Android: .aab signed with the Play upload keystore (materialized from secrets;
 #     see keystore.properties.example), uploaded as a workflow artifact. Tag builds
-#     also publish it to Play's closed testing track via the Play API service
+#     also prepare it as a draft production release on Play via the Play API service
 #     account, with the tag as versionName and the run number as versionCode.
 #   - iOS: signed with the Apple Distribution cert + "Paper Balloon App Store" profile, and
 #     the embedded App Clip with "Paper Balloon Clip App Store" (project.yml pins manual
 #     signing with exactly these). Tag builds upload straight to TestFlight via the
 #     ASC API key with the tag as marketing version (the TestFlight build IS the
-#     release candidate — no .ipa artifact); workflow_dispatch builds export the
-#     .ipa as a workflow artifact instead.
+#     release candidate — no .ipa artifact), then the appstore job readies that
+#     version for submission; workflow_dispatch builds export the .ipa as a workflow
+#     artifact instead.
+#
+# A tag readies a release on both stores but submits neither: sending it to review
+# stays a deliberate step, in Play Console and App Store Connect. What's New is the
+# same short line every time, for both stores (store/play/whatsnew); edit it in the
+# consoles when a release deserves more.
 #
 # Runs on bare-semver release tags and on demand. Each signing step fails fast with
 # a named error when its secrets are missing — the Android build would otherwise
@@ -102,12 +108,11 @@ jobs:
 
       # Tags only, like the iOS TestFlight upload beside it — a dispatch stays
       # "build and hand me the artifact". mapping.txt goes with it or crash
-      # reports from this R8 build are unreadable. "alpha" is the closed testing
-      # track's API name (edits.tracks.list). Completed, not draft: testers
-      # opted in, and Play still reviews the release. The service account needs
-      # "Release to testing tracks" on this app in Play Console (Users and
+      # reports from this R8 build are unreadable. A draft: rolling it out (which
+      # sends it to Google's review) is done in Play Console. The service account
+      # needs "Release to production" on this app in Play Console (Users and
       # permissions, not Cloud IAM).
-      - name: Publish to Play (closed testing)
+      - name: Prepare the Play production release (draft)
         if: github.ref_type == 'tag'
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
@@ -115,8 +120,9 @@ jobs:
           packageName: games.paperballoon.controller
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           mappingFile: android/app/build/outputs/mapping/release/mapping.txt
-          tracks: alpha
-          status: completed
+          tracks: production
+          status: draft
+          whatsNewDirectory: store/play/whatsnew
 
   ios:
     name: iOS (IPA)
@@ -237,3 +243,27 @@ jobs:
           name: games.paperballoon.controller-release-dsyms
           path: ios/build/PaperBalloon.xcarchive/dSYMs
           if-no-files-found: error
+
+  # Tags only: turns the TestFlight upload into an App Store version ready to submit
+  # (store/appclip/prepare_release.py). Its own job on a cheap runner, since it mostly
+  # waits for Apple to process the build.
+  appstore:
+    name: App Store (prepare release)
+    if: github.ref_type == 'tag'
+    needs: ios
+    environment: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Prepare the App Store version
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_API_KEY_P8_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/"AuthKey_$ASC_API_KEY_ID.p8"
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet pyjwt==2.10.1 cryptography==44.0.0 requests==2.32.3
+          "$RUNNER_TEMP/venv/bin/python" store/appclip/prepare_release.py "$GITHUB_REF_NAME" "$GITHUB_RUN_NUMBER"
