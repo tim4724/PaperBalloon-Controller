@@ -110,10 +110,10 @@ import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -1259,7 +1259,7 @@ private fun posterLuminance(art: Art, fraction: Float): Float =
 // balloon leads, sea, gold and dusk follow. Placed in dp from the top of the screen (sky)
 // or the bottom of the status bar (the fleet, which keeps station with the title) and
 // from the right edge; iOS's SkyBackdrop draws the same sky around its own title.
-// It is alive while it's [moving]: the balloons bob on their strings, some stars
+// It is alive while it's [moving] and on screen: the balloons bob on their strings, some stars
 // twinkle, and once a launch a shooting star may cross the night. A tapped balloon
 // swings; tap one five times running and it slips away, and a new one inflates in its
 // place. The bob and twinkle hold still with animations switched off, in Battery Saver
@@ -1276,8 +1276,7 @@ private fun SkyBackdrop(scrolled: () -> Float, taps: Flow<Offset>, moving: Boole
   val context = LocalContext.current
   // Seconds of sky time, read only in the draw phase, so the motion never recomposes. It
   // runs only while the sky moves (the frame clock pauses with the activity too) and
-  // carries on from where it stopped, so the fleet never jumps. It ticks about 30 times a
-  // second rather than every frame: the bob covers a few pixels a second.
+  // carries on from where it stopped, so the fleet never jumps. It ticks every frame.
   var time by remember { mutableFloatStateOf(0f) }
   // The hidden sky's craft flies only while a pull shows it: the seconds it flew in
   // earlier pulls, and the sky time this one brought it into view.
@@ -1290,23 +1289,25 @@ private fun SkyBackdrop(scrolled: () -> Float, taps: Flow<Offset>, moving: Boole
       hiddenSkyAt = if (revealed) time else null
     }
   }
-  LaunchedEffect(moving) {
-    if (!moving || coroutineContext[MotionDurationScale]?.scaleFactor == 0f || skyHeldStill(context)) {
+  // It ticks only while something that moves is on screen: the fleet, and at night the
+  // stars. Scrolled past them, a tick would redraw the whole window to show nothing new.
+  val fleetReach = statusTop + SKY_FLEET_REACH
+  val reach = with(density) { (if (dark) maxOf(fleetReach, SKY_STARS_REACH) else fleetReach).toPx() }
+  val inView by remember(reach) { derivedStateOf { scrolled() < reach } }
+  val alive = moving && inView
+  LaunchedEffect(alive) {
+    if (!alive || coroutineContext[MotionDurationScale]?.scaleFactor == 0f || skyHeldStill(context)) {
       return@LaunchedEffect
     }
     val origin = withInfiniteAnimationFrameNanos { it } - (time * 1e9f).toLong()
-    while (true) {
-      withInfiniteAnimationFrameNanos { time = (it - origin) / 1e9f }
-      // A craft a pull has found gets every frame.
-      if (hiddenSkyAt == null) delay(SKY_TICK_MS)
-    }
+    while (true) withInfiniteAnimationFrameNanos { time = (it - origin) / 1e9f }
   }
   val shootingStar = remember { Animatable(0f) }
   val shootingFrom = remember { Offset(Random.nextFloat() * 0.4f + 0.05f, Random.nextFloat() * 100f + 20f) }
-  LaunchedEffect(dark, moving) {
+  LaunchedEffect(dark, alive) {
     // First, so a flight this effect's last run was cancelled in doesn't stay drawn.
     shootingStar.snapTo(0f)
-    if (!dark || !moving || shootingStarShown) return@LaunchedEffect
+    if (!dark || !alive || shootingStarShown) return@LaunchedEffect
     delay(Random.nextLong(SHOOTING_STAR_AFTER_MS.first, SHOOTING_STAR_AFTER_MS.last))
     shootingStarShown = true
     shootingStar.animateTo(1f, tween(SHOOTING_STAR_MS, easing = LinearEasing))
@@ -1444,19 +1445,27 @@ private fun SkyBackdrop(scrolled: () -> Float, taps: Flow<Offset>, moving: Boole
           .padding(top = statusTop + top.dp, end = end.dp)
           .width(width.dp)
           .aspectRatio(SKY_BALLOON_ASPECT)
-          .graphicsLayer {
+          // On a layer of its own, so its ticks redraw only it.
+          .graphicsLayer()
+          // Moved while drawing, not by moving its layer: Compose counts a moved layer as a
+          // layout change, and re-checks the whole screen for content capture after each.
+          .drawWithContent {
             // The smaller, further balloons bob less. All of it pivots on the knot.
-            transformOrigin = TransformOrigin(0.5f, 1f)
-            translationY = sin(time * TWO_PI / period + i * 1.7f) * (width * 0.06f).dp.toPx() + bounce[i].value
-            rotationZ = 3f * sin(time * TWO_PI / (period * 1.4f) + i) + swing[i].value
+            val knot = Offset(size.width / 2, size.height)
+            var dy = sin(time * TWO_PI / period + i * 1.7f) * (width * SKY_FLEET_BOB).dp.toPx() + bounce[i].value
             // Slipping away: rising, swaying as it goes, far past the top of the screen.
-            translationY -= escape[i].value * (statusTop + top.dp + (width / SKY_BALLOON_ASPECT).dp + SLIP_BEYOND).toPx()
-            translationX = sin(escape[i].value * 3 * PI.toFloat()) * (width * 0.2f).dp.toPx()
-            scaleX = inflate[i].value
-            scaleY = inflate[i].value
-            // The silhouette becomes a mask for the balloon's gradient.
-            compositingStrategy = CompositingStrategy.Offscreen
+            dy -= escape[i].value * (statusTop + top.dp + (width / SKY_BALLOON_ASPECT).dp + SLIP_BEYOND).toPx()
+            val dx = sin(escape[i].value * 3 * PI.toFloat()) * (width * 0.2f).dp.toPx()
+            withTransform({
+              translate(dx, dy)
+              rotate(3f * sin(time * TWO_PI / (period * 1.4f) + i) + swing[i].value, knot)
+              scale(inflate[i].value, inflate[i].value, knot)
+            }) {
+              this@drawWithContent.drawContent()
+            }
           }
+          // The silhouette becomes a mask for the balloon's gradient.
+          .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
           .drawWithContent {
             drawContent()
             drawRect(brush, blendMode = BlendMode.SrcIn)
@@ -1511,12 +1520,12 @@ private fun HiddenSky(dark: Boolean, craft: SkyCraft, flight: () -> Float, width
     TowedBanner(
       craft,
       flight,
-      Modifier.graphicsLayer {
+      // Moved while drawing, as the fleet is: a moved layer would count as a layout change.
+      Modifier.graphicsLayer().drawWithContent {
         val t = flight()
         val room = CRAFT_ROOM.toPx()
         val flown = (CRAFT_START.toPx() + room + craft.speed.dp.toPx() * t) % (width() + room)
-        translationX = flown - room
-        translationY = (CRAFT_TOP + craft.bob(t).dp).toPx()
+        translate(flown - room, (CRAFT_TOP + craft.bob(t).dp).toPx()) { this@drawWithContent.drawContent() }
       },
     )
   }
@@ -1564,6 +1573,7 @@ private val SKY_STARS = listOf(
   Triple(0.56f, 280f, 0.8f), Triple(0.77f, 250f, 1.3f), Triple(0.08f, 370f, 0.9f), Triple(0.33f, 340f, 1.1f),
   Triple(0.67f, 350f, 0.8f), Triple(0.90f, 380f, 1.2f), Triple(0.49f, 410f, 0.9f), Triple(0.95f, 100f, 0.8f),
 )
+private val SKY_STARS_REACH = SKY_STARS.maxOf { (_, y, r) -> y + r }.dp
 // Clouds: left dp (from the screen's right edge when fromRight), top dp from the top of
 // the screen, width dp. One overflows the left edge, one drifts behind the fleet at the
 // right — never behind the chips or over the status line below the title.
@@ -1577,6 +1587,10 @@ private val SKY_FLEET = listOf(
   Triple(40f, 48f, 62f), Triple(24f, 104f, 94f), Triple(15f, 20f, 56f), Triple(17f, 5f, 92f),
 )
 private const val SKY_BALLOON_ASPECT = 58f / 82.43f // res/drawable/sky_balloon.xml's viewport
+// How far a balloon bobs either way, as a share of its width.
+private const val SKY_FLEET_BOB = 0.06f
+// How far below the status bar the fleet reaches at the bottom of its bob.
+private val SKY_FLEET_REACH = SKY_FLEET.maxOf { (width, _, top) -> top + width / SKY_BALLOON_ASPECT + width * SKY_FLEET_BOB }.dp
 // Each balloon's bob, in seconds per cycle — no two alike, so the fleet never moves as one.
 private val SKY_FLEET_BOB_S = listOf(6.2f, 5.1f, 7.3f, 5.7f)
 // The smallest target a balloon gets: the small ones are far narrower than a finger.
@@ -1593,9 +1607,6 @@ private val SLIP_EASING = CubicBezierEasing(0.55f, 0f, 1f, 1f)
 private val SLIP_BEYOND = 800.dp
 private const val TAP_RUN_GAP_MS = 1500L
 private const val TWO_PI = 2 * PI.toFloat()
-// The rest between sky ticks. With the wait for the next frame on top it makes about 30
-// ticks a second at 60 or 90 Hz (measured on a Pixel 7), 40 at 120 Hz.
-private const val SKY_TICK_MS = 20L
 private const val SHOOTING_STAR_ANGLE = 25 * PI.toFloat() / 180
 private const val SHOOTING_STAR_MS = 900
 // Late enough that a quick visit never sees it, early enough that a lingering one might.

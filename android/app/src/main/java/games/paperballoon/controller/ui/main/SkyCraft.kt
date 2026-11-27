@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -21,9 +22,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathOperation
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
@@ -104,12 +105,14 @@ internal fun TowedBanner(craft: SkyCraft, flight: () -> Float, modifier: Modifie
       Box(Modifier.background(rope))
       Spacer(
         Modifier
-          .graphicsLayer {
-            rotationZ = craft.tilt(flight())
-            transformOrigin = TransformOrigin(craft.towX, craft.towY)
-            // The seams cut the silhouette, not the sky behind it.
-            compositingStrategy = CompositingStrategy.Offscreen
+          // Tilted while drawing: a rotated layer would count as a layout change.
+          .drawWithContent {
+            rotate(craft.tilt(flight()), Offset(craft.towX * size.width, craft.towY * size.height)) {
+              this@drawWithContent.drawContent()
+            }
           }
+          // The seams cut the silhouette, not the sky behind it.
+          .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
           .drawBehind { drawCraft(craft, flight()) },
       )
     },

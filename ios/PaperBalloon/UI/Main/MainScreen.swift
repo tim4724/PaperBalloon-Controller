@@ -1032,6 +1032,9 @@ private struct SkyBackdrop: View {
     /// earlier pulls, and the sky time this one brought it into view.
     @State private var craftFlown: TimeInterval = 0
     @State private var hiddenSkyAt: TimeInterval?
+    // Whether the fleet and the stars are on screen: scrolled past them, nothing moving shows.
+    @State private var fleetInView = true
+    @State private var starsInView = true
     // Per balloon: a tap's count (the swing's trigger) and which way it pushed, and its
     // slips (that animation's trigger) and when it last slipped.
     @State private var swings = [Int](repeating: 0, count: Self.fleet.count)
@@ -1083,11 +1086,14 @@ private struct SkyBackdrop: View {
     private static let balloonAspect: CGFloat = 58 / 82.43  // SkyBalloon's viewBox
     /// Each balloon's bob, in seconds per cycle — no two alike, so the fleet never moves as one.
     private static let bobPeriods: [Double] = [6.2, 5.1, 7.3, 5.7]
-    /// About 30 sky ticks a second rather than every frame: the bob covers a few points a
-    /// second (Android: MainScreen.kt `SKY_TICK_MS`).
-    private static let tick: TimeInterval = 1.0 / 30
+    /// How far a balloon bobs either way, as a share of its width.
+    private static let bobDepth: CGFloat = 0.06
+    /// How far below the content top the fleet reaches at the bottom of its bob, and the
+    /// stars.
+    private static let fleetReach = fleet.map { $0.top + $0.width / balloonAspect + $0.width * bobDepth }.max()!
+    private static let starsReach = stars.map { $0.y + $0.r }.max()!
     /// The band the stars and the shooting star use, from the top of the content: the
-    /// star canvas covers only that, not the whole sky, as the twinkle redraws it every tick.
+    /// star canvas covers only that, not the whole sky, as the twinkle redraws it every frame.
     private static let starBand: (top: CGFloat, height: CGFloat) = (-200, 430)
     /// The smallest target a balloon gets: the small ones are far narrower than a finger.
     private static let target: CGFloat = 48
@@ -1107,9 +1113,12 @@ private struct SkyBackdrop: View {
     // Where it starts: x as a fraction of the width, y below the top of the screen.
     @State private var shootingFrom = CGPoint(x: .random(in: 0.05...0.45), y: .random(in: 20...120))
 
-    /// Read whenever `moving` changes (Android also holds still on a low-RAM phone).
+    /// Read whenever `moving` or what's on screen changes (Android also holds still on a
+    /// low-RAM phone). Only while something that moves is on screen: the fleet, and at
+    /// night the stars.
     private var ticking: Bool {
-        moving && !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled
+        moving && (fleetInView || scheme == .dark && starsInView)
+            && !reduceMotion && !ProcessInfo.processInfo.isLowPowerModeEnabled
     }
 
     var body: some View {
@@ -1123,8 +1132,7 @@ private struct SkyBackdrop: View {
         let height = Self.above + Self.paper
         GeometryReader { geo in
             let width = geo.size.width
-            // A shooting star in flight gets every frame: it crosses the sky in under a second.
-            TimelineView(.animation(minimumInterval: shootingStarAt == nil ? Self.tick : nil, paused: !ticking)) { timeline in
+            TimelineView(.animation(paused: !ticking)) { timeline in
                 let t = (heldAt ?? timeline.date).timeIntervalSince(clockStart)
                 ZStack(alignment: .topLeading) {
                     LinearGradient(
@@ -1237,7 +1245,7 @@ private struct SkyBackdrop: View {
                             }
                             // The smaller, further balloons bob less. All of it pivots on the knot.
                             .rotationEffect(.degrees(3 * sin(t * 2 * .pi / (period * 1.4) + Double(i))), anchor: .bottom)
-                            .offset(y: sin(t * 2 * .pi / period + Double(i) * 1.7) * balloon.width * 0.06)
+                            .offset(y: sin(t * 2 * .pi / period + Double(i) * 1.7) * balloon.width * Self.bobDepth)
                             .offset(x: width - balloon.end - balloon.width, y: Self.above + balloon.top)
                     }
                 }
@@ -1246,8 +1254,8 @@ private struct SkyBackdrop: View {
                 // never takes a touch.
                 .allowsHitTesting(false)
             }
-            // Outside the sky's ticks, which would rebuild it while it is out of sight, on a
-            // clock of its own: a craft a pull has found gets every frame, the sky its ticks.
+            // Outside the sky's timeline, which would rebuild it every frame while it is out
+            // of sight: on a clock of its own, running only while a pull shows it.
             .overlay(alignment: .topLeading) {
                 TimelineView(.animation(paused: !ticking || hiddenSkyAt == nil)) { timeline in
                     let t = (heldAt ?? timeline.date).timeIntervalSince(clockStart)
@@ -1267,6 +1275,8 @@ private struct SkyBackdrop: View {
             // In the content's own space: y 0 is the top of the content.
             .background { WindowTaps { tapped(at: $0, width: width) } }
         }
+        .onGeometryChange(for: Bool.self) { $0.frame(in: .global).minY + Self.fleetReach > 0 } action: { fleetInView = $0 }
+        .onGeometryChange(for: Bool.self) { $0.frame(in: .global).minY + Self.starsReach > 0 } action: { starsInView = $0 }
         .accessibilityHidden(true)
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.7), trigger: swings)
         .onChange(of: ticking, initial: true) { _, isTicking in
@@ -1283,9 +1293,6 @@ private struct SkyBackdrop: View {
             guard !Task.isCancelled else { return }
             shootingStarAt = .now
             Self.shootingStarShown = true
-            // Back to the slower ticks once it's gone, cancelled or not.
-            try? await Task.sleep(for: .seconds(Self.shootingStarDuration))
-            shootingStarAt = nil
         }
     }
 
