@@ -86,10 +86,6 @@ struct Game: Identifiable, Hashable {
     /// loads a URL the scan or the relay directory named, never one built from this.
     let controllerBaseUrl: String?
     let hosts: [String]
-    /// The game's own relay (pre-unification) — some of its rooms still live here rather
-    /// than on the shared directory, and a code gives no hint which, so both are probed
-    /// (see `probeRelays`/`probeRoom`).
-    let relayProbeBase: String?
     /// Native TV apps: platform id -> "live" | "soon". Display-only; ids map to
     /// device chips in the info sheet (PlatformChips), unknown ids are ignored.
     let tvApps: [String: String]
@@ -102,7 +98,7 @@ struct Game: Identifiable, Hashable {
     init(id: String, name: String, status: String = "soon",
          minPlayers: Int? = nil, maxPlayers: Int? = nil, video: String? = nil, accentColor: Color = PB.defaultAccent,
          art: String? = nil, icon: String? = nil, controllerBaseUrl: String? = nil, hosts: [String] = [],
-         relayProbeBase: String? = nil, tvApps: [String: String] = [:], tvStores: [String: String] = [:]) {
+         tvApps: [String: String] = [:], tvStores: [String: String] = [:]) {
         self.id = id
         self.name = name
         self.status = status
@@ -114,7 +110,6 @@ struct Game: Identifiable, Hashable {
         self.icon = icon
         self.controllerBaseUrl = controllerBaseUrl
         self.hosts = hosts
-        self.relayProbeBase = relayProbeBase
         self.tvApps = tvApps
         self.tvStores = tvStores
     }
@@ -195,8 +190,6 @@ enum GamesManifest {
 
         let controllerBaseUrl = httpsURL(obj["controllerBaseUrl"])
 
-        let relayProbeBase = httpsURL(obj["relayProbeBase"])?.trimmingTrailingSlashes()
-
         // Strictly strings — a malformed hosts array fails the whole parse (Android
         // matches), keeping the documented all-or-nothing promise instead of silently
         // shipping a shorter allow-list than the other platform.
@@ -214,7 +207,7 @@ enum GamesManifest {
         return Game(id: id, name: name, status: status,
                     minPlayers: minPlayers, maxPlayers: maxPlayers, video: video, accentColor: accentColor,
                     art: art, icon: icon, controllerBaseUrl: controllerBaseUrl, hosts: hosts,
-                    relayProbeBase: relayProbeBase, tvApps: tvApps, tvStores: tvStores)
+                    tvApps: tvApps, tvStores: tvStores)
     }
 
     /// A positive Int from a JSON value, or nil if absent/non-numeric/≤0.
@@ -317,15 +310,6 @@ func androidUriEncode(_ s: String) -> String {
         }
     }
     return out
-}
-
-extension String {
-    /// Drop any trailing "/" so a base URL concatenates cleanly with "/" + code.
-    func trimmingTrailingSlashes() -> String {
-        var stripped = self
-        while stripped.hasSuffix("/") { stripped.removeLast() }
-        return stripped
-    }
 }
 
 // MARK: - Profile

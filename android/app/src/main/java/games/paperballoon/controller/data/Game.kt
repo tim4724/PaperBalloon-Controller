@@ -30,10 +30,6 @@ data class Game(
   // loads a URL the scan or the relay directory named, never one built from this.
   val controllerBaseUrl: String?,
   val hosts: List<String>,       // domains that resolve to this game (subdomains included)
-  // The game's own relay (pre-unification) — some of its rooms still live here rather
-  // than on the shared directory, and a code gives no hint which, so both are probed
-  // (see [probeRelays]/[probeRoom]).
-  val relayProbeBase: String? = null,
   // Native TV apps: platform id -> "live" | "soon". Display-only; ids map to
   // device chips in the info sheet (PlatformChips), unknown ids are ignored.
   val tvApps: Map<String, String> = emptyMap(),
@@ -103,7 +99,6 @@ object GamesManifest {
         } else {
           emptyList()
         },
-        relayProbeBase = g.optHttpsUrl("relayProbeBase")?.trimEnd('/'),
         // Display-only, so lenient where hosts is strict: a non-string status
         // drops that entry rather than failing the parse.
         tvApps = g.optJSONObject("tvApps")?.let { o ->

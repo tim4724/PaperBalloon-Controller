@@ -20,8 +20,7 @@
       "controllerBaseUrl": "https://hexstacker.com",
       "hosts": [
         "hexstacker.com"
-      ],
-      "relayProbeBase": "https://ws.hexstacker.com"
+      ]
     },
     {
       "id": "tinytrack",

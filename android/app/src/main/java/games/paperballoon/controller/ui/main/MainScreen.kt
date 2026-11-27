@@ -165,7 +165,7 @@ import games.paperballoon.controller.data.distinctAdverts
 import games.paperballoon.controller.data.nearbyAdverts
 import games.paperballoon.controller.data.homeRooms
 import games.paperballoon.controller.data.lanAvailable
-import games.paperballoon.controller.data.resolveNearby
+import games.paperballoon.controller.data.nearbyRoom
 import games.paperballoon.controller.data.clearLocalNetworkAsked
 import games.paperballoon.controller.data.localNetworkPermanentlyDenied
 import games.paperballoon.controller.data.localNetworkPermissionGranted
@@ -177,9 +177,10 @@ import games.paperballoon.controller.data.ProfileStore
 import games.paperballoon.controller.data.RecentRoom
 import games.paperballoon.controller.data.RecentRoomStore
 import games.paperballoon.controller.data.ROOM_POLL_MS
+import games.paperballoon.controller.data.RoomDirectory
 import games.paperballoon.controller.data.RoomLookup
-import games.paperballoon.controller.data.probeRoom
 import games.paperballoon.controller.data.resolveJoin
+import games.paperballoon.controller.data.validRoomCode
 import androidx.compose.ui.tooling.preview.Preview
 import games.paperballoon.controller.theme.PaperBalloonTheme
 import games.paperballoon.controller.theme.FleetDusk
@@ -302,10 +303,12 @@ fun MainScreen(
   // is also what makes a hand-edited permission take effect without a relaunch. (A revoke
   // arrives as a process kill instead, so the initializers above cover that direction.)
   LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refreshDiscovery() }
-  // An advertised code becomes a card only once the relay has resolved it — that call is
-  // what supplies the join URL, `pbp` and the occupancy check. Re-checked on the same
-  // cadence as the rejoin card: both promise "you can enter this", so both have to notice
-  // when the room dies or fills. Lifecycle-gated — no polling while backgrounded.
+  // A card is offered only while the relay vouches for its room: the rejoin card for the
+  // room the player just left, a nearby card for each one advertised on the LAN. Both
+  // promise "you can enter this", so each tick asks the relay once per room code — codes
+  // are global, so one answer serves both cards — and both notice together when a room
+  // dies or fills. The answer also supplies a nearby card's join URL and `pbp`.
+  // Lifecycle-gated — no polling while backgrounded.
   val resolved = remember { mutableStateMapOf<String, NearbyRoom>() }
   // A record that stops appearing doesn't end a room — only the relay does, and a held
   // room keeps being probed until it answers (see AdvertLinger).
@@ -313,17 +316,41 @@ fun MainScreen(
   LaunchedEffect(adverts, games) {
     lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
       while (true) {
+        // Re-read the saved room EVERY tick — never capture it once. A game that ended
+        // with room_not_found clears the store from under this poll; the next tick must
+        // drop the card, not re-show the dead room off a stale captured value. No code
+        // (a scanned URL that surfaced none) leaves nothing to ask about.
+        val recent = RecentRoomStore.current()?.takeIf { it.roomCode.isNotBlank() }
         // One probe per ROOM, not per record: a room announced by its display and by
         // every phone in it is still one code.
-        val distinct = linger.hold(distinctAdverts(adverts))
-        resolved.keys.retainAll(distinct.map { it.code }.toSet())
-        coroutineScope {
-          distinct.map { advert ->
-            async {
-              val room = resolveNearby(advert, games)
-              if (room == null) resolved.remove(advert.code) else resolved[advert.code] = room
-            }
-          }.awaitAll()
+        val held = linger.hold(distinctAdverts(adverts)).filter { validRoomCode(it.code) }
+        val codes = (held.map { it.code } + listOfNotNull(recent?.roomCode)).distinct()
+        val lookups = coroutineScope { codes.map { async { it to RoomDirectory.lookup(it) } }.awaitAll() }.toMap()
+
+        resolved.keys.retainAll(held.map { it.code }.toSet())
+        for (advert in held) {
+          val room = nearbyRoom(advert, lookups.getValue(advert.code), games)
+          if (room == null) resolved.remove(advert.code) else resolved[advert.code] = room
+        }
+
+        rejoin = when (val lookup = recent?.let { lookups.getValue(it.roomCode) }) {
+          // Not when it reads FULL, like a nearby card: there's no seat to offer one tap
+          // into. The room stays remembered, though, so the card is back once one frees.
+          // Unlike a nearby card it needs no usable template: it loads the URL the player
+          // joined with. The template still names the room's box when nothing on the LAN
+          // is advertising it — re-read the slot to pick that up.
+          is RoomLookup.Found -> if (lookup.isFull) null else {
+            RecentRoomStore.putPlatform(lookup.url)
+            RecentRoomStore.current() ?: recent
+          }
+          // Only an ANSWER ends it for good: a 404 forgets the room…
+          RoomLookup.NotFound -> {
+            RecentRoomStore.clear()
+            null
+          }
+          // …while an unreachable relay just means we can't vouch for the offer right
+          // now, so the room stays remembered and the next tick asks again.
+          RoomLookup.Error, null -> null
         }
         delay(ROOM_POLL_MS)
       }
@@ -414,55 +441,6 @@ fun MainScreen(
     if (deepLink != null) {
       resolveAndJoin(deepLink)
       onDeepLinkConsumed()
-    }
-  }
-
-  // Offer one-tap rejoin while the last-joined room is still alive: keep probing the
-  // relays that could hold it so the card clears itself when the room dies.
-  // Lifecycle-gated — no polling while backgrounded.
-  LaunchedEffect(Unit) {
-    lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-      // Re-read the saved room EVERY iteration — never capture it once. A game that
-      // ended with room_not_found clears the store from under this still-running poll;
-      // the next tick must honor that and drop the card, not re-show the dead room off
-      // a stale captured value + a relay record that hasn't 404'd yet.
-      while (true) {
-        val recent = RecentRoomStore.current()
-        // Nothing to verify: no saved room (never joined, aged out, cleared on a
-        // room_not_found end), or a scanned URL that surfaced no code to probe with.
-        if (recent == null || recent.roomCode.isBlank()) {
-          rejoin = null
-          return@repeatOnLifecycle
-        }
-        // Every relay that could hold it, like the join path: only one of them minted
-        // this room (see probeRoom).
-        val results = probeRoom(recent.roomCode, recent.game)
-        val founds = results.filterIsInstance<RoomLookup.Found>()
-        if (founds.isEmpty()) {
-          // Unconfirmed is unconfirmed: a relay that says the room is gone and one we
-          // couldn't reach at all both mean no card. Only an ANSWER settles it, though —
-          // a 404 from every relay that could hold the room ends it for good, while an
-          // unreachable one just means we can't vouch for the offer right now, so the
-          // room stays remembered and the next tick asks again.
-          rejoin = null
-          if (results.none { it is RoomLookup.Error }) {
-            RecentRoomStore.clear()
-            return@repeatOnLifecycle
-          }
-        } else {
-          // Offered even when the room reads FULL. One of those slots is very likely
-          // this player's own, held for them by the relay, which takes a stored clientId
-          // back into it — the game only treats full as fatal for a FRESH joiner. Hiding
-          // the card here locks someone out of the room they were just in; a rejoin that
-          // genuinely bounces costs one page load and lands on the `game_full` banner.
-          //
-          // The probe also carries the §6 template, so the room names its box here even
-          // when nothing on the LAN is advertising it — re-read the slot to pick that up.
-          RecentRoomStore.putPlatform(founds.firstOrNull { it.url != null }?.url)
-          rejoin = RecentRoomStore.current() ?: recent
-        }
-        delay(ROOM_POLL_MS)
-      }
     }
   }
 

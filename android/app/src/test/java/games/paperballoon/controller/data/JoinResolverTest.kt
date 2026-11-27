@@ -49,21 +49,20 @@ class JoinResolverTest {
   }
 
   @Test
-  fun resolveLookups() {
-    for (case in cases.getJSONArray("resolveLookups").objects()) {
-      val lookups = case.getJSONArray("lookups").objects().map { l ->
-        when (val kind = l.getString("kind")) {
-          "found" -> RoomLookup.Found(
-            url = if (l.isNull("url")) null else l.getString("url"),
-            clients = l.optInt("clients"),
-            maxClients = l.optInt("maxClients"),
-          )
-          "notFound" -> RoomLookup.NotFound
-          "error" -> RoomLookup.Error
-          else -> throw AssertionError("unknown lookup kind $kind")
-        }
+  fun resolveLookup() {
+    for (case in cases.getJSONArray("resolveLookup").objects()) {
+      val l = case.getJSONObject("lookup")
+      val lookup = when (val kind = l.getString("kind")) {
+        "found" -> RoomLookup.Found(
+          url = if (l.isNull("url")) null else l.getString("url"),
+          clients = l.optInt("clients"),
+          maxClients = l.optInt("maxClients"),
+        )
+        "notFound" -> RoomLookup.NotFound
+        "error" -> RoomLookup.Error
+        else -> throw AssertionError("unknown lookup kind $kind")
       }
-      val outcome = resolveLookups(lookups, games)
+      val outcome = resolveLookup(lookup, games)
       if (case.has("fail")) {
         val message = when (val fail = case.getString("fail")) {
           "notARoom" -> R.string.error_not_paperballoon_room

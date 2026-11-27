@@ -2,9 +2,9 @@ import Foundation
 
 // MARK: - Lookup result
 
-/// How often a room on screen is re-checked against its relay. One cadence for both card
-/// kinds — a rejoin card and a nearby card make the same promise ("you can enter this"),
-/// so they go stale the same way and are refreshed by the same probe.
+/// How often the rooms on screen are re-checked against the relay. One cadence for both
+/// card kinds — a rejoin card and a nearby card make the same promise ("you can enter
+/// this"), so they go stale the same way and are refreshed by the same probe.
 let roomPollInterval: Duration = .seconds(10)
 
 enum RoomLookup: Equatable {
@@ -31,15 +31,15 @@ enum RoomDirectory {
         return URLSession(configuration: config)
     }()
 
-    /// GET {relayBase}/room/{androidUriEncode(code)}. Never throws.
+    /// GET {PB.relayBase}/room/{androidUriEncode(code)}. Never throws.
     /// 200 + JSON object → .found; 404 → .notFound; anything else → .error.
     /// Empty trimmed code → .notFound (no network).
-    static func lookup(code: String, relayBase: String) async -> RoomLookup {
+    static func lookup(code: String) async -> RoomLookup {
         let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             return .notFound
         }
-        guard let url = URL(string: relayBase + "/room/" + androidUriEncode(trimmed)) else {
+        guard let url = URL(string: PB.relayBase + "/room/" + androidUriEncode(trimmed)) else {
             return .error
         }
         do {
@@ -87,88 +87,42 @@ func resolveJoin(_ raw: String, games: [Game]) async -> JoinOutcome {
     guard let code = originlessCode(trimmed), !code.isEmpty else {
         return JoinResolver.resolve(trimmed, games: games)
     }
-    return resolveLookups(await probeRelays(code, games: games), games: games)
+    return resolveLookup(await RoomDirectory.lookup(code: code), games: games)
 }
 
-/// The relays a code could live on: every playable game's own, then the shared directory.
-/// Probed in parallel, relay order preserved in the results, so a game's own wins ties.
-func probeRelays(_ code: String, games: [Game]) async -> [RoomLookup] {
-    await probeAll(code, preferred: games.filter { $0.isPlayable }.compactMap { $0.relayProbeBase })
-}
-
-/// The relays a room whose GAME is already known is checked against — the liveness poll
-/// behind the rejoin card. Its own relay first, then the shared directory: the room may
-/// have been minted on either, and a room must not be declared dead by a relay that
-/// never held it.
-func probeRoom(_ code: String, game: Game) async -> [RoomLookup] {
-    await probeAll(code, preferred: [game.relayProbeBase].compactMap { $0 })
-}
-
-private func probeAll(_ code: String, preferred: [String]) async -> [RoomLookup] {
-    var relays: [String] = []
-    for base in preferred + [PB.relayBase] where !relays.contains(base) {
-        relays.append(base)
-    }
-    var results = [RoomLookup](repeating: .error, count: relays.count)
-    await withTaskGroup(of: (Int, RoomLookup).self) { group in
-        for (index, relay) in relays.enumerated() {
-            group.addTask {
-                (index, await RoomDirectory.lookup(code: code, relayBase: relay))
-            }
-        }
-        for await (index, result) in group {
-            results[index] = result
-        }
-    }
-    return results
-}
-
-/// The decision table over already-fetched lookups — separate from `resolveJoin` so
-/// a caller that probed for its own reasons (`resolveNearby`'s fullness check) resolves
-/// from those results instead of probing the same relays a second time.
-func resolveLookups(_ results: [RoomLookup], games: [Game]) -> JoinOutcome {
+/// The decision on the relay's answer — separate from `resolveJoin` so the home poll,
+/// which probes for its own reasons, makes a nearby card (`nearbyRoom`) from the same
+/// answer instead of probing a second time.
+func resolveLookup(_ lookup: RoomLookup, games: [Game]) -> JoinOutcome {
     // Deliberately NOT refused when full, though the lookup reports it: a full room still
     // takes its own players back (the relay swaps a stored clientId into the slot it is
     // holding for them), and from a code alone we cannot tell that player from a stranger.
     // Refusing here locks someone out of the room they are already in. Let the load happen
     // and let the relay decide — a stranger bounces back on `game_full`, which the shell
-    // already turns into a banner. Only the nearby list, which never offers a room the
-    // player has a slot in, can safely act on `isFull`.
+    // already turns into a banner. Only the home cards act on `isFull`: a card is an
+    // offer, and a full room has no seat to offer one tap into.
 
-    // A relay knows the room and handed back the controller URL (relay-list order) →
-    // load exactly that (untrusted; re-validated). A url that is itself origin-less
-    // (a paperballoon.games/<code> template) declares nothing the directory hadn't already
-    // told us, so it doesn't count as one.
-    if let url = results.lazy.compactMap(\.url).first(where: { originlessCode($0) == nil }) {
-        return JoinResolver.resolve(url, games: games)
-    }
-
-    // The room is there but nothing says where it lives. §6: registering a usable
-    // template is what makes a code joinable, so this is a display bug, and the honest
-    // answer is to say the code can't be placed rather than guess a game for it.
-    if results.contains(where: \.isFound) {
+    switch lookup {
+    case .found(let url, _, _):
+        // The relay knows the room and handed back the controller URL → load exactly
+        // that (untrusted; re-validated). A url that is itself origin-less (a
+        // paperballoon.games/<code> template) declares nothing the directory hadn't
+        // already told us, so it doesn't count as one; nor does none at all. §6:
+        // registering a usable template is what makes a code joinable, so either is a
+        // display bug, and the honest answer is to say the code can't be placed rather
+        // than guess a game for it.
+        if let url, originlessCode(url) == nil {
+            return JoinResolver.resolve(url, games: games)
+        }
         return .failure(message: String(localized: "This code can’t be matched to a game right now."))
-    }
-    if results.contains(.notFound) {
+    case .notFound:
         return .failure(message: String(localized: "Room not found."))
+    case .error:
+        return .failure(message: String(localized: "Couldn’t reach the server. Try again."))
     }
-    return .failure(message: String(localized: "Couldn’t reach the server. Try again."))
 }
 
-// Swift can't destructure an enum case as tersely as Kotlin's filterIsInstance, so the
-// three things callers actually ask of a lookup are named here once.
 extension RoomLookup {
-    var isFound: Bool {
-        if case .found = self { return true }
-        return false
-    }
-
-    /// The §6 template, if this is a Found that carried one.
-    var url: String? {
-        if case .found(let url, _, _) = self { return url }
-        return nil
-    }
-
     /// The display occupies a slot too, so this is exact, not off by one.
     var isFull: Bool {
         guard case .found(_, let clients, let maxClients) = self else { return false }

@@ -3,9 +3,6 @@ package games.paperballoon.controller.data
 import android.net.Uri
 import games.paperballoon.controller.R
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -17,9 +14,9 @@ import java.net.URL
 const val RELAY_BASE = "https://ws.paperballoon.games"
 
 /**
- * How often a room on screen is re-checked against its relay. One cadence for both card
- * kinds — a rejoin card and a nearby card make the same promise ("you can enter this"),
- * so they go stale the same way and are refreshed by the same probe.
+ * How often the rooms on screen are re-checked against the relay. One cadence for both
+ * card kinds — a rejoin card and a nearby card make the same promise ("you can enter
+ * this"), so they go stale the same way and are refreshed by the same probe.
  */
 const val ROOM_POLL_MS = 10_000L
 
@@ -48,11 +45,11 @@ sealed interface RoomLookup {
 
 object RoomDirectory {
   /** Probe the relay for a room code. Never throws; network failure → [RoomLookup.Error]. */
-  suspend fun lookup(code: String, relayBase: String): RoomLookup = withContext(Dispatchers.IO) {
+  suspend fun lookup(code: String): RoomLookup = withContext(Dispatchers.IO) {
     val trimmed = code.trim()
     if (trimmed.isEmpty()) return@withContext RoomLookup.NotFound
     val conn = runCatching {
-      (URL("$relayBase/room/${Uri.encode(trimmed)}").openConnection() as HttpURLConnection).apply {
+      (URL("$RELAY_BASE/room/${Uri.encode(trimmed)}").openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"
         connectTimeout = 5000
         readTimeout = 5000
@@ -97,55 +94,33 @@ suspend fun resolveJoin(raw: String, games: List<Game>): JoinOutcome {
   // look up — the offline resolver already knows what to load, or why it can't.
   val code = originlessCode(trimmed)
   if (code.isNullOrEmpty()) return JoinResolver.resolve(trimmed, games)
-  return resolveLookups(probeRelays(code, games), games)
-}
-
-/** The relays a code could live on: every playable game's own, then the shared directory.
- * Probed in parallel; a game's own relay comes first, so it wins ties. */
-suspend fun probeRelays(code: String, games: List<Game>): List<RoomLookup> =
-  probeAll(code, games.filter { it.isPlayable }.mapNotNull { it.relayProbeBase })
-
-/**
- * The relays a room whose GAME is already known is checked against — the liveness poll
- * behind the rejoin card. Its own relay first, then the shared directory: the room may
- * have been minted on either, and a room must not be declared dead by a relay that
- * never held it.
- */
-suspend fun probeRoom(code: String, game: Game): List<RoomLookup> =
-  probeAll(code, listOfNotNull(game.relayProbeBase))
-
-private suspend fun probeAll(code: String, preferred: List<String>): List<RoomLookup> = coroutineScope {
-  (preferred + RELAY_BASE).distinct()
-    .map { base -> async { RoomDirectory.lookup(code, base) } }
-    .awaitAll()
+  return resolveLookup(RoomDirectory.lookup(code), games)
 }
 
 /**
- * The decision table over already-fetched lookups — separate from [resolveJoin] so
- * a caller that probed for its own reasons ([resolveNearby]'s fullness check) resolves
- * from those results instead of probing the same relays a second time.
+ * The decision on the relay's answer — separate from [resolveJoin] so the home poll,
+ * which probes for its own reasons, makes a nearby card ([nearbyRoom]) from the same
+ * answer instead of probing a second time.
  */
-fun resolveLookups(results: List<RoomLookup>, games: List<Game>): JoinOutcome {
-  val founds = results.filterIsInstance<RoomLookup.Found>()
+fun resolveLookup(lookup: RoomLookup, games: List<Game>): JoinOutcome {
   // Deliberately NOT refused when full, though the lookup reports it: a full room still
   // takes its own players back (the relay swaps a stored clientId into the slot it is
   // holding for them), and from a code alone we cannot tell that player from a stranger.
   // Refusing here locks someone out of the room they are already in. Let the load happen
   // and let the relay decide — a stranger bounces back on `game_full`, which the shell
-  // already turns into a banner. Only the nearby list, which never offers a room the
-  // player has a slot in, can safely act on `isFull`.
+  // already turns into a banner. Only the home cards act on `isFull`: a card is an
+  // offer, and a full room has no seat to offer one tap into.
 
-  // A `url` that is itself origin-less (a paperballoon.games/<code> template) declares nothing
-  // the directory hadn't already told us, so it doesn't count as one.
-  val foundUrl = founds.firstOrNull { it.url != null && originlessCode(it.url) == null }?.url
-  return when {
-    // A relay knows the room and handed back the controller URL — load exactly that.
-    foundUrl != null -> JoinResolver.resolve(foundUrl, games)
-    // The room is there but nothing says where it lives. §6: registering a usable
-    // template is what makes a code joinable, so this is a display bug, and the honest
-    // answer is to say the code can't be placed rather than guess a game for it.
-    founds.isNotEmpty() -> JoinOutcome.Failure(R.string.error_code_unmatched)
-    results.any { it is RoomLookup.NotFound } -> JoinOutcome.Failure(R.string.error_room_not_found)
-    else -> JoinOutcome.Failure(R.string.error_server_unreachable)
+  return when (lookup) {
+    // The relay knows the room and handed back the controller URL — load exactly that. A
+    // `url` that is itself origin-less (a paperballoon.games/<code> template) declares
+    // nothing the directory hadn't already told us, so it doesn't count as one; nor does
+    // none at all. §6: registering a usable template is what makes a code joinable, so
+    // either is a display bug, and the honest answer is to say the code can't be placed
+    // rather than guess a game for it.
+    is RoomLookup.Found -> lookup.url?.takeIf { originlessCode(it) == null }?.let { JoinResolver.resolve(it, games) }
+      ?: JoinOutcome.Failure(R.string.error_code_unmatched)
+    RoomLookup.NotFound -> JoinOutcome.Failure(R.string.error_room_not_found)
+    RoomLookup.Error -> JoinOutcome.Failure(R.string.error_server_unreachable)
   }
 }

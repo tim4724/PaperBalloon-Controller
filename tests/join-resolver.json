@@ -1,5 +1,5 @@
 {
-  "about": "Shared JoinResolver cases, run by both apps' unit tests (JoinResolverTest.kt, JoinResolverTests.swift) so the two ports can't drift apart. A resolve case expects a join (game id + best-effort room code; the URL always loads verbatim, trimmed) or a rejection. A resolveLookups case feeds the relays' answers, in relay-list order, to the decision table and expects a join (game id + the URL to load) or which failure it reports. Tests run debug builds, whose LAN dev-server allowance is deliberately not covered here.",
+  "about": "Shared JoinResolver cases, run by both apps' unit tests (JoinResolverTest.kt, JoinResolverTests.swift) so the two ports can't drift apart. A resolve case expects a join (game id + best-effort room code; the URL always loads verbatim, trimmed) or a rejection. A resolveLookup case feeds the relay's answer to the decision and expects a join (game id + the URL to load) or which failure it reports. Tests run debug builds, whose LAN dev-server allowance is deliberately not covered here.",
   "games": [
     { "id": "hexstacker", "hosts": ["hexstacker.com"] },
     { "id": "tinytrack", "hosts": ["tinytrack.paperballoon.games"] }
@@ -35,21 +35,16 @@
     { "input": "HTTPS://hexstacker.com/A3KX9p", "game": "hexstacker", "room": "A3KX9p" },
     { "input": "https://hexstacker.com@evil.com/A3KX9p", "reject": true }
   ],
-  "resolveLookups": [
-    { "lookups": [{ "kind": "found", "url": "https://hexstacker.com/A3KX9p#fra-1" }], "game": "hexstacker", "url": "https://hexstacker.com/A3KX9p#fra-1" },
-    { "lookups": [{ "kind": "found", "url": "https://evil.example/A3KX9p" }], "fail": "notARoom", "note": "the relay's url is untrusted: off the list, it loads nothing" },
-    { "lookups": [{ "kind": "found", "url": "http://hexstacker.com/A3KX9p" }], "fail": "notARoom" },
-    { "lookups": [{ "kind": "found", "url": "https://paperballoon.games/A3KX9p" }], "fail": "unmatched", "note": "an origin-less template says nothing the directory hadn't" },
-    { "lookups": [{ "kind": "found" }], "fail": "unmatched", "note": "the room is there but nothing says where it lives" },
-    { "lookups": [{ "kind": "found" }, { "kind": "found", "url": "https://hexstacker.com/A3KX9p#fra-1" }], "game": "hexstacker", "url": "https://hexstacker.com/A3KX9p#fra-1" },
-    { "lookups": [{ "kind": "found", "url": "https://tinytrack.paperballoon.games/A3KX9p" }, { "kind": "found", "url": "https://hexstacker.com/A3KX9p#fra-1" }], "game": "tinytrack", "url": "https://tinytrack.paperballoon.games/A3KX9p", "note": "relay-list order decides" },
-    { "lookups": [{ "kind": "found", "url": "https://hexstacker.com/A3KX9p#fra-1", "clients": 8, "maxClients": 8 }], "game": "hexstacker", "url": "https://hexstacker.com/A3KX9p#fra-1", "note": "a full room still takes its own players back" },
-    { "lookups": [{ "kind": "error" }, { "kind": "found", "url": "https://hexstacker.com/A3KX9p#fra-1" }], "game": "hexstacker", "url": "https://hexstacker.com/A3KX9p#fra-1" },
-    { "lookups": [{ "kind": "found", "url": "https://paperballoon.games/A3KX9p" }, { "kind": "notFound" }], "fail": "unmatched" },
-    { "lookups": [{ "kind": "notFound" }, { "kind": "notFound" }], "fail": "notFound" },
-    { "lookups": [{ "kind": "notFound" }, { "kind": "error" }], "fail": "notFound", "note": "one relay's 404 outranks another's failure" },
-    { "lookups": [{ "kind": "error" }, { "kind": "error" }], "fail": "unreachable" },
-    { "lookups": [], "fail": "unreachable" }
+  "resolveLookup": [
+    { "lookup": { "kind": "found", "url": "https://hexstacker.com/A3KX9p#fra-1" }, "game": "hexstacker", "url": "https://hexstacker.com/A3KX9p#fra-1" },
+    { "lookup": { "kind": "found", "url": "https://tinytrack.paperballoon.games/A3KX9p" }, "game": "tinytrack", "url": "https://tinytrack.paperballoon.games/A3KX9p" },
+    { "lookup": { "kind": "found", "url": "https://evil.example/A3KX9p" }, "fail": "notARoom", "note": "the relay's url is untrusted: off the list, it loads nothing" },
+    { "lookup": { "kind": "found", "url": "http://hexstacker.com/A3KX9p" }, "fail": "notARoom" },
+    { "lookup": { "kind": "found", "url": "https://paperballoon.games/A3KX9p" }, "fail": "unmatched", "note": "an origin-less template says nothing the directory hadn't" },
+    { "lookup": { "kind": "found" }, "fail": "unmatched", "note": "the room is there but nothing says where it lives" },
+    { "lookup": { "kind": "found", "url": "https://hexstacker.com/A3KX9p#fra-1", "clients": 8, "maxClients": 8 }, "game": "hexstacker", "url": "https://hexstacker.com/A3KX9p#fra-1", "note": "a full room still takes its own players back" },
+    { "lookup": { "kind": "notFound" }, "fail": "notFound" },
+    { "lookup": { "kind": "error" }, "fail": "unreachable" }
   ],
   "originlessCode": [
     { "input": "", "code": null },

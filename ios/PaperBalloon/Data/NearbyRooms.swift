@@ -151,13 +151,12 @@ struct HomeRooms {
     /// card's locator: its own name, and a join URL that came straight from the relay's
     /// §6 template — the one place `pbp` is guaranteed to be declared.
     let rejoinAdvert: NearbyRoom?
-    /// Every other advertised room, deduped and in a stable order.
+    /// Every other advertised room, in a stable order.
     let nearby: [NearbyRoom]
 }
 
-/// Turns resolved rooms into the card list in ONE pass: collapses a room advertised twice
-/// (a display on two interfaces) into one card, sorts for a stable order, and folds the
-/// rejoin room's advertisement into the rejoin card.
+/// Turns resolved rooms — one per code, as codes are global — into the card list: sorts
+/// them for a stable order, and folds the rejoin room's advertisement into the rejoin card.
 ///
 /// `rejoin` is the room that card is currently offering. Leaving a game does not close the
 /// room, so the display keeps advertising it — without this the player lands on home
@@ -165,59 +164,36 @@ struct HomeRooms {
 /// captured page title, and it inherits the advertisement it displaced: dropping the
 /// duplicate and handing back what it knew are the same match, asked once.
 func homeRooms(_ rooms: [NearbyRoom], rejoin: RecentRoom? = nil) -> HomeRooms {
-    // Keyed on ROOM CODE, scoped by GAME: codes are minted per relay (a game may run its
-    // own, Game.relayProbeBase), so two games can independently mint the same code and
-    // must not collapse into one card. An UNRESOLVED game (a launcher preview subdomain
-    // matching no id) collapses every such deployment onto one synthetic id, which
-    // discriminates nothing — fall back to the host there, which does.
-    var rejoinAdvert: NearbyRoom?
-    var best: [String: NearbyRoom] = [:]
-    for room in rooms {
-        if room.isSameRoom(as: rejoin) {
-            if rejoinAdvert == nil { rejoinAdvert = room }
-            continue
-        }
-        let scope = room.game.id == Game.syntheticLauncher.id
-            ? (URLComponents(string: room.joinUrl)?.host ?? "")
-            : room.game.id
-        let key = room.roomCode.isEmpty ? room.joinUrl : "\(scope)/\(room.roomCode)"
-        if best[key] == nil { best[key] = room }
-    }
-    return HomeRooms(rejoinAdvert: rejoinAdvert,
-                     nearby: best.values.sorted { ($0.label, $0.joinUrl) < ($1.label, $1.joinUrl) })
+    HomeRooms(rejoinAdvert: rooms.first { $0.isSameRoom(as: rejoin) },
+              nearby: rooms.filter { !$0.isSameRoom(as: rejoin) }
+                  .sorted { ($0.label, $0.joinUrl) < ($1.label, $1.joinUrl) })
 }
 
-/// Resolves one advertised code against the relay — the same probe a typed code takes,
-/// so scan, type and nearby-tap all land on one path. The relay's `url` is what loads
-/// (re-validated against the manifest allow-list by `resolveLookups`) and is also where
-/// `pbp` comes from, so the launcher never trusts anything the LAN said beyond the code.
+/// The card an advertised room makes, from the relay's answer for its code — the answer
+/// a typed code gets too, so scan, type and nearby-tap all land on one path. The relay's
+/// `url` is what loads (re-validated against the manifest allow-list by `resolveLookup`)
+/// and is also where `pbp` comes from, so the launcher never trusts anything the LAN said
+/// beyond the code.
 ///
 /// Nil when the room is gone, unreachable, off the allow-list, or FULL — a card that
 /// can't be joined is worse than no card, since tapping it costs a whole page load only
 /// to bounce back on `game_full`.
-func resolveNearby(_ advert: NearbyAdvert, games: [Game]) async -> NearbyRoom? {
-    guard validRoomCode(advert.code) else { return nil }
-    // One probe round serves both the fullness check and the URL resolution — this runs
-    // on every 10s poll tick per advertised room, so a second identical round would
-    // double the relay traffic for nothing.
-    let lookups = await probeRelays(advert.code, games: games)
-    let founds = lookups.filter(\.isFound)
-    guard !founds.isEmpty, !founds.contains(where: \.isFull) else { return nil }
-
-    guard case .success(let game, let roomCode, let joinUrl) =
-            resolveLookups(lookups, games: games) else { return nil }
+func nearbyRoom(_ advert: NearbyAdvert, lookup: RoomLookup, games: [Game]) -> NearbyRoom? {
+    guard !lookup.isFull,
+          case .success(let game, let roomCode, let joinUrl) = resolveLookup(lookup, games: games)
+    else { return nil }
     // A relayed record's instance name is the relaying phone's own, not the TV's.
     return NearbyRoom(label: advert.relayed ? "" : advert.label, game: game, roomCode: roomCode,
                       joinUrl: joinUrl)
 }
 
 extension NearbyRoom {
-    // Room code is the reliable identity (the advertised URL and the one we joined with
-    // can differ in query/fragment); the URL match is the fallback for a code-less URL.
+    // Room code is the reliable identity, and a global one (the advertised URL and the one
+    // we joined with can differ in query/fragment); the URL match is the fallback for a
+    // code-less URL.
     func isSameRoom(as recent: RecentRoom?) -> Bool {
         guard let recent else { return false }
-        if !roomCode.isEmpty, roomCode == recent.roomCode, game.id == recent.game.id { return true }
-        return joinUrl == recent.joinUrl
+        return (!roomCode.isEmpty && roomCode == recent.roomCode) || joinUrl == recent.joinUrl
     }
 }
 
@@ -397,7 +373,7 @@ enum LocalNetworkAsked {
             // The code is the whole gate: the record has no version field, and a code no
             // relay knows is dropped at resolution.
             let code = txt[codeKey]?.trimmingCharacters(in: .whitespaces)
-            // A sanity cap on hostile input, not the format check — resolveNearby applies
+            // A sanity cap on hostile input, not the format check — the room poll applies
             // the real base58/length rule. Any advert field gets the same bound.
             guard let code, !code.isEmpty, code.count <= maxAdvertLabelLength else { continue }
             adverts.append(NearbyAdvert(label: sanitizeAdvertLabel(name), code: code,

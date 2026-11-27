@@ -148,14 +148,13 @@ data class HomeRooms(
    * §6 template — the one place `pbp` is guaranteed to be declared.
    */
   val rejoinAdvert: NearbyRoom?,
-  /** Every other advertised room, deduped and in a stable order. */
+  /** Every other advertised room, in a stable order. */
   val nearby: List<NearbyRoom>,
 )
 
 /**
- * Turns resolved rooms into the card list in ONE pass: collapses a room advertised twice
- * (a display on two interfaces) into one card, sorts for a stable order, and folds the
- * rejoin room's advertisement into the rejoin card.
+ * Turns resolved rooms — one per code, as codes are global — into the card list: sorts
+ * them for a stable order, and folds the rejoin room's advertisement into the rejoin card.
  *
  * [rejoin] is the room that card is currently offering. Leaving a game does not close the
  * room, so the display keeps advertising it — without this the player lands on home
@@ -164,48 +163,24 @@ data class HomeRooms(
  * duplicate and handing back what it knew are the same match, asked once.
  */
 fun homeRooms(rooms: List<NearbyRoom>, rejoin: RecentRoom? = null): HomeRooms {
-  // Keyed on ROOM CODE, scoped by GAME: codes are minted per relay (a game may run its
-  // own, Game.relayProbeBase), so two games can independently mint the same code and
-  // must not collapse into one card. An UNRESOLVED game (a launcher preview subdomain
-  // matching no id) collapses every such deployment onto one synthetic id, which
-  // discriminates nothing — fall back to the host there, which does.
-  var rejoinAdvert: NearbyRoom? = null
-  val best = LinkedHashMap<String, NearbyRoom>()
-  for (room in rooms) {
-    if (room.isSameRoomAs(rejoin)) {
-      if (rejoinAdvert == null) rejoinAdvert = room
-      continue
-    }
-    val scope = if (room.game.id == SYNTHETIC_GAME_ID) {
-      runCatching { room.joinUrl.toUri().host }.getOrNull().orEmpty()
-    } else {
-      room.game.id
-    }
-    val key = if (room.roomCode.isBlank()) room.joinUrl else scope + "/" + room.roomCode
-    best.putIfAbsent(key, room)
-  }
-  return HomeRooms(rejoinAdvert, best.values.sortedWith(compareBy({ it.label }, { it.joinUrl })))
+  val (mine, others) = rooms.partition { it.isSameRoomAs(rejoin) }
+  return HomeRooms(mine.firstOrNull(), others.sortedWith(compareBy({ it.label }, { it.joinUrl })))
 }
 
 /**
- * Resolves one advertised code against the relay — the same probe a typed code takes,
- * so scan, type and nearby-tap all land on one path. The relay's `url` is what loads
- * (re-validated against the manifest allow-list by [resolveLookups]) and is also where
- * `pbp` comes from, so the launcher never trusts anything the LAN said beyond the code.
+ * The card an advertised room makes, from the relay's answer for its code — the answer
+ * a typed code gets too, so scan, type and nearby-tap all land on one path. The relay's
+ * `url` is what loads (re-validated against the manifest allow-list by [resolveLookup])
+ * and is also where `pbp` comes from, so the launcher never trusts anything the LAN said
+ * beyond the code.
  *
  * Null when the room is gone, unreachable, off the allow-list, or FULL — a card that
  * can't be joined is worse than no card, since tapping it costs a whole page load only
  * to bounce back on `game_full`.
  */
-suspend fun resolveNearby(advert: NearbyAdvert, games: List<Game>): NearbyRoom? {
-  if (!validRoomCode(advert.code)) return null
-  // One probe round serves both the fullness check and the URL resolution — this runs
-  // on every 10s poll tick per advertised room, so a second identical round would
-  // double the relay traffic for nothing.
-  val results = probeRelays(advert.code, games)
-  val founds = results.filterIsInstance<RoomLookup.Found>()
-  if (founds.isEmpty() || founds.any { it.isFull }) return null
-  val hit = resolveLookups(results, games) as? JoinOutcome.Success ?: return null
+fun nearbyRoom(advert: NearbyAdvert, lookup: RoomLookup, games: List<Game>): NearbyRoom? {
+  if (lookup !is RoomLookup.Found || lookup.isFull) return null
+  val hit = resolveLookup(lookup, games) as? JoinOutcome.Success ?: return null
   return NearbyRoom(
     // A relayed record's instance name is the relaying phone's own, not the TV's.
     label = if (advert.relayed) "" else advert.label,
@@ -215,12 +190,11 @@ suspend fun resolveNearby(advert: NearbyAdvert, games: List<Game>): NearbyRoom? 
   )
 }
 
-// Room code is the reliable identity (the resolved URL can differ in query/fragment);
-// the URL match is the fallback for a code-less join URL.
+// Room code is the reliable identity, and a global one (the resolved URL can differ in
+// query/fragment); the URL match is the fallback for a code-less join URL.
 private fun NearbyRoom.isSameRoomAs(recent: RecentRoom?): Boolean {
   if (recent == null) return false
-  if (roomCode.isNotBlank() && roomCode == recent.roomCode && game.id == recent.game.id) return true
-  return joinUrl == recent.joinUrl
+  return (roomCode.isNotBlank() && roomCode == recent.roomCode) || joinUrl == recent.joinUrl
 }
 
 /**
@@ -543,7 +517,7 @@ fun nearbyAdverts(context: Context): Flow<List<NearbyAdvert>> = callbackFlow {
 private fun NsdServiceInfo.toAdvert(): NearbyAdvert? {
   val attrs = attributes ?: return null
   val code = attrs[CODE_KEY].decodeUtf8()?.trim()
-  // A sanity cap on hostile input, not the format check — resolveNearby applies the real
+  // A sanity cap on hostile input, not the format check — the room poll applies the real
   // BASE58/length rule. Any advert field gets the same bound; none is ever this long.
   if (code.isNullOrBlank() || code.length > MAX_ADVERT_LABEL_LENGTH) return null
   val relayed = attrs[RELAYED_KEY].decodeUtf8() == "1"

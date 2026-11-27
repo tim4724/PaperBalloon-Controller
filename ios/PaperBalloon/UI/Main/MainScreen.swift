@@ -188,12 +188,8 @@ struct MainScreen: View {
             }
             onDeepLinkConsumed()
         }
-        .task(id: isTopVisible) {
-            guard isTopVisible else { return }
-            await runRejoinPoll()
-        }
         // Browse only while home is on screen AND Local Network has been asked — the same
-        // gating as the rejoin poll, and it keeps the Local Network prompt off the
+        // gating as the room poll, and it keeps the Local Network prompt off the
         // game host and off a first launch nobody asked anything of yet.
         .onChange(of: isTopVisible, initial: true) { _, visible in
             if visible {
@@ -215,29 +211,11 @@ struct MainScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             if isTopVisible && lanAsked { nearby.start() }
         }
-        // Re-checked on the same cadence as the rejoin card: both promise "you can enter
-        // this", so both have to notice when the room dies or fills. Keyed on visibility
-        // too, so nothing polls while this screen isn't the visible top (lingering
-        // adverts would otherwise keep it probing behind the game host).
+        // Keyed on visibility too, so nothing polls while this screen isn't the visible top
+        // (lingering adverts would otherwise keep it probing behind the game host).
         .task(id: isTopVisible ? nearby.adverts : nil) {
             guard isTopVisible else { return }
-            while !Task.isCancelled {
-                // One probe per ROOM, not per record: a room announced by its display
-                // and by every phone in it is still one code.
-                let adverts = linger.hold(distinctAdverts(nearby.adverts))
-                resolvedNearby = resolvedNearby.filter { key, _ in
-                    adverts.contains { $0.code == key }
-                }
-                await withTaskGroup(of: (String, NearbyRoom?).self) { group in
-                    for advert in adverts {
-                        group.addTask { (advert.code, await resolveNearby(advert, games: games)) }
-                    }
-                    for await (code, room) in group {
-                        if let room { resolvedNearby[code] = room } else { resolvedNearby[code] = nil }
-                    }
-                }
-                do { try await Task.sleep(for: roomPollInterval) } catch { return }
-            }
+            await runRoomPoll()
         }
         // Keyed on the LAN too: Wi-Fi coming back restarts the grace period, so the slot
         // reads "Searching…" again instead of a stale instant "No rooms found".
@@ -541,57 +519,62 @@ struct MainScreen: View {
         }
     }
 
-    // MARK: Rejoin polling
+    // MARK: Room polling
 
+    /// A card is offered only while the relay vouches for its room: the rejoin card for the
+    /// room the player just left, a nearby card for each one advertised on the LAN. Both
+    /// promise "you can enter this", so each tick asks the relay once per room code — codes
+    /// are global, so one answer serves both cards — and both notice together when a room
+    /// dies or fills. The answer also supplies a nearby card's join URL and `pbp`.
     @MainActor
-    private func runRejoinPoll() async {
-        // Re-read the saved room EVERY iteration — never capture it once. A game that
-        // ended with room_not_found clears the store from under this still-running poll;
-        // the next tick must honor that and drop the card, not re-show the dead room off
-        // a stale captured value + a relay record that hasn't 404'd yet.
+    private func runRoomPoll() async {
         while !Task.isCancelled {
-            // Nothing to verify: no saved room (never joined, aged out, cleared on a
-            // room_not_found end), or a scanned URL that surfaced no code to probe with.
-            guard let recent = RecentRoomStore.current(), !recent.roomCode.isEmpty else {
-                withAnimation(.spring(duration: 0.45)) { rejoin = nil }
-                return
-            }
-            // Every relay that could hold it, like the join path: only one of them
-            // minted this room (see probeRoom).
-            let results = await probeRoom(recent.roomCode, game: recent.game)
-            if Task.isCancelled { return }
-            let founds = results.filter(\.isFound)
-            if founds.isEmpty {
-                // Unconfirmed is unconfirmed: a relay that says the room is gone and one
-                // we couldn't reach at all both mean no card. Only an ANSWER settles it,
-                // though — a 404 from every relay that could hold the room ends it for
-                // good, while an unreachable one just means we can't vouch for the offer
-                // right now, so the room stays remembered and the next tick asks again.
-                withAnimation(.spring(duration: 0.45)) { rejoin = nil }
-                if !results.contains(.error) {
-                    RecentRoomStore.clear()
-                    return
+            // Re-read the saved room EVERY tick — never capture it once. A game that ended
+            // with room_not_found clears the store from under this poll; the next tick must
+            // drop the card, not re-show the dead room off a stale captured value. No code
+            // (a scanned URL that surfaced none) leaves nothing to ask about.
+            let recent = RecentRoomStore.current().flatMap { $0.roomCode.isEmpty ? nil : $0 }
+            // One probe per ROOM, not per record: a room announced by its display and by
+            // every phone in it is still one code.
+            let adverts = linger.hold(distinctAdverts(nearby.adverts)).filter { validRoomCode($0.code) }
+            let codes = Set(adverts.map(\.code) + [recent?.roomCode].compactMap { $0 })
+            var lookups: [String: RoomLookup] = [:]
+            await withTaskGroup(of: (String, RoomLookup).self) { group in
+                for code in codes {
+                    group.addTask { (code, await RoomDirectory.lookup(code: code)) }
                 }
-            } else {
-                // Offered even when the room reads FULL. One of those slots is very
-                // likely this player's own, held for them by the relay, which takes a
-                // stored clientId back into it — the game only treats full as fatal for a
-                // FRESH joiner. Hiding the card here locks someone out of the room they
-                // were just in; a rejoin that genuinely bounces costs one page load and
-                // lands on the `game_full` banner.
-                //
-                // The probe also carries the §6 template, so the room names its box here
-                // even when nothing on the LAN is advertising it — re-read the slot to
-                // pick that up.
-                RecentRoomStore.putPlatform(fromTemplate: founds.lazy.compactMap(\.url).first)
-                let room = RecentRoomStore.current() ?? recent
-                withAnimation(.spring(duration: 0.45)) { rejoin = room }
+                for await (code, lookup) in group { lookups[code] = lookup }
             }
-            do {
-                try await Task.sleep(for: roomPollInterval)
-            } catch {
-                return
+            if Task.isCancelled { return }
+
+            resolvedNearby = adverts.reduce(into: [:]) { rooms, advert in
+                if let lookup = lookups[advert.code] { rooms[advert.code] = nearbyRoom(advert, lookup: lookup, games: games) }
             }
+
+            var room: RecentRoom?
+            if let recent, let lookup = lookups[recent.roomCode] {
+                switch lookup {
+                case .found(let url, _, _) where !lookup.isFull:
+                    // Not when it reads FULL (the `where` above), like a nearby card: there's
+                    // no seat to offer one tap into. The room stays remembered, though, so
+                    // the card is back once one frees. Unlike a nearby card it needs no usable
+                    // template: it loads the URL the player joined with. The template still
+                    // names the room's box when nothing on the LAN is advertising it —
+                    // re-read the slot to pick that up.
+                    RecentRoomStore.putPlatform(fromTemplate: url)
+                    room = RecentRoomStore.current() ?? recent
+                case .notFound:
+                    // Only an ANSWER ends it for good: a 404 forgets the room…
+                    RecentRoomStore.clear()
+                default:
+                    // …while a full room or an unreachable relay just means no card right
+                    // now: the room stays remembered and the next tick asks again.
+                    break
+                }
+            }
+            withAnimation(.spring(duration: 0.45)) { rejoin = room }
+
+            do { try await Task.sleep(for: roomPollInterval) } catch { return }
         }
     }
 }
