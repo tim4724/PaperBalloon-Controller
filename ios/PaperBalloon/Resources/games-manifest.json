@@ -30,9 +30,11 @@
       "minPlayers": 1,
       "maxPlayers": 4,
       "tvApps": {
+        "appletv": "live",
         "androidtv": "live"
       },
       "tvStores": {
+        "appletv": "https://testflight.apple.com/join/j9nqeStv",
         "androidtv": "https://play.google.com/store/apps/details?id=games.paperballoon.tinytrack"
       },
       "art": "/assets/artwork/tinytrack-16x9-v4.webp",
