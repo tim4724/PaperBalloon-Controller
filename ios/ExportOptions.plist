@@ -3,14 +3,17 @@
 <plist version="1.0">
 <!-- App Store export used by .github/workflows/release-build.yml. Mirrors the
      manual-signing settings in project.yml (team, profile) — keep them in sync.
-     destination=export writes the .ipa to disk; on tag builds the workflow
-     patches destination to "upload" in place (plutil) and authenticates with
-     the ASC API key, sending the build straight to TestFlight. -->
+     destination=upload sends the build straight to TestFlight with the ASC API
+     key the workflow passes; no .ipa is written. For a one-off local .ipa, export
+     with -exportOptionsPlist <(plutil -replace destination -string export -o - ExportOptions.plist).
+     manageAppVersionAndBuildNumber=false keeps xcodebuild from rewriting the
+     build number the archive was stamped with, which prepare_release.py then
+     looks the build up by. -->
 <dict>
 	<key>method</key>
 	<string>app-store-connect</string>
 	<key>destination</key>
-	<string>export</string>
+	<string>upload</string>
 	<key>signingStyle</key>
 	<string>manual</string>
 	<key>teamID</key>
@@ -24,5 +27,7 @@
 	</dict>
 	<key>uploadSymbols</key>
 	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
 </dict>
 </plist>
