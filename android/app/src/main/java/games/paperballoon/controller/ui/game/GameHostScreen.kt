@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -121,6 +120,7 @@ fun GameHostScreen(
   title: String,
   allowedHosts: List<String>,
   onBarIcons: (BarIcons) -> Unit,
+  onLandscape: (Boolean) -> Unit,
   onLeave: () -> Unit,
   onGameEnd: (reason: String?) -> Unit,
 ) {
@@ -128,7 +128,7 @@ fun GameHostScreen(
   // follow the system's light/dark mode, like home: the launcher can't know a game's
   // colors before its page has loaded, and not every game is in the manifest.
   PaperBalloonTheme {
-    GameHostContent(joinUrl, title, allowedHosts, onBarIcons, onLeave, onGameEnd)
+    GameHostContent(joinUrl, title, allowedHosts, onBarIcons, onLandscape, onLeave, onGameEnd)
   }
 }
 
@@ -143,6 +143,7 @@ private fun GameHostContent(
   title: String,
   allowedHosts: List<String>,
   onBarIcons: (BarIcons) -> Unit,
+  onLandscape: (Boolean) -> Unit,
   onLeave: () -> Unit,
   onGameEnd: (reason: String?) -> Unit,
 ) {
@@ -207,27 +208,16 @@ private fun GameHostContent(
   // callbacks — hence rememberUpdatedState.
   val currentOnLeave by rememberUpdatedState(onLeave)
   val currentOnGameEnd by rememberUpdatedState(onGameEnd)
-  // One-shot guard for the two TERMINAL exits — a leave and a game-reported end.
-  // Whoever fires first wins; the loser (incl. a stray gameEnded during teardown)
-  // no-ops, so we never pop the back stack twice. A load failure is NOT terminal: it
-  // shows the retry overlay in place, and only its close trips this.
+  // One-shot guard for the TERMINAL exits — a leave and a game-reported end, plus a join
+  // link, whose pop MainNavigation makes. Whoever fires first wins; the loser (incl. a
+  // stray gameEnded during teardown) no-ops, so we never pop the back stack twice. A
+  // load failure is NOT terminal: it shows the retry overlay in place, and only its
+  // close trips this.
   val exited = remember { AtomicBoolean(false) }
-  // Hand the window back to the launcher: BOTH bars (systemBars, not navigationBars — a
-  // landscape game also hid the status bar) and the launcher's portrait (§10 — home is
-  // portrait, and an orientation the game asked for must not outlive it). Called BEFORE
-  // each exit pops, not just on dispose: dispose waits out the exit crossfade, and home
-  // would lay out landscape until then and only turn after. The bar icons are not
-  // touched here: MainNavigation applies them.
-  fun restoreLauncherWindow() {
-    val activity = context.findActivity() ?: return
-    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-    WindowCompat.getInsetsController(activity.window, view).show(WindowInsetsCompat.Type.systemBars())
-  }
+  // The window goes back to portrait with its bars when this host stops being the top
+  // entry — MainNavigation's doing, not this host's (see there).
   fun exitOnce(pop: () -> Unit) {
-    if (exited.compareAndSet(false, true)) {
-      restoreLauncherWindow()
-      pop()
-    }
+    if (exited.compareAndSet(false, true)) pop()
   }
   val leave = { exitOnce { currentOnLeave() } }
   // Retry the controller load in place (no re-scan): clear the error, bring the join
@@ -305,19 +295,9 @@ private fun GameHostContent(
   }
   val schemeBridge = remember { SchemeBridge { pageDark = it } }
 
-  // The page's requested orientation (CONTRACT.md §10). SENSOR_LANDSCAPE, not a fixed
-  // one: a controller held either way round must land right side up, and the launcher
-  // has no idea which hand the player uses. Portrait stays locked — a controller that
-  // hasn't asked for landscape must not rotate into one by accident mid-match.
-  //
-  // Safe because the activity handles `orientation` in configChanges (see the manifest):
-  // this rotates the window WITHOUT recreating the activity, so the WebView — and the
-  // player's live relay socket — survive it.
-  LaunchedEffect(landscape) {
-    context.findActivity()?.requestedOrientation =
-      if (landscape) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-      else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-  }
+  // The page's requested orientation (CONTRACT.md §10), applied by MainNavigation while
+  // this host is the top entry.
+  SideEffect { onLandscape(landscape) }
 
   // The room is not idle while its player is looking at it: hold the recent-room slot
   // open for as long as the host is up, so a long session can't age out from under the
@@ -344,12 +324,16 @@ private fun GameHostContent(
   //
   // Back (CONTRACT.md §9) brings the bar back for as long as the page keeps it on —
   // see [hostShowsNavBar] for when.
+  //
+  // Neither bar is touched once this host has exited: it stays composed through its exit
+  // fade, and by then the bars belong to whatever screen or game is on top.
   val hostShowsNavBar = hostShowsNavBar(
     backOn = backOn,
     landscape = isLandscapeUi,
     gestureNav = gestureNavEnabled(context),
   )
   LaunchedEffect(hostShowsNavBar) {
+    if (exited.get()) return@LaunchedEffect
     val window = context.findActivity()?.window ?: return@LaunchedEffect
     if (hostShowsNavBar) {
       WindowCompat.getInsetsController(window, view).show(WindowInsetsCompat.Type.navigationBars())
@@ -376,17 +360,13 @@ private fun GameHostContent(
   // behavior set is one the player cannot swipe back, and nothing orders these two
   // effects.
   LaunchedEffect(landscape) {
+    if (exited.get()) return@LaunchedEffect
     val window = context.findActivity()?.window ?: return@LaunchedEffect
     WindowCompat.getInsetsController(window, view).run {
       systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
       if (landscape) hide(WindowInsetsCompat.Type.statusBars())
       else show(WindowInsetsCompat.Type.statusBars())
     }
-  }
-
-  // Backstop for any pop that skipped the restores above.
-  DisposableEffect(Unit) {
-    onDispose { restoreLauncherWindow() }
   }
 
   fun watchPageScheme() {
@@ -443,15 +423,15 @@ private fun GameHostContent(
 
   // A join link (re-scan) pops this host, but the activity resumes on it first and the
   // page would reconnect just before the pop drops it — the display sees join, leave,
-  // join. onNewIntent precedes onResume, so pause the WebView (reports the page hidden),
-  // and hand the window back now rather than after the pop's crossfade.
+  // join. onNewIntent precedes onResume, so pause the WebView (reports the page hidden).
+  // The pop is as terminal as a leave: this host writes no window state from here on.
   // dataString != null is what MainActivity treats as a deep link.
   DisposableEffect(Unit) {
     val activity = context.findActivity() as? ComponentActivity
     val listener = Consumer<Intent> {
       if (it.dataString != null) {
+        exited.set(true)
         webView?.onPause()
-        restoreLauncherWindow()
       }
     }
     activity?.addOnNewIntentListener(listener)

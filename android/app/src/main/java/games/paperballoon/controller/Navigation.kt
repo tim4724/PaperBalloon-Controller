@@ -1,6 +1,7 @@
 package games.paperballoon.controller
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import androidx.core.net.toUri
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
@@ -19,6 +20,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -34,14 +36,17 @@ import games.paperballoon.controller.ui.game.GameHostScreen
 import games.paperballoon.controller.ui.legal.LegalLinks
 import games.paperballoon.controller.ui.legal.WebDocScreen
 import games.paperballoon.controller.ui.main.MainScreen
+import java.util.UUID
 import kotlinx.coroutines.delay
 
 @Composable
 fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}) {
   val backStack = rememberNavBackStack(Main)
   // A second tap that lands while the first push is still animating in would stack the
-  // same screen twice (iOS: AppRouter.push).
+  // same screen twice (iOS: AppRouter.push). One live game host at a time too: every join
+  // is a distinct key, so the same-screen check can't catch a second join.
   fun push(key: NavKey) {
+    if (key is GameHost && backStack.lastOrNull() is GameHost) return
     if (backStack.lastOrNull() != key) backStack.add(key)
   }
   // Likewise a second tap on a closing screen's back button: it would pop the screen
@@ -79,7 +84,8 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
   // so a new top entry's first frame already carries its icons.
   var mainBars by remember { mutableStateOf<BarIcons?>(null) }
   var gameBars by remember { mutableStateOf<BarIcons?>(null) }
-  val bars = when (backStack.lastOrNull()) {
+  val top = backStack.lastOrNull()
+  val bars = when (top) {
     is Main -> mainBars
     is GameHost -> gameBars
     else -> null
@@ -91,6 +97,32 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
       WindowCompat.getInsetsController(window, view).run {
         isAppearanceLightStatusBars = bars.lightStatus
         isAppearanceLightNavigationBars = bars.lightNav
+      }
+    }
+    onDispose {}
+  }
+
+  // Likewise the ONE writer of the window's orientation (CONTRACT.md §10), and of the
+  // system bars coming back once no game is on top (the top host hides them itself).
+  // Only the top entry's landscape wish counts, for the reason above: a leaving host's
+  // restore landed over the next game's turn. SENSOR_LANDSCAPE, not a fixed side: a
+  // controller held either way round must land right side up. Portrait otherwise,
+  // locked — a page that hasn't asked must not rotate by accident mid-match. The turn
+  // doesn't recreate the activity (configChanges), so the WebView and its relay socket
+  // survive it.
+  var landscapeHost by remember { mutableStateOf<GameHost?>(null) }
+  val inGame = top is GameHost
+  val landscape = landscapeHost != null && landscapeHost == top
+  DisposableEffect(landscape) {
+    context.findActivity()?.requestedOrientation =
+      if (landscape) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+      else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    onDispose {}
+  }
+  DisposableEffect(inGame) {
+    if (!inGame) {
+      context.findActivity()?.window?.let { window ->
+        WindowCompat.getInsetsController(window, view).show(WindowInsetsCompat.Type.systemBars())
       }
     }
     onDispose {}
@@ -126,7 +158,7 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           deepLink = deepLink,
           onDeepLinkConsumed = onDeepLinkConsumed,
           onJoin = { joinUrl, title, allowedHosts ->
-            push(GameHost(joinUrl, title, allowedHosts))
+            push(GameHost(joinUrl, title, allowedHosts, UUID.randomUUID().toString()))
           },
           // A scanned privacy/imprint QR opens the in-app doc viewer over Main,
           // rather than routing the URL through the join resolver.
@@ -175,6 +207,7 @@ fun MainNavigation(deepLink: String? = null, onDeepLinkConsumed: () -> Unit = {}
           title = key.title,
           allowedHosts = key.allowedHosts,
           onBarIcons = { gameBars = it },
+          onLandscape = { if (backStack.lastOrNull() == key) landscapeHost = if (it) key else null },
           onLeave = { pop(key) },
           // Back home like leave(), plus a banner in the rejoin slot — the player didn't
           // choose to leave, so silence would read as a crash. (A load failure isn't a

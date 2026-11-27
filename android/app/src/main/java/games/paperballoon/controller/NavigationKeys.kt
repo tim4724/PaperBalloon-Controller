@@ -24,4 +24,8 @@ data class GameHost(
   // else is bounced to the browser. The launcher's own domain is always added by
   // the host screen. This is the trust boundary for relay-supplied URLs.
   val allowedHosts: List<String>,
+  // Unique per join, and read by nothing: NavDisplay tells entries apart by the key's
+  // toString(), so a re-scan of the room already open would otherwise get the old host
+  // back, paused, in place of a fresh join.
+  val joinId: String,
 ) : NavKey
