@@ -1,39 +1,37 @@
-# Builds the two store-ready, signed release artifacts:
+# Builds the two store releases from a bare-semver tag, with the tag as version name
+# and the run number as build number:
 #   - Android: .aab signed with the Play upload keystore (materialized from secrets;
-#     see keystore.properties.example), uploaded as a workflow artifact. Tag builds
-#     also prepare it as a draft production release on Play via the Play API service
-#     account, with the tag as versionName and the run number as versionCode.
+#     see keystore.properties.example), kept as a workflow artifact and prepared as a
+#     draft production release on Play via the Play API service account.
 #   - iOS: signed with the Apple Distribution cert + "Paper Balloon App Store" profile, and
 #     the embedded App Clip with "Paper Balloon Clip App Store" (project.yml pins manual
-#     signing with exactly these). Tag builds upload straight to TestFlight via the
-#     ASC API key with the tag as marketing version (the TestFlight build IS the
-#     release candidate — no .ipa artifact), then the appstore job readies that
-#     version for submission; workflow_dispatch builds export the .ipa as a workflow
-#     artifact instead.
+#     signing with exactly these), and uploaded straight to TestFlight via the ASC API
+#     key (the TestFlight build IS the release candidate — no .ipa artifact). The
+#     appstore job then readies that version for submission.
 #
 # A tag readies a release on both stores but submits neither: sending it to review
 # stays a deliberate step, in Play Console and App Store Connect. What's New is the
 # same short line every time, for both stores (store/play/whatsnew); edit it in the
 # consoles when a release deserves more.
 #
-# Runs on bare-semver release tags and on demand. Each signing step fails fast with
-# a named error when its secrets are missing — the Android build would otherwise
-# silently fall back to a debug-signed (store-rejected) artifact. The secrets live
-# in the `release` environment, which admits only main and release tags, so a
-# workflow pushed on any other branch can't read them.
+# Tags only, no manual runs: a change to this pipeline is tested by cutting a patch
+# tag. Each store upload is the last step of its job, so a failed upload has used up
+# no build number and "Re-run failed jobs" is the retry; a fix needs a new tag. Each
+# signing step fails fast with a named error when its secrets are missing — the
+# Android build would otherwise silently fall back to a debug-signed (store-rejected)
+# artifact. The secrets live in the `release` environment, which admits only release
+# tags, so a workflow pushed on any branch can't read them.
 name: Release build
 
 on:
   push:
     tags: ["[0-9]+.[0-9]+.[0-9]+"]
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: release-${{ github.ref }}
 
 jobs:
   android:
@@ -49,19 +47,19 @@ jobs:
         with:
           submodules: true
 
-      - name: Materialize upload keystore from secrets
+      - name: Materialize the upload keystore from secrets
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          for v in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          for v in ANDROID_KEYSTORE_B64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
             [ -n "${!v}" ] || { echo "::error::Secret $v is not set"; exit 1; }
           done
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+          echo "$ANDROID_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/upload-keystore.jks"
           cat > android/keystore.properties <<EOF
-          storeFile=upload-keystore.jks
+          storeFile=$RUNNER_TEMP/upload-keystore.jks
           storePassword=$ANDROID_KEYSTORE_PASSWORD
           keyAlias=$ANDROID_KEY_ALIAS
           keyPassword=$ANDROID_KEY_PASSWORD
@@ -74,27 +72,31 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
 
+      # Play rejects a reused versionCode, so stamp a unique one. Both are -P
+      # overrides — the static values in build.gradle.kts stay untouched. (Mirrors
+      # the iOS Archive step below.)
       - name: Build signed release bundle
         working-directory: android
-        run: |
-          # Play rejects a reused versionCode, so stamp a unique one; tag builds
-          # take their versionName from the tag (bare semver), others keep
-          # build.gradle.kts's. Both are -P overrides — the static values stay
-          # untouched. (Mirrors the iOS Archive step below.)
-          VERSION_ARGS=("-PpbVersionCode=$GITHUB_RUN_NUMBER")
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            VERSION_ARGS+=("-PpbVersionName=$GITHUB_REF_NAME")
-          fi
-          ./gradlew bundleRelease "${VERSION_ARGS[@]}"
+        run: ./gradlew bundleRelease "-PpbVersionCode=$GITHUB_RUN_NUMBER" "-PpbVersionName=$GITHUB_REF_NAME"
 
-      - name: Verify the AAB is signed with the upload key
+      # The Gradle script debug-signs release builds whenever keystore.properties is
+      # unusable, so prove the upload key was picked up. An equality against the
+      # keystore's own certificate, not a search for "Android Debug": that also passes
+      # when keytool prints nothing at all.
+      - name: Verify the release signature
+        env:
+          AAB: android/app/build/outputs/bundle/release/app-release.aab
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          CERT="$(keytool -printcert -jarfile android/app/build/outputs/bundle/release/app-release.aab)"
-          echo "$CERT"
-          # Belt and suspenders on top of the fail-fast above: the Gradle script
-          # debug-signs release builds whenever keystore.properties is unusable.
-          if grep -q "CN=Android Debug" <<< "$CERT"; then
-            echo "::error::AAB is debug-signed — upload keystore was not applied"
+          want=$(keytool -exportcert -keystore "$RUNNER_TEMP/upload-keystore.jks" \
+              -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" -rfc |
+            keytool -printcert | grep -m1 'SHA256:' | tr -d ' ')
+          got=$(keytool -printcert -jarfile "$AAB" | grep -m1 'SHA256:' | tr -d ' ')
+          echo "keystore $want"
+          echo "bundle   $got"
+          if [ -z "$got" ] || [ "$want" != "$got" ]; then
+            echo "::error::$AAB is not signed with the upload key"
             exit 1
           fi
 
@@ -106,14 +108,11 @@ jobs:
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
-      # Tags only, like the iOS TestFlight upload beside it — a dispatch stays
-      # "build and hand me the artifact". mapping.txt goes with it or crash
-      # reports from this R8 build are unreadable. A draft: rolling it out (which
-      # sends it to Google's review) is done in Play Console. The service account
-      # needs "Release to production" on this app in Play Console (Users and
-      # permissions, not Cloud IAM).
+      # mapping.txt goes with it or crash reports from this R8 build are unreadable. A
+      # draft: rolling it out (which sends it to Google's review) is done in Play
+      # Console. The service account needs "Release to production" on this app in Play
+      # Console (Users and permissions, not Cloud IAM).
       - name: Prepare the Play production release (draft)
-        if: github.ref_type == 'tag'
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -125,7 +124,7 @@ jobs:
           whatsNewDirectory: store/play/whatsnew
 
   ios:
-    name: iOS (IPA)
+    name: iOS (TestFlight)
     environment: release
     runs-on: xcode-27
     timeout-minutes: 30
@@ -155,8 +154,13 @@ jobs:
           IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
           IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
           IOS_CLIP_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_CLIP_PROVISIONING_PROFILE_BASE64 }}
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
         run: |
-          for v in IOS_DIST_CERT_P12_BASE64 IOS_DIST_CERT_PASSWORD IOS_PROVISIONING_PROFILE_BASE64 IOS_CLIP_PROVISIONING_PROFILE_BASE64; do
+          # The upload's key too, so a missing one fails here and not after the archive.
+          for v in IOS_DIST_CERT_P12_BASE64 IOS_DIST_CERT_PASSWORD IOS_PROVISIONING_PROFILE_BASE64 IOS_CLIP_PROVISIONING_PROFILE_BASE64 \
+                   ASC_API_KEY_P8_BASE64 ASC_API_KEY_ID ASC_API_ISSUER_ID; do
             [ -n "${!v}" ] || { echo "::error::Secret $v is not set"; exit 1; }
           done
 
@@ -189,67 +193,50 @@ jobs:
         working-directory: ios
         run: xcodegen generate
 
+      # ASC rejects reused build numbers, so stamp a unique one. Both are
+      # xcodebuild-level overrides — project.yml's static values stay untouched.
       - name: Archive
         working-directory: ios
         run: |
-          # ASC rejects reused build numbers, so stamp a unique one; tag builds
-          # take their marketing version from the tag (bare semver), others keep
-          # project.yml's. Both are xcodebuild-level overrides — project.yml's
-          # static values stay untouched.
-          VERSION_ARGS=("CURRENT_PROJECT_VERSION=$GITHUB_RUN_NUMBER")
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            VERSION_ARGS+=("MARKETING_VERSION=$GITHUB_REF_NAME")
-          fi
           xcodebuild archive \
             -project PaperBalloon.xcodeproj \
             -scheme PaperBalloon \
             -destination "generic/platform=iOS" \
             -archivePath build/PaperBalloon.xcarchive \
-            "${VERSION_ARGS[@]}"
-
-      - name: Export signed IPA (dispatch) or upload to TestFlight (tag)
-        working-directory: ios
-        env:
-          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
-        run: |
-          EXPORT_ARGS=(-archivePath build/PaperBalloon.xcarchive -exportOptionsPlist ExportOptions.plist)
-          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-            for v in ASC_API_KEY_P8_BASE64 ASC_API_KEY_ID ASC_API_ISSUER_ID; do
-              [ -n "${!v}" ] || { echo "::error::Secret $v is not set"; exit 1; }
-            done
-            plutil -replace destination -string upload ExportOptions.plist
-            echo "$ASC_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
-            EXPORT_ARGS+=(-authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8"
-                          -authenticationKeyID "$ASC_API_KEY_ID"
-                          -authenticationKeyIssuerID "$ASC_API_ISSUER_ID")
-          else
-            EXPORT_ARGS+=(-exportPath build/export)
-          fi
-          xcodebuild -exportArchive "${EXPORT_ARGS[@]}"
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        if: github.ref_type != 'tag'
-        with:
-          name: games.paperballoon.controller-release-ipa
-          path: ios/build/export/*.ipa
-          if-no-files-found: error
+            "CURRENT_PROJECT_VERSION=$GITHUB_RUN_NUMBER" "MARKETING_VERSION=$GITHUB_REF_NAME"
 
       # Keep the debug symbols with the build — needed to symbolicate crash
-      # reports for exactly this binary.
+      # reports for exactly this binary. Before the upload, which stays the job's
+      # last step.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: games.paperballoon.controller-release-dsyms
           path: ios/build/PaperBalloon.xcarchive/dSYMs
           if-no-files-found: error
 
-  # Tags only: turns the TestFlight upload into an App Store version ready to submit
+      # ExportOptions.plist has destination=upload, so "exporting" the archive
+      # pushes the build to App Store Connect via the ASC API key.
+      - name: Upload to TestFlight
+        working-directory: ios
+        env:
+          ASC_API_KEY_P8_BASE64: ${{ secrets.ASC_API_KEY_P8_BASE64 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        run: |
+          echo "$ASC_API_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
+          xcodebuild -exportArchive \
+            -archivePath build/PaperBalloon.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID"
+
+  # Turns the TestFlight upload into an App Store version ready to submit
   # (store/appclip/prepare_release.py). Its own job on a cheap runner, since it mostly
-  # waits for Apple to process the build.
+  # waits for Apple to process the build, and so "Re-run failed jobs" retries it alone
+  # with the build number the upload used.
   appstore:
     name: App Store (prepare release)
-    if: github.ref_type == 'tag'
     needs: ios
     environment: release
     runs-on: ubuntu-latest
