@@ -8,13 +8,14 @@
       "maxPlayers": 8,
       "tvApps": {
         "appletv": "live",
-        "androidtv": "soon"
+        "androidtv": "live"
       },
       "tvStores": {
-        "appletv": "https://apps.apple.com/app/hexstacker-party/id6788876779"
+        "appletv": "https://apps.apple.com/app/hexstacker-party/id6788876779",
+        "androidtv": "https://play.google.com/store/apps/details?id=com.couchgames.stacker"
       },
-      "art": "/artwork/hexstacker-16x9-v2.webp",
-      "icon": "/artwork/hexstacker-icon-v2.png",
+      "art": "/assets/artwork/hexstacker-16x9-v2.webp",
+      "icon": "/assets/artwork/hexstacker-icon-v2.png",
       "video": "https://hexstacker.com/artwork/trailer.mp4?v=2",
       "accentColor": "#FF6B6B",
       "controllerBaseUrl": "https://hexstacker.com",
@@ -28,8 +29,14 @@
       "status": "beta",
       "minPlayers": 1,
       "maxPlayers": 4,
-      "art": "/artwork/tinytrack-16x9-v4.webp",
-      "icon": "/artwork/tinytrack-icon-v4.png",
+      "tvApps": {
+        "androidtv": "live"
+      },
+      "tvStores": {
+        "androidtv": "https://play.google.com/store/apps/details?id=games.paperballoon.tinytrack"
+      },
+      "art": "/assets/artwork/tinytrack-16x9-v4.webp",
+      "icon": "/assets/artwork/tinytrack-icon-v4.png",
       "video": "https://tinytrack.paperballoon.games/assets/trailer/trailer-v2.mp4",
       "accentColor": "#4ECDC4",
       "controllerBaseUrl": "https://tinytrack.paperballoon.games",
@@ -43,7 +50,7 @@
       "status": "soon",
       "minPlayers": 1,
       "maxPlayers": 4,
-      "art": "/artwork/powder-16x9.webp",
+      "art": "/assets/artwork/powder-16x9.webp",
       "accentColor": "#A78BFA"
     }
   ]
