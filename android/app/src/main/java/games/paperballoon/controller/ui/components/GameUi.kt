@@ -3,6 +3,7 @@ package games.paperballoon.controller.ui.components
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -65,6 +66,7 @@ import games.paperballoon.controller.theme.onBetaTag
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 // The tappable player identity in the home header: a frosted pill over the sky, like
@@ -108,6 +110,9 @@ fun PlayerChip(name: String, onClick: () -> Unit, modifier: Modifier = Modifier)
 private const val MAX_ART_WIDTH = 1280
 private const val MAX_ART_HEIGHT = 720
 
+/** How long a failed decode is remembered before it is tried again. */
+private const val ART_RETRY_MS = 60_000L
+
 /**
  * Decoded artwork plus what the status-bar icons need to know when a poster scrolls
  * under them: the mean relative luminance of each of [ART_LUMINANCE_ROWS] horizontal
@@ -120,8 +125,10 @@ const val ART_LUMINANCE_ROWS = 16
 /**
  * Process-wide memoized decode of artwork, keyed by manifest art path. Decoding runs
  * off the main thread, so opening a sheet never decodes mid-animation, and a path
- * that FAILS is remembered too — otherwise a game whose art this build didn't ship
- * (and whose download failed) re-probes assets and disk on every recomposition.
+ * that FAILS is remembered for [ART_RETRY_MS] — otherwise every composable showing a
+ * game whose art this build didn't ship (and whose download failed) re-probes assets,
+ * disk and network. After that it is tried again, so a download that failed offline
+ * isn't missing for the rest of the process.
  * Follows iOS's ArtCache (UI/Components/SharedComponents.swift), minus its
  * in-flight coalescing: two composables wanting the same path at the same moment
  * would each decode it. Only reachable in the window before the first decode
@@ -129,16 +136,17 @@ const val ART_LUMINANCE_ROWS = 16
  */
 private object ArtCache {
   private val images = ConcurrentHashMap<String, Art>()
-  private val failures = ConcurrentHashMap.newKeySet<String>()
+  // When each failed, on the elapsedRealtime clock.
+  private val failures = ConcurrentHashMap<String, Long>()
 
   /** Non-null only after a successful decode has been memoized. */
   fun cached(art: String): Art? = images[art]
 
   suspend fun load(context: Context, art: String): Art? {
     images[art]?.let { return it }
-    if (art in failures) return null
+    failures[art]?.let { if (SystemClock.elapsedRealtime() - it < ART_RETRY_MS) return null }
     val decoded = withContext(Dispatchers.IO) { decode(context, art) }
-    if (decoded == null) failures.add(art) else images[art] = decoded
+    if (decoded == null) failures[art] = SystemClock.elapsedRealtime() else images[art] = decoded
     return decoded
   }
 
@@ -179,12 +187,23 @@ private fun rowLuminance(bitmap: Bitmap): FloatArray {
   }
 }
 
-/** The decoded [Art] for a manifest path: null until decoded, or for good when it can't be. */
+/**
+ * The decoded [Art] for a manifest path: null until decoded. One that can't be is tried
+ * again every [ART_RETRY_MS] while it's shown.
+ */
 @Composable
 fun rememberArt(path: String?): Art? {
   val context = LocalContext.current
   val art by produceState(initialValue = path?.let(ArtCache::cached), path) {
-    value = path?.let { ArtCache.load(context, it) }
+    if (path == null) {
+      value = null
+      return@produceState
+    }
+    while (true) {
+      value = ArtCache.load(context, path)
+      if (value != null) return@produceState
+      delay(ART_RETRY_MS)
+    }
   }
   return art
 }

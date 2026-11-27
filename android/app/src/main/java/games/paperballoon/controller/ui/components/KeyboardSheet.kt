@@ -80,10 +80,10 @@ import kotlinx.coroutines.launch
  *
  * Content-height sheets sit on the keyboard; [fullHeight] ones (the landscape rename) fill
  * the screen at the keyboard's width and ignore it, the keyboard sliding in over their
- * lower part. Closing — by [content]'s close, the backdrop or back — slides the sheet out
- * with the keyboard, then [onClosed] tells the caller to drop it. One back closes it even
- * with the keyboard up: the sheet is only there to type in, so a back that took just the
- * keyboard would leave it stranded.
+ * lower part. Closing — by [content]'s close, the backdrop or back — tells [onClosing] at
+ * once, slides the sheet out with the keyboard, then [onClosed] tells the caller to drop
+ * it. One back closes it even with the keyboard up: the sheet is only there to type in, so
+ * a back that took just the keyboard would leave it stranded.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -92,15 +92,18 @@ fun KeyboardSheet(
   /** The sheet's fill; null for the house glass (AppSheet's). */
   color: Color?,
   onClosed: () -> Unit,
+  onClosing: () -> Unit = {},
   content: @Composable (close: () -> Unit) -> Unit,
 ) {
   val progress = remember { Animatable(0f) }
   val scope = rememberCoroutineScope()
   var closing by remember { mutableStateOf(false) }
   val currentOnClosed by rememberUpdatedState(onClosed)
+  val currentOnClosing by rememberUpdatedState(onClosing)
   val close: () -> Unit = {
     if (!closing) {
       closing = true
+      currentOnClosing()
       scope.launch {
         progress.animateTo(0f, tween(200))
         currentOnClosed()

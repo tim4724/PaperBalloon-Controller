@@ -243,11 +243,12 @@ fun MainScreen(
   onBarIcons: (BarIcons) -> Unit = {},
 ) {
   val context = LocalContext.current
-  // Home goes two posters across when the window is wider than tall — in practice a
-  // screen 600dp or more across, where Android 16+ ignores the portrait request (a tablet,
-  // a foldable held open). iOS matches on the open iPhone Duo.
+  // Home goes two posters across when the window is wider than tall and 600dp or more
+  // across, where Android 16+ ignores the portrait request (a tablet, a foldable held
+  // open) — not a phone's half of split-screen, wider than tall but a phone's width. iOS
+  // matches on the open iPhone Duo.
   val configuration = LocalConfiguration.current
-  val wide = configuration.screenWidthDp > configuration.screenHeightDp
+  val wide = configuration.screenWidthDp >= 600 && configuration.screenWidthDp > configuration.screenHeightDp
   // Config-aware resources for string lookups in callbacks (context.getString on
   // LocalContext.current is flagged by lint as not tracking config changes).
   val resources = LocalResources.current
@@ -691,9 +692,13 @@ fun MainScreen(
       loading = codeLoading,
       error = codeError,
       onEdit = { codeError = null },
-      onDismiss = {
+      // A sheet closed while its code resolves was a change of mind: the code doesn't join,
+      // even if the answer lands during the slide-out.
+      onClosing = {
         codeJob?.cancel()
         codeLoading = false
+      },
+      onDismiss = {
         showCodeEntry = false
         codeError = null
       },

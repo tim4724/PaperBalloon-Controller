@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
     }
   }
 
-  // A new App Link while we're already running (launchMode=singleTop).
+  // A new App Link while we're already running (launchMode=singleTask).
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)

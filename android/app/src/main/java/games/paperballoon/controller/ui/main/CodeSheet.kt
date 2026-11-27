@@ -85,6 +85,8 @@ fun CodeSheet(
   /** The player changed the code after an error, which no longer applies. */
   onEdit: () -> Unit,
   onSubmit: (String) -> Unit,
+  /** Closing has begun: a code still resolving no longer joins. */
+  onClosing: () -> Unit,
   onDismiss: () -> Unit,
 ) {
   var code by remember { mutableStateOf("") }
@@ -133,7 +135,7 @@ fun CodeSheet(
     if (next.length == ROOM_CODE_LENGTH && old.length < ROOM_CODE_LENGTH) onSubmit(next)
   }
 
-  KeyboardSheet(fullHeight = false, color = null, onClosed = onDismiss) {
+  KeyboardSheet(fullHeight = false, color = null, onClosed = onDismiss, onClosing = onClosing) {
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     Column(

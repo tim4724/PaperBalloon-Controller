@@ -107,7 +107,11 @@ struct JoiningCover: View {
 enum ArtCache {
     private static let lock = NSLock()
     private static var images: [String: UIImage] = [:]
-    private static var failures: Set<String> = []
+    /// When each path failed. A failure is remembered for `retryAfter`, so the views
+    /// waiting on it don't each re-probe the bundle, the disk and the network; after that
+    /// it is tried again, so a download that failed offline isn't missing for good.
+    private static var failures: [String: Date] = [:]
+    private static let retryAfter: TimeInterval = 60
     private static var inFlight: [String: Task<UIImage?, Never>] = [:]
 
     /// Synchronous accessor: non-nil only after a successful decode has been memoized.
@@ -117,10 +121,11 @@ enum ArtCache {
         return images[path]
     }
 
-    /// Decode once per art path, off-main, memoized forever.
+    /// Decode once per art path, off-main, memoized forever (a failure for `retryAfter`).
     static func uiImage(forArt path: String) async -> UIImage? {
         let pending: Task<UIImage?, Never>? = locked {
-            if images[path] != nil || failures.contains(path) { return nil }
+            if images[path] != nil { return nil }
+            if let failed = failures[path], Date.now.timeIntervalSince(failed) < retryAfter { return nil }
             if let task = inFlight[path] { return task }
             let task = Task<UIImage?, Never>.detached(priority: .userInitiated) {
                 let result = await decode(artPath: path)
@@ -128,7 +133,7 @@ enum ArtCache {
                     if let result {
                         images[path] = result
                     } else {
-                        failures.insert(path)
+                        failures[path] = .now
                     }
                     inFlight[path] = nil
                 }
@@ -141,6 +146,18 @@ enum ArtCache {
             return await pending.value
         }
         return locked { images[path] }
+    }
+
+    /// `uiImage(forArt:)` until it decodes or the caller's task ends, tried again every
+    /// `retryAfter`; `onMiss` hears of each try that failed.
+    @MainActor
+    static func uiImageRetrying(forArt path: String, onMiss: () -> Void = {}) async -> UIImage? {
+        while !Task.isCancelled {
+            if let image = await uiImage(forArt: path) { return image }
+            onMiss()
+            try? await Task.sleep(for: .seconds(retryAfter))
+        }
+        return nil
     }
 
     /// Fire-and-forget decodes for every game's art. Called at scene connect so the
@@ -241,7 +258,7 @@ struct GameArt: View {
                 decodeFailed = false
                 guard let art = game.art else { image = nil; return }
                 if let cached = ArtCache.cached(forArt: art) { image = cached; return }
-                image = await ArtCache.uiImage(forArt: art)
+                image = await ArtCache.uiImageRetrying(forArt: art) { decodeFailed = true }
                 decodeFailed = image == nil
             }
     }
@@ -297,7 +314,7 @@ struct GameIcon: View {
         .task(id: game.icon) {
             guard let icon = game.icon else { image = nil; return }
             image = ArtCache.cached(forArt: icon)
-            if image == nil { image = await ArtCache.uiImage(forArt: icon) }
+            if image == nil { image = await ArtCache.uiImageRetrying(forArt: icon) }
         }
     }
 }

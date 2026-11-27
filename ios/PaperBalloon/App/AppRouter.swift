@@ -65,8 +65,10 @@ enum Route: Hashable {
         pop()
         // A room that's gone can't be rejoined — drop the saved room now so the home
         // rejoin card clears immediately instead of lingering until the liveness poll's
-        // relay record independently catches up (10s + relay lag).
-        if reason == "room_not_found" { RecentRoomStore.clear() }
+        // relay record independently catches up (10s + relay lag). Nor can a full one
+        // that turned this player away: the relay holds no slot for them, or it would
+        // have taken them back into it.
+        if reason == "room_not_found" || reason == "game_full" { RecentRoomStore.clear() }
         messages.showGameEndBanner(gameEndMessage(reason))
     }
 }
